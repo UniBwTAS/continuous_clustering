@@ -1,0 +1,48 @@
+<launch>
+    <!-- flag if rviz should be started -->
+    <arg name="use_rviz" default="true"/>
+
+    <!-- lidar sensor -->
+    <arg name="sensor_name" default="vls128_roof"/> <!-- vls128_roof, hdl64_roof, hdl32_roof -->
+
+    <!-- range image parameters -->
+    <arg name="columns_per_full_rotation" default="1700"/>
+    <arg name="number_of_buffered_columns" default="50"/>
+    <arg name="wait_for_tf" default="true"/>
+    <arg name="supplement_inclination_angle_for_nan_cells" default="true"/>
+
+    <!-- clustering parameters -->
+    <arg name="use_last_point_for_cluster_stamp" default="false"/>
+
+    <!-- ros specific parameters -->
+    <arg name="sensor_frame" default="sensor/lidar/$(arg sensor_name)"/>
+    <arg name="odom_frame" default="odom"/>
+    <arg name="lidar_position" default="top"/>
+    <arg name="ns_detector" default="perception/detections/lidar_$(arg lidar_position)/cluster"/>
+
+    <group ns="$(arg ns_detector)">
+
+        <!-- Streaming Clustering Node/Nodelet -->
+        <node name="streaming_clustering" pkg="streaming_clustering" type="streaming_clustering_node" output="screen">
+
+            <!-- velodyne specific parameters/remappings -->
+            <remap from="raw_data" to="/bus/vls128_roof/eth_scan/bus_to_host"/>
+            <param name="model" value="VLS128"/>
+            <param name="rpm" value="600.0"/>
+            <param name="calibration" value="$(find io_velodyne)/calibrations/velodyne_vls128_tas.yaml"/>
+
+            <param name="sensor_frame" value="$(arg sensor_frame)"/>
+            <param name="odom_frame" value="$(arg odom_frame)"/>
+            <param name="columns_per_full_rotation" value="$(arg columns_per_full_rotation)"/>
+            <param name="wait_for_tf" value="$(arg wait_for_tf)"/>
+            <param name="supplement_inclination_angle_for_nan_cells"
+                   value="$(arg supplement_inclination_angle_for_nan_cells)"/>
+            <param name="use_last_point_for_cluster_stamp" value="$(arg use_last_point_for_cluster_stamp)"/>
+        </node>
+
+    </group>
+
+    <node name="rviz" pkg="rviz" type="rviz"
+          args="--display-config $(find streaming_clustering)/rviz/streaming_clustering.rviz"
+          if="$(arg use_rviz)"/>
+</launch>
