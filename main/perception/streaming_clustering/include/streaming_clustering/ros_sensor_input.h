@@ -21,7 +21,7 @@ class RosSensorInput : public SensorInput
     void subscribe() override
     {
         sub = nh.subscribe(
-            "raw_data", 1000, &RosSensorInput::onRawDataArrivedInternal, this, ros::TransportHints().tcpNoDelay(true));
+            "raw_data", 100000, &RosSensorInput::onRawDataArrivedInternal, this, ros::TransportHints().tcpNoDelay(true));
     }
 
     void reset() override

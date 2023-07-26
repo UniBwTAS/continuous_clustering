@@ -3,6 +3,7 @@
 
 #include <streaming_clustering/streaming_clustering.h>
 
+#include <fstream>
 #include <memory>
 
 namespace streaming_clustering
@@ -122,21 +123,6 @@ void StreamingClustering::onNewFiringsCallback(const RawPoints::ConstPtr& firing
     ros::Time stamp_current_firing;
     stamp_current_firing.fromNSec(firing->points[0].stamp);
 
-    double input_latency = (ros::Time::now() - stamp_current_firing).toSec();
-    if (input_latency > 0.1)
-    {
-        ROS_ERROR_STREAM("LATENCY FIRINGS: " << input_latency);
-
-        ROS_ERROR_STREAM("RING BUFFER BOUNDS: " << ring_buffer_start_global_column_index << ", "
-                                                << ring_buffer_end_global_column_index);
-
-        ROS_ERROR_STREAM("JOB QUEUES (INSERT, ASSOC, TREE, PUB): "
-                         << insertion_thread_pool.get_number_of_unprocessed_jobs() << ", "
-                         << association_thread_pool.get_number_of_unprocessed_jobs() << ", "
-                         << tree_combination_thread_pool.get_number_of_unprocessed_jobs() << ", "
-                         << publishing_thread_pool.get_number_of_unprocessed_jobs());
-    }
-
     // dynamically save number of rows
     num_rows = static_cast<int>(firing->points.size());
 
@@ -157,12 +143,16 @@ void StreamingClustering::onNewFiringsCallback(const RawPoints::ConstPtr& firing
 
     publishFiring(firing);
 
-    /*std::cout << "JOB QUEUES (INSERT, SEGMENT, ASSOC, TREE, PUB): "
-              << insertion_thread_pool.get_number_of_unprocessed_jobs() << ", "
-              << segmentation_thread_pool.get_number_of_unprocessed_jobs() << ", "
-              << association_thread_pool.get_number_of_unprocessed_jobs() << ", "
-              << tree_combination_thread_pool.get_number_of_unprocessed_jobs() << ", "
-              << publishing_thread_pool.get_number_of_unprocessed_jobs() << std::endl;*/
+    // keep track of the job queue size's with ongoing time
+    if (stop_statistics)
+        return;
+    num_pending_jobs.push_back(insertion_thread_pool.get_number_of_unprocessed_jobs());
+    num_pending_jobs.push_back(segmentation_thread_pool.get_number_of_unprocessed_jobs());
+    num_pending_jobs.push_back(association_thread_pool.get_number_of_unprocessed_jobs());
+    num_pending_jobs.push_back(tree_combination_thread_pool.get_number_of_unprocessed_jobs());
+    num_pending_jobs.push_back(publishing_thread_pool.get_number_of_unprocessed_jobs());
+    while (num_pending_jobs.size() > 100000 * 5)
+        num_pending_jobs.pop_front();
 }
 
 void StreamingClustering::onNewFiringsWithTfCallback(const RawPoints::ConstPtr& firing,
@@ -389,12 +379,27 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
         int64_t point_global_column_index_copy = point.global_column_index;
         if (point_global_column_index_copy != job.ring_buffer_current_global_column_index &&
             point_global_column_index_copy != -1)
+        {
+            stop_statistics = true;
+            std::string filename = std::tmpnam(nullptr);
+            std::cout << "JOB QUEUES (INSERT, SEGMENT, ASSOC, TREE, PUB): "
+                      << insertion_thread_pool.get_number_of_unprocessed_jobs() << ", "
+                      << segmentation_thread_pool.get_number_of_unprocessed_jobs() << ", "
+                      << association_thread_pool.get_number_of_unprocessed_jobs() << ", "
+                      << tree_combination_thread_pool.get_number_of_unprocessed_jobs() << ", "
+                      << publishing_thread_pool.get_number_of_unprocessed_jobs() << std::endl;
+            std::cout << "Writing statistics to: " << filename << std::endl;
+            std::ofstream out(filename);
+            for (auto n : num_pending_jobs)
+                out << n << ", ";
+            out.close();
             throw std::runtime_error(
                 "This column is not cleared. Probably this means the ring buffer is full or there "
                 "is some other issue with clearing (not cleared at all or written after clearing): " +
                 std::to_string(point_global_column_index_copy) + ", " +
                 std::to_string(job.ring_buffer_current_global_column_index) + ", " +
                 std::to_string(ring_buffer_max_columns));
+        }
 
         // refill local/global column index because it was not filled for omitted cells
         point.global_column_index = job.ring_buffer_current_global_column_index;

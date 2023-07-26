@@ -261,5 +261,9 @@ class StreamingClustering
     ThreadPool<AssociationJob> association_thread_pool{"A"};
     ThreadPool<TreeCombinationJob> tree_combination_thread_pool{"C"};
     ThreadPool<PublishingJob> publishing_thread_pool{"P"};
+
+    // performance statistics
+    bool stop_statistics = false;
+    std::list<size_t> num_pending_jobs;
 };
 } // namespace streaming_clustering
