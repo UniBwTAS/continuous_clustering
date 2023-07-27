@@ -31,8 +31,9 @@
 
     <depend>roscpp</depend>
     <depend>sensor_msgs</depend>
-    <depend>velodyne_pointcloud</depend>
     <depend>dynamic_reconfigure</depend>
+    <depend>velodyne_pointcloud</depend>
+    <depend>ouster_ros</depend>
 
     <exec_depend>vis_range_image</exec_depend>
     <exec_depend>vis_streaming_point_cloud</exec_depend>

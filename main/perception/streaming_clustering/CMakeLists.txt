@@ -11,10 +11,11 @@ add_compile_options(-std=c++14)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED roscpp sensor_msgs velodyne_pointcloud dynamic_reconfigure)
+find_package(catkin REQUIRED roscpp sensor_msgs dynamic_reconfigure velodyne_pointcloud ouster_ros pcl_conversions)
 
 ## System dependencies are found with CMake's conventions
 find_package(Eigen3 REQUIRED)
+find_package(PCL REQUIRED COMPONENTS common)
 
 
 ## Uncomment this if the package has a setup.py. This macro ensures
@@ -104,7 +105,7 @@ generate_dynamic_reconfigure_options(
 catkin_package(
         INCLUDE_DIRS include
         LIBRARIES streaming_clustering
-        CATKIN_DEPENDS roscpp sensor_msgs
+        CATKIN_DEPENDS roscpp sensor_msgs dynamic_reconfigure velodyne_pointcloud ouster_ros
         #  DEPENDS system_lib
 )
 
@@ -122,7 +123,7 @@ include_directories(
 
 ## Declare a C++ library
 add_library(streaming_clustering src/streaming_clustering.cpp)
-target_link_libraries(streaming_clustering ${catkin_LIBRARIES})
+target_link_libraries(streaming_clustering ${catkin_LIBRARIES} pcl_common)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries

@@ -19,14 +19,14 @@ template<typename Message>
 class RosSensorInput : public SensorInput
 {
   public:
-    RosSensorInput(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private) : nh(nh)
+    RosSensorInput(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private) : nh_(nh)
     {
         message_thread_pool_.init([this](MessageJob<Message>&& job) { onRawDataArrived(job.msg); });
     }
 
     void subscribe() override
     {
-        sub = nh.subscribe("raw_data",
+        sub = nh_.subscribe("raw_data",
                            100000,
                            &RosSensorInput::onRawDataArrivedInternal,
                            this,
@@ -54,7 +54,7 @@ class RosSensorInput : public SensorInput
     }
 
   protected:
-    ros::NodeHandle nh;
+    ros::NodeHandle nh_;
     ros::Subscriber sub;
     ThreadPool<MessageJob<Message>> message_thread_pool_{"M"};
 };

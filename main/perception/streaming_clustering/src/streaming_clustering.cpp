@@ -1,4 +1,5 @@
-#include <streaming_clustering/velodyne_input/velodyne_input.h>
+#include <streaming_clustering/ouster_input.h>
+#include <streaming_clustering/velodyne_input.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 #include <streaming_clustering/streaming_clustering.h>
@@ -12,7 +13,7 @@ namespace streaming_clustering
 StreamingClustering::StreamingClustering(ros::NodeHandle nh, const ros::NodeHandle& nh_private)
 {
     // obtain parameters
-    nh_private.param<std::string>("sensor_name", sensor_name, "vls_128");
+    nh_private.param<std::string>("sensor_manufacturer", sensor_manufacturer, "velodyne");
     nh_private.param<std::string>("sensor_frame", sensor_frame, "sensor/lidar/vls128_roof");
     nh_private.param<std::string>("odom_frame", odom_frame, "odom");
     nh_private.param<int>("columns_per_full_rotation", num_columns, 1877);
@@ -24,10 +25,12 @@ StreamingClustering::StreamingClustering(ros::NodeHandle nh, const ros::NodeHand
     ring_buffer_max_columns = num_columns * 10;
 
     // use desired sensor input
-    if (sensor_name == "vls_128")
+    if (sensor_manufacturer == "velodyne")
         sensor_input_.reset(new VelodyneInput(nh, nh_private));
+    else if (sensor_manufacturer == "ouster")
+        sensor_input_.reset(new OusterInput(nh, nh_private));
     else
-        throw std::runtime_error("Unknown sensor: " + sensor_name);
+        throw std::runtime_error("Unknown manufacturer: " + sensor_manufacturer);
     sensor_input_->subscribe();
     sensor_input_->addOnNewFiringCallback([this](const RawPoints::ConstPtr& firing) { onNewFiringsCallback(firing); });
 
@@ -35,6 +38,7 @@ StreamingClustering::StreamingClustering(ros::NodeHandle nh, const ros::NodeHand
     bool success = true;
     std::string ego_name;
     success &= nh.getParam("/vehicles/ego", ego_name);
+    success &= nh.getParam("/vehicles/" + ego_name + "/geometric/height_ref_to_maximum", height_ref_to_maximum_);
     success &= nh.getParam("/vehicles/" + ego_name + "/geometric/height_ref_to_ground", height_ref_to_ground_);
     success &= nh.getParam("/vehicles/" + ego_name + "/geometric/length_ref_to_front_end", length_ref_to_front_end_);
     success &= nh.getParam("/vehicles/" + ego_name + "/geometric/length_ref_to_rear_end", length_ref_to_rear_end_);
@@ -282,31 +286,36 @@ void StreamingClustering::insertFiringIntoRangeImage(InsertionJob&& job)
         if (!std::isnan(point->distance) && (std::isnan(distance) || distance >= point->distance))
             continue;
 
-        // do not insert into columns that are already cleared (or going to be cleared)
-        int64_t ring_buffer_start_global_column_index_copy = ring_buffer_start_global_column_index;
-        if (ring_buffer_start_global_column_index_copy >= 0 &&
-            global_column_index < ring_buffer_start_global_column_index_copy)
+        // do not insert into columns that were passed to the next processing step
+        bool laser_to_far_behind = false;
+        if (srig_first_unfinished_global_column_index >= 0 &&
+            global_column_index < srig_first_unfinished_global_column_index)
         {
-            ROS_WARN_STREAM(
-                "Ignore point of firing because it would be inserted into a cleared column. Wanted to insert at "
-                << global_column_index << ", but first ring buffer start is already at "
-                << ring_buffer_start_global_column_index_copy << " (row index: " << row_index << ")");
-            continue;
+            ROS_WARN_STREAM("Ignore point of firing because it would be inserted into a already published column. "
+                            "Wanted to insert at "
+                            << global_column_index << ", but first unfinished global column index is already at "
+                            << srig_first_unfinished_global_column_index << " (row index: " << row_index << ")");
+
+            laser_to_far_behind = true;
         }
 
         // fill point data
-        point->xyz.x = static_cast<float>(p_odom.x());
-        point->xyz.y = static_cast<float>(p_odom.y());
-        point->xyz.z = static_cast<float>(p_odom.z());
-        point->distance = distance;
-        point->azimuth_angle = azimuth_angle;
-        point->inclination_angle = std::asin(static_cast<float>(p_odom_rel.z()) / point->distance);
-        point->continuous_azimuth_angle = continuous_azimuth_angle; // omitted cells will be filled again later
-        point->global_column_index = global_column_index;           // omitted cells will be filled again later
-        point->local_column_index = local_column_index;
-        point->row_index = row_index;
-        point->intensity = raw_point.intensity;
-        point->stamp.fromNSec(raw_point.stamp);
+        if (!laser_to_far_behind)
+        {
+            point->xyz.x = static_cast<float>(p_odom.x());
+            point->xyz.y = static_cast<float>(p_odom.y());
+            point->xyz.z = static_cast<float>(p_odom.z());
+            point->firing_index = raw_point.firing_index;
+            point->intensity = raw_point.intensity;
+            point->stamp.fromNSec(raw_point.stamp);
+            point->distance = distance;
+            point->azimuth_angle = azimuth_angle;
+            point->inclination_angle = std::asin(static_cast<float>(p_odom_rel.z()) / point->distance);
+            point->continuous_azimuth_angle = continuous_azimuth_angle; // omitted cells will be filled again later
+            point->global_column_index = global_column_index;           // omitted cells will be filled again later
+            point->local_column_index = local_column_index;
+            point->row_index = row_index;
+        }
 
         // keep track of global column index of rearmost & foremost laser
         if (global_column_index_of_rearmost_laser < 0 || global_column_index < global_column_index_of_rearmost_laser)
@@ -331,8 +340,10 @@ void StreamingClustering::insertFiringIntoRangeImage(InsertionJob&& job)
             return;
         }
 
-        srig_previous_global_column_index_of_rearmost_laser = global_column_index_of_rearmost_laser;
-        srig_previous_global_column_index_of_foremost_laser = global_column_index_of_foremost_laser;
+        if (global_column_index_of_rearmost_laser > srig_previous_global_column_index_of_rearmost_laser)
+            srig_previous_global_column_index_of_rearmost_laser = global_column_index_of_rearmost_laser;
+        if (global_column_index_of_foremost_laser > srig_previous_global_column_index_of_foremost_laser)
+            srig_previous_global_column_index_of_foremost_laser = global_column_index_of_foremost_laser;
     }
 
     // there is no information about minimum and maximum global column index
@@ -439,7 +450,8 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
         if (cur_point_in_base_link.x() < length_ref_to_front_end_ &&
             cur_point_in_base_link.x() > length_ref_to_rear_end_ &&
             cur_point_in_base_link.y() < width_ref_to_left_mirror_ &&
-            cur_point_in_base_link.y() > width_ref_to_right_mirror_)
+            cur_point_in_base_link.y() > width_ref_to_right_mirror_ &&
+            cur_point_in_base_link.z() < height_ref_to_maximum_ && cur_point_in_base_link.z() > height_ref_to_ground_)
         {
             point.ground_point_label = GP_EGO_VEHICLE;
             point.debug_ground_point_label = VIOLET;
@@ -1196,7 +1208,15 @@ void StreamingClustering::publishColumns(int64_t from_global_column_index,
         }
     }
 
-    msg->header.stamp = minimum_point_stamp;
+    if (minimum_point_stamp.sec != std::numeric_limits<int32_t>::max())
+    {
+        msg->header.stamp = minimum_point_stamp;
+    }
+    else
+    {
+        ROS_WARN_STREAM("This column had no timestamps!");
+        return;
+    }
 
     pub.publish(msg);
 }
@@ -1239,7 +1259,7 @@ PointCloud2Iterators StreamingClustering::prepareMessageAndCreateIterators(senso
     msg.is_dense = false;
 
     sensor_msgs::PointCloud2Modifier output_modifier(msg);
-    output_modifier.setPointCloud2Fields(25,
+    output_modifier.setPointCloud2Fields(26,
                                          "x",
                                          1,
                                          sensor_msgs::PointField::FLOAT32,
@@ -1249,6 +1269,18 @@ PointCloud2Iterators StreamingClustering::prepareMessageAndCreateIterators(senso
                                          "z",
                                          1,
                                          sensor_msgs::PointField::FLOAT32,
+                                         "firing_index",
+                                         1,
+                                         sensor_msgs::PointField::UINT32,
+                                         "intensity",
+                                         1,
+                                         sensor_msgs::PointField::UINT8,
+                                         "time_sec",
+                                         1,
+                                         sensor_msgs::PointField::UINT32,
+                                         "time_nsec",
+                                         1,
+                                         sensor_msgs::PointField::UINT32,
                                          "distance",
                                          1,
                                          sensor_msgs::PointField::FLOAT32,
@@ -1270,15 +1302,6 @@ PointCloud2Iterators StreamingClustering::prepareMessageAndCreateIterators(senso
                                          "row_index",
                                          1,
                                          sensor_msgs::PointField::UINT16,
-                                         "intensity",
-                                         1,
-                                         sensor_msgs::PointField::UINT8,
-                                         "time_sec",
-                                         1,
-                                         sensor_msgs::PointField::UINT32,
-                                         "time_nsec",
-                                         1,
-                                         sensor_msgs::PointField::UINT32,
                                          "ground_point_label",
                                          1,
                                          sensor_msgs::PointField::UINT8,
@@ -1319,6 +1342,10 @@ PointCloud2Iterators StreamingClustering::prepareMessageAndCreateIterators(senso
     return {{msg, "x"},
             {msg, "y"},
             {msg, "z"},
+            {msg, "firing_index"},
+            {msg, "intensity"},
+            {msg, "time_sec"},
+            {msg, "time_nsec"},
             {msg, "distance"},
             {msg, "azimuth_angle"},
             {msg, "inclination_angle"},
@@ -1326,9 +1353,6 @@ PointCloud2Iterators StreamingClustering::prepareMessageAndCreateIterators(senso
             {msg, "global_column_index"},
             {msg, "local_column_index"},
             {msg, "row_index"},
-            {msg, "intensity"},
-            {msg, "time_sec"},
-            {msg, "time_nsec"},
             {msg, "ground_point_label"},
             {msg, "debug_ground_point_label"},
             {msg, "debug_local_column_index_of_left_ground_neighbor"},
@@ -1350,6 +1374,10 @@ void StreamingClustering::addPointToMessage(PointCloud2Iterators& container,
     *(container.iter_x_out + data_index_message) = point.xyz.x;
     *(container.iter_y_out + data_index_message) = point.xyz.y;
     *(container.iter_z_out + data_index_message) = point.xyz.z;
+    *(container.iter_f_out + data_index_message) = static_cast<uint32_t>(point.firing_index);
+    *(container.iter_i_out + data_index_message) = point.intensity;
+    *(container.iter_time_sec_out + data_index_message) = point.stamp.sec;
+    *(container.iter_time_nsec_out + data_index_message) = point.stamp.nsec;
     *(container.iter_d_out + data_index_message) = point.distance;
     *(container.iter_a_out + data_index_message) = point.azimuth_angle;
     *(container.iter_ia_out + data_index_message) = point.inclination_angle;
@@ -1357,9 +1385,6 @@ void StreamingClustering::addPointToMessage(PointCloud2Iterators& container,
     *(container.iter_gc_out + data_index_message) = point.global_column_index;
     *(container.iter_lc_out + data_index_message) = point.local_column_index;
     *(container.iter_r_out + data_index_message) = point.row_index;
-    *(container.iter_i_out + data_index_message) = point.intensity;
-    *(container.iter_time_sec_out + data_index_message) = point.stamp.sec;
-    *(container.iter_time_nsec_out + data_index_message) = point.stamp.nsec;
     *(container.iter_gp_label_out + data_index_message) = point.ground_point_label;
     *(container.iter_dbg_gp_label_out + data_index_message) = point.debug_ground_point_label;
     *(container.iter_dbg_c_n_left_out + data_index_message) = point.local_column_index_of_left_ground_neighbor;
@@ -1382,6 +1407,7 @@ void StreamingClustering::addRawPointToMessage(PointCloud2Iterators& container,
     *(container.iter_x_out + data_index_message) = point.x;
     *(container.iter_y_out + data_index_message) = point.y;
     *(container.iter_z_out + data_index_message) = point.z;
+    *(container.iter_f_out + data_index_message) = static_cast<uint32_t>(point.firing_index);
     *(container.iter_i_out + data_index_message) = point.intensity;
 
     ros::Time t;
