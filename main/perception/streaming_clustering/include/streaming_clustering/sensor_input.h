@@ -25,6 +25,7 @@ class SensorInput
 {
   public:
     virtual void subscribe() = 0;
+    virtual size_t dataCount() = 0;
 
     virtual void reset()
     {

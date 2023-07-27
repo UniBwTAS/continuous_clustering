@@ -146,12 +146,13 @@ void StreamingClustering::onNewFiringsCallback(const RawPoints::ConstPtr& firing
     // keep track of the job queue size's with ongoing time
     if (stop_statistics)
         return;
-    num_pending_jobs.push_back(insertion_thread_pool.get_number_of_unprocessed_jobs());
-    num_pending_jobs.push_back(segmentation_thread_pool.get_number_of_unprocessed_jobs());
-    num_pending_jobs.push_back(association_thread_pool.get_number_of_unprocessed_jobs());
-    num_pending_jobs.push_back(tree_combination_thread_pool.get_number_of_unprocessed_jobs());
-    num_pending_jobs.push_back(publishing_thread_pool.get_number_of_unprocessed_jobs());
-    while (num_pending_jobs.size() > 100000 * 5)
+    num_pending_jobs.push_back(sensor_input_->dataCount());
+    num_pending_jobs.push_back(insertion_thread_pool.getNumberOfUnprocessedJobs());
+    num_pending_jobs.push_back(segmentation_thread_pool.getNumberOfUnprocessedJobs());
+    num_pending_jobs.push_back(association_thread_pool.getNumberOfUnprocessedJobs());
+    num_pending_jobs.push_back(tree_combination_thread_pool.getNumberOfUnprocessedJobs());
+    num_pending_jobs.push_back(publishing_thread_pool.getNumberOfUnprocessedJobs());
+    while (num_pending_jobs.size() > 100000 * 6)
         num_pending_jobs.pop_front();
 }
 
@@ -383,11 +384,11 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
             stop_statistics = true;
             std::string filename = std::tmpnam(nullptr);
             std::cout << "JOB QUEUES (INSERT, SEGMENT, ASSOC, TREE, PUB): "
-                      << insertion_thread_pool.get_number_of_unprocessed_jobs() << ", "
-                      << segmentation_thread_pool.get_number_of_unprocessed_jobs() << ", "
-                      << association_thread_pool.get_number_of_unprocessed_jobs() << ", "
-                      << tree_combination_thread_pool.get_number_of_unprocessed_jobs() << ", "
-                      << publishing_thread_pool.get_number_of_unprocessed_jobs() << std::endl;
+                      << insertion_thread_pool.getNumberOfUnprocessedJobs() << ", "
+                      << segmentation_thread_pool.getNumberOfUnprocessedJobs() << ", "
+                      << association_thread_pool.getNumberOfUnprocessedJobs() << ", "
+                      << tree_combination_thread_pool.getNumberOfUnprocessedJobs() << ", "
+                      << publishing_thread_pool.getNumberOfUnprocessedJobs() << std::endl;
             std::cout << "Writing statistics to: " << filename << std::endl;
             std::ofstream out(filename);
             for (auto n : num_pending_jobs)
@@ -1094,7 +1095,9 @@ void StreamingClustering::clearColumns(int64_t from_global_column_index, int64_t
             Point& point = range_image_[local_column_index * num_rows + row_index];
 
             // clear range image generation / general
-            point.xyz = {std::nanf(""), std::nanf(""), std::nanf("")};
+            point.xyz.x = std::nanf("");
+            point.xyz.y = std::nanf("");
+            point.xyz.z = std::nanf("");
             point.distance = std::nanf("");
             point.azimuth_angle = std::nanf("");
             point.inclination_angle = std::nanf("");
@@ -1103,7 +1106,8 @@ void StreamingClustering::clearColumns(int64_t from_global_column_index, int64_t
             point.local_column_index = -1;
             point.row_index = -1;
             point.intensity = 0;
-            point.stamp = {0, 0};
+            point.stamp.sec = 0;
+            point.stamp.nsec = 0;
 
             // clear ground point segmentation
             point.ground_point_label = 0;
@@ -1111,7 +1115,7 @@ void StreamingClustering::clearColumns(int64_t from_global_column_index, int64_t
             point.debug_ground_point_label = WHITE;
             // can be cleared because we ensure that at least one rotation is still available when
             // calculating the column range to clear
-            point.pointer_to_global_column_index_of_next_ground_point.reset();
+            // point.pointer_to_global_column_index_of_next_ground_point.reset();
             point.local_column_index_of_left_ground_neighbor = 0;
             point.local_column_index_of_right_ground_neighbor = 0;
 
@@ -1120,7 +1124,8 @@ void StreamingClustering::clearColumns(int64_t from_global_column_index, int64_t
             point.finished_at_continuous_azimuth_angle = 0.f;
             point.child_points.clear();
             point.associated_trees.clear();
-            point.tree_root_ = {0, -1};
+            point.tree_root_.row_index = 0;
+            point.tree_root_.column_index = -1;
             point.tree_num_points = 0;
             point.id = 0;
             point.visited_at_continuous_azimuth_angle = -1.;

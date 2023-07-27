@@ -60,9 +60,15 @@ class ThreadPool
         job_queue.clear();
     }
 
-    size_t get_number_of_unprocessed_jobs()
+    size_t getNumberOfUnprocessedJobs()
     {
         return job_queue.size();
+    }
+
+    void clearJobs()
+    {
+        job_queue.shutdown();
+        job_queue.clear();
     }
 
   private:
