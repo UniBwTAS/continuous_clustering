@@ -156,7 +156,11 @@ class OusterInput : public RosSensorInput<ouster_ros::PacketMsg>
                     current_firing->points[p.ring].x = p.x;
                     current_firing->points[p.ring].y = p.y;
                     current_firing->points[p.ring].z = p.z;
-                    current_firing->points[p.ring].intensity = static_cast<uint8_t>(p.intensity * 255);
+
+                    // according to https://github.com/ouster-lidar/ouster_example/issues/128#issuecomment-558160200 the
+                    // typical intensity range is between 0 - 1000 (can be theoretically higher, up to 6000)
+                    current_firing->points[p.ring].intensity =
+                        static_cast<uint8_t>(std::min(1.f, p.intensity / 1000.f) * 255);
                 }
                 else
                 {
