@@ -4,47 +4,59 @@
 #include <ros/callback_queue.h>
 #include <ros/ros.h>
 #include <streaming_clustering/sensor_input.h>
-
-using namespace std::chrono_literals;
+#include "thread_pool.h"
 
 namespace streaming_clustering
 {
 
 template<typename Message>
+struct MessageJob
+{
+    const typename Message::ConstPtr msg;
+};
+
+template<typename Message>
 class RosSensorInput : public SensorInput
 {
   public:
-    RosSensorInput(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private) : nh(nh)
+    RosSensorInput(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private) : nh_(nh)
     {
+        message_thread_pool_.init([this](MessageJob<Message>&& job) { onRawDataArrived(job.msg); });
     }
 
     void subscribe() override
     {
-        sub = nh.subscribe(
-            "raw_data", 100000, &RosSensorInput::onRawDataArrivedInternal, this, ros::TransportHints().tcpNoDelay(true));
+        sub = nh_.subscribe("raw_data",
+                           100000,
+                           &RosSensorInput::onRawDataArrivedInternal,
+                           this,
+                           ros::TransportHints().tcpNoDelay(true));
+    }
+
+    size_t dataCount() override
+    {
+        return message_thread_pool_.getNumberOfUnprocessedJobs();
     }
 
     void reset() override
     {
         SensorInput::reset();
-        last_reset_wall_stamp = std::chrono::steady_clock::now();
+        message_thread_pool_.clearJobs();
     }
 
   protected:
     virtual void onRawDataArrived(const typename Message::ConstPtr& m) = 0;
 
   private:
-    void onRawDataArrivedInternal(const typename Message::ConstPtr& m)
+    void onRawDataArrivedInternal(const typename Message::ConstPtr& msg)
     {
-        // clear message queue after reset (didn't find a atomic solution :( )
-        if ((std::chrono::steady_clock::now() - last_reset_wall_stamp) > 200ms)
-            onRawDataArrived(m);
+        message_thread_pool_.enqueue({msg});
     }
 
   protected:
-    ros::NodeHandle nh;
+    ros::NodeHandle nh_;
     ros::Subscriber sub;
-    std::chrono::time_point<std::chrono::steady_clock, std::chrono::nanoseconds> last_reset_wall_stamp{0ns};
+    ThreadPool<MessageJob<Message>> message_thread_pool_{"M"};
 };
 
 } // namespace streaming_clustering

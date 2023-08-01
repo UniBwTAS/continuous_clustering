@@ -9,6 +9,7 @@ struct RawPoint
     float x{};
     float y{};
     float z{};
+    uint64_t firing_index{};
     uint8_t intensity{};
     uint64_t stamp{};
 };
@@ -25,9 +26,11 @@ class SensorInput
 {
   public:
     virtual void subscribe() = 0;
+    virtual size_t dataCount() = 0;
 
     virtual void reset()
     {
+        firing_index = 0;
         prepareNewFiring();
     };
 
@@ -41,6 +44,7 @@ class SensorInput
     {
         if (callback)
             callback(current_firing);
+        firing_index++;
         prepareNewFiring();
     }
 
@@ -54,6 +58,7 @@ class SensorInput
     RawPoints::Ptr current_firing;
     std::function<void(const RawPoints::ConstPtr&)> callback;
     int num_lasers{};
+    uint64_t firing_index{0};
 };
 
 } // namespace streaming_clustering

@@ -54,9 +54,9 @@ class VelodyneInput : public velodyne_rawdata::DataContainerBase, public RosSens
     {
         int row_index = num_lasers - ring - 1;
 
-        ros::Duration duration_in_packet;
-        duration_in_packet.fromSec(time);
-        current_firing->points[row_index].stamp = cur_packet_stamp.toNSec() + duration_in_packet.toNSec();
+        auto offset_in_ns = static_cast<uint64_t>(time / 1e9);
+        current_firing->points[row_index].stamp = cur_packet_stamp.toNSec() + offset_in_ns;
+        current_firing->points[row_index].firing_index = firing_index;
 
         if (distance > 0)
         {
@@ -92,7 +92,6 @@ class VelodyneInput : public velodyne_rawdata::DataContainerBase, public RosSens
   private:
     velodyne_rawdata::RawData parser;
     ros::Time cur_packet_stamp{0, 0};
-    bool currently_during_unpack{false};
     bool interrupt_message{false};
 };
 

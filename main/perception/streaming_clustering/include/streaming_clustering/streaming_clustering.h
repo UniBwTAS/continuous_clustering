@@ -59,6 +59,8 @@ struct Point
 {
     // range image generation / general
     Point3D xyz{std::nanf(""), std::nanf(""), std::nanf("")};
+    uint64_t firing_index{0};
+    uint8_t intensity{0};
     float distance{std::nanf("")};
     float azimuth_angle{std::nanf("")};
     float inclination_angle{std::nanf("")};
@@ -66,7 +68,6 @@ struct Point
     int64_t global_column_index{-1};
     int local_column_index{-1};
     int row_index{-1};
-    uint8_t intensity{0};
     ros::Time stamp{0, 0};
 
     // ground point segmentation
@@ -97,6 +98,10 @@ struct PointCloud2Iterators
     sensor_msgs::PointCloud2Iterator<float> iter_x_out;
     sensor_msgs::PointCloud2Iterator<float> iter_y_out;
     sensor_msgs::PointCloud2Iterator<float> iter_z_out;
+    sensor_msgs::PointCloud2Iterator<uint32_t> iter_f_out;
+    sensor_msgs::PointCloud2Iterator<uint8_t> iter_i_out;
+    sensor_msgs::PointCloud2Iterator<uint32_t> iter_time_sec_out;
+    sensor_msgs::PointCloud2Iterator<uint32_t> iter_time_nsec_out;
     sensor_msgs::PointCloud2Iterator<float> iter_d_out;
     sensor_msgs::PointCloud2Iterator<float> iter_a_out;
     sensor_msgs::PointCloud2Iterator<float> iter_ia_out;
@@ -104,9 +109,6 @@ struct PointCloud2Iterators
     sensor_msgs::PointCloud2Iterator<uint32_t> iter_gc_out;
     sensor_msgs::PointCloud2Iterator<uint16_t> iter_lc_out;
     sensor_msgs::PointCloud2Iterator<uint16_t> iter_r_out;
-    sensor_msgs::PointCloud2Iterator<uint8_t> iter_i_out;
-    sensor_msgs::PointCloud2Iterator<uint32_t> iter_time_sec_out;
-    sensor_msgs::PointCloud2Iterator<uint32_t> iter_time_nsec_out;
 
     // ground point segmentation
     sensor_msgs::PointCloud2Iterator<uint8_t> iter_gp_label_out;
@@ -128,12 +130,13 @@ struct PointCloud2Iterators
 struct InsertionJob
 {
     RawPoints::ConstPtr firing;
-    geometry_msgs::TransformStamped odom_from_sensor;
+    geometry_msgs::TransformStamped odom_frame_from_sensor_frame;
 };
 
 struct SegmentationJob
 {
     int64_t ring_buffer_current_global_column_index;
+    tf2::Transform odom_frame_from_sensor_frame;
 };
 
 struct AssociationJob
@@ -176,6 +179,10 @@ class StreamingClustering
 
     // ground point segmentation
     inline void performGroundPointSegmentationForColumn(SegmentationJob&& job);
+    static inline Point2D to2D(const Point3D& p)
+    {
+        return {p.xy().length(), p.z};
+    }
 
     // streaming clustering
     inline void associatePointsInColumn(AssociationJob&& job);
@@ -210,13 +217,14 @@ class StreamingClustering
     ros::Publisher pub_clusters;
     ros::Time last_update_{0, 0};
     bool first_firing_after_reset{false};
+    std::string ego_robot_frame{};
     std::string sensor_frame{};
     std::string odom_frame{};
     bool wait_for_tf{true};
     RosTransformSynchronizer<RawPoints> tf_synchronizer;
 
     // sensor specific stuff
-    std::string sensor_name;
+    std::string sensor_manufacturer;
     std::shared_ptr<SensorInput> sensor_input_;
 
     // range image (implemented as ring buffer)
@@ -236,14 +244,15 @@ class StreamingClustering
     bool srig_reset_because_of_bad_start{false};
 
     // streaming ground point segmentation (sgps)
-    float height_ref_to_ground_{};
+    float height_ref_to_maximum_{}, height_ref_to_ground_{};
     float length_ref_to_front_end_{}, length_ref_to_rear_end_{};
     float width_ref_to_left_mirror_{}, width_ref_to_right_mirror_{};
     float height_sensor_to_ground_{};
     Point3D sgps_sensor_position{0, 0, 0};
-    tf2::Transform sgps_base_link_from_odom_;
+    std::unique_ptr<tf2::Transform> sgps_ego_robot_frame_from_sensor_frame_;
     std::vector<int64_t> sgps_previous_ground_points_;
     std::vector<std::shared_ptr<int64_t>> sgps_next_ground_points_;
+    ros::Time sgps_previous_column_stamp_;
 
     // streaming clustering (sc)
     int64_t sc_first_unpublished_global_column_index{-1};

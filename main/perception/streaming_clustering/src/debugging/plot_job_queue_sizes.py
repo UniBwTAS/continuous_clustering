@@ -23,16 +23,18 @@ def main():
     # input_file = "/tmp/fileJhlmRB"
     # input_file = "/tmp/filesIPvPU"
     # input_file = "/tmp/filenQJzfv"
-    input_file = "/tmp/fileF3DpY0"
+    # input_file = "/tmp/fileF3DpY0"
+    input_file = "/tmp/fileSuYMpI"
 
     data = np.genfromtxt(input_file, delimiter=',')[:-1]  # last comma is also a element
     print(data.shape, data.dtype)
-    data = data.reshape(-1, 5)
-    plt.plot(data[:, 0], label='insertion')
-    plt.plot(data[:, 1], label='segmentation')
-    plt.plot(data[:, 2], label='association')
-    plt.plot(data[:, 3], label='tree_combination')
-    plt.plot(data[:, 4], label='publishing')
+    data = data.reshape(-1, 6)
+    plt.plot(data[:, 0], label='message')
+    plt.plot(data[:, 1], label='insertion')
+    plt.plot(data[:, 2], label='segmentation')
+    plt.plot(data[:, 3], label='association')
+    plt.plot(data[:, 4], label='tree_combination')
+    plt.plot(data[:, 5], label='publishing')
     plt.legend()
     plt.show()
 
