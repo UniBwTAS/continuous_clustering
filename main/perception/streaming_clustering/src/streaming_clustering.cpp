@@ -369,7 +369,7 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
         try
         {
             geometry_msgs::TransformStamped tf =
-                tf_synchronizer.getTfBuffer().lookupTransform(ego_robot_frame, sensor_frame, ros::Time());
+                tf_synchronizer.getTfBuffer()->lookupTransform(ego_robot_frame, sensor_frame, ros::Time());
             sgps_ego_robot_frame_from_sensor_frame_ = std::make_unique<tf2::Transform>();
             tf2::fromMsg(tf.transform, *sgps_ego_robot_frame_from_sensor_frame_);
         }

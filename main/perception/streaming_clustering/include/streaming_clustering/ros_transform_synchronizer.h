@@ -10,14 +10,23 @@ template<typename Message>
 class RosTransformSynchronizer
 {
   public:
-    explicit RosTransformSynchronizer() : tf_buffer(), tf_listener(tf_buffer, true, ros::TransportHints().tcpNoDelay())
+    explicit RosTransformSynchronizer(const std::shared_ptr<tf2_ros::Buffer>& buffer)
     {
+        tf_buffer = buffer;
+    }
+
+    explicit RosTransformSynchronizer()
+    {
+        tf_buffer = std::make_shared<tf2_ros::Buffer>();
+        tf_listener =
+            std::make_shared<tf2_ros::TransformListener>(*tf_buffer, true, ros::TransportHints().tcpNoDelay());
     }
 
     void reset(const std::string& target_frame, const std::string& source_frame)
     {
         target_frame_ = target_frame;
         source_frame_ = source_frame;
+        frames_are_different_ = target_frame_ != source_frame_;
         message_queue.clear();
     }
 
@@ -41,12 +50,13 @@ class RosTransformSynchronizer
 
         // get latest available transform odom from sensor frame
         ros::Time latest_available_tf(0, 0);
-        if (wait_for_transform_)
+        bool wait_for_transform_required = wait_for_transform_ && frames_are_different_;
+        if (wait_for_transform_required)
         {
             try
             {
                 geometry_msgs::TransformStamped tf =
-                    tf_buffer.lookupTransform(target_frame_, source_frame_, ros::Time());
+                    tf_buffer->lookupTransform(target_frame_, source_frame_, ros::Time());
                 latest_available_tf = tf.header.stamp;
             }
             catch (tf2::TransformException& ex)
@@ -67,8 +77,8 @@ class RosTransformSynchronizer
             // transform again but this time with the specific time stamp
             try
             {
-                ros::Time s = wait_for_transform_ ? message_queue.front().first : ros::Time();
-                geometry_msgs::TransformStamped tf = tf_buffer.lookupTransform(target_frame_, source_frame_, s);
+                ros::Time s = wait_for_transform_required ? message_queue.front().first : ros::Time();
+                geometry_msgs::TransformStamped tf = tf_buffer->lookupTransform(target_frame_, source_frame_, s);
                 if (callback_)
                     callback_(message_queue.front().second, tf);
             }
@@ -82,7 +92,7 @@ class RosTransformSynchronizer
         }
     }
 
-    tf2_ros::Buffer& getTfBuffer()
+    std::shared_ptr<tf2_ros::Buffer> getTfBuffer()
     {
         return tf_buffer;
     }
@@ -93,13 +103,14 @@ class RosTransformSynchronizer
     }
 
   private:
-    tf2_ros::Buffer tf_buffer;
-    tf2_ros::TransformListener tf_listener;
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener;
     std::deque<std::pair<ros::Time, const typename Message::ConstPtr>> message_queue;
     std::string source_frame_;
     std::string target_frame_;
     std::function<void(const typename Message::ConstPtr&, const geometry_msgs::TransformStamped&)> callback_;
-    bool wait_for_transform_{};
+    bool wait_for_transform_{true};
+    bool frames_are_different_{false};
 };
 
 #endif // STREAMING_CLUSTERING_ROS_TRANSFORM_SYNCHRONIZER_H
