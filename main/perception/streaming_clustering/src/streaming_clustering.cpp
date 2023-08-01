@@ -16,6 +16,7 @@ StreamingClustering::StreamingClustering(ros::NodeHandle nh, const ros::NodeHand
     nh_private.param<std::string>("sensor_manufacturer", sensor_manufacturer, "velodyne");
     nh_private.param<std::string>("sensor_frame", sensor_frame, "sensor/lidar/vls128_roof");
     nh_private.param<std::string>("odom_frame", odom_frame, "odom");
+    nh_private.param<std::string>("ego_robot_frame", ego_robot_frame, "base_link");
     nh_private.param<int>("columns_per_full_rotation", num_columns, 1877);
     nh_private.param<bool>("wait_for_tf", wait_for_tf, true);
     nh_private.param<bool>(
@@ -89,6 +90,7 @@ void StreamingClustering::reset()
     // reset members for streaming ground point segmentation (sgps)
     sgps_previous_ground_points_.resize(num_rows, -1);
     sgps_next_ground_points_.resize(num_rows, std::make_shared<int64_t>(-1));
+    sgps_ego_robot_frame_from_sensor_frame_.reset();
 
     // reset members for streaming clustering (sc)
     sc_first_unpublished_global_column_index = -1;
@@ -174,27 +176,13 @@ void StreamingClustering::insertFiringIntoRangeImage(InsertionJob&& job)
 
     // get odom from sensor in order to transform points from sensor into odom coordinate system
     tf2::Transform odom_from_sensor;
-    fromMsg(job.odom_from_sensor.transform, odom_from_sensor);
-    fromMsg(job.odom_from_sensor.transform.translation, srig_sensor_position);
+    fromMsg(job.odom_frame_from_sensor_frame.transform, odom_from_sensor);
+    fromMsg(job.odom_frame_from_sensor_frame.transform.translation, srig_sensor_position);
 
     // sensor position
     sgps_sensor_position.x = static_cast<float>(srig_sensor_position.x());
     sgps_sensor_position.y = static_cast<float>(srig_sensor_position.y());
     sgps_sensor_position.z = static_cast<float>(srig_sensor_position.z());
-
-    // get base_link from odom in order to transform points from odom into vehicle
-    // coordinates (important to find points on roof, etc.)
-    try
-    {
-        geometry_msgs::TransformStamped tf = tf_synchronizer.getTfBuffer().lookupTransform(
-            "base_link", odom_frame, job.odom_from_sensor.header.stamp); // use same stamp
-        tf2::fromMsg(tf.transform, sgps_base_link_from_odom_);
-    }
-    catch (tf2::TransformException& ex)
-    {
-        // it can still happen that only one transform is in buffer so no interpolation is possible
-        return;
-    }
 
     // keep track of the global column indices of the foremost and rearmost laser (w.r.t. azimuth angle clockwise =
     // rotation direction of lidar sensor) in this firing
@@ -367,12 +355,37 @@ void StreamingClustering::insertFiringIntoRangeImage(InsertionJob&& job)
 
     // iterate over finished but unfinished columns and publish them
     while (srig_first_unfinished_global_column_index < srig_previous_global_column_index_of_rearmost_laser)
-        segmentation_thread_pool.enqueue({srig_first_unfinished_global_column_index++});
+        segmentation_thread_pool.enqueue({srig_first_unfinished_global_column_index++, odom_from_sensor});
 }
 
 void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJob&& job)
 {
     int local_column_index = static_cast<int>(job.ring_buffer_current_global_column_index % ring_buffer_max_columns);
+
+    // get ego robot frame from sensor frame in order to transform points from sensor (odom) into vehicle coordinates
+    // (important to find points on roof, etc.)
+    if (!sgps_ego_robot_frame_from_sensor_frame_)
+    {
+        try
+        {
+            geometry_msgs::TransformStamped tf =
+                tf_synchronizer.getTfBuffer().lookupTransform(ego_robot_frame, sensor_frame, ros::Time());
+            sgps_ego_robot_frame_from_sensor_frame_ = std::make_unique<tf2::Transform>();
+            tf2::fromMsg(tf.transform, *sgps_ego_robot_frame_from_sensor_frame_);
+        }
+        catch (tf2::TransformException& ex)
+        {
+            return;
+        }
+    }
+    tf2::Transform ego_robot_frame_from_odom_frame =
+        *sgps_ego_robot_frame_from_sensor_frame_ * job.odom_frame_from_sensor_frame.inverse();
+
+    // new TODO
+    bool last_point_was_obstacle = true;
+    Point2D line_start, line_direction;
+    bool line_initialized = false;
+    int line_start_row_index = -1;
 
     // iterate rows from bottom to top and find ground points
     bool first_point_found = false;
@@ -445,19 +458,28 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
         const Point3D& current_position = point.xyz;
 
         // special handling for points on ego vehicle surface
-        tf2::Vector3 cur_point_in_base_link =
-            sgps_base_link_from_odom_ * tf2::Vector3(current_position.x, current_position.y, current_position.z);
-        if (cur_point_in_base_link.x() < length_ref_to_front_end_ &&
-            cur_point_in_base_link.x() > length_ref_to_rear_end_ &&
-            cur_point_in_base_link.y() < width_ref_to_left_mirror_ &&
-            cur_point_in_base_link.y() > width_ref_to_right_mirror_ &&
-            cur_point_in_base_link.z() < height_ref_to_maximum_ && cur_point_in_base_link.z() > height_ref_to_ground_)
+        tf2::Vector3 current_position_in_ego_robot_frame =
+            ego_robot_frame_from_odom_frame * tf2::Vector3(current_position.x, current_position.y, current_position.z);
+        if (current_position_in_ego_robot_frame.x() < length_ref_to_front_end_ &&
+            current_position_in_ego_robot_frame.x() > length_ref_to_rear_end_ &&
+            current_position_in_ego_robot_frame.y() < width_ref_to_left_mirror_ &&
+            current_position_in_ego_robot_frame.y() > width_ref_to_right_mirror_ &&
+            current_position_in_ego_robot_frame.z() < height_ref_to_maximum_ &&
+            current_position_in_ego_robot_frame.z() > height_ref_to_ground_)
         {
             point.ground_point_label = GP_EGO_VEHICLE;
             point.debug_ground_point_label = VIOLET;
-            obstacle_mode = true;
-            number_of_flat_points_after_obstacle = 0;
-            row_index_of_first_flat_point_after_obstacle = -1;
+            // last_point_was_obstacle = true;
+            // number_of_flat_points_after_obstacle = 0;
+            // row_index_of_first_flat_point_after_obstacle = -1;
+            continue;
+        }
+
+        // special handling for points below ego vehicle, which are reflections from mirror (only ouster, TODO)
+        if (current_position_in_ego_robot_frame.z() < height_ref_to_ground_ - 0.2)
+        {
+            point.ground_point_label = GP_EGO_VEHICLE;
+            point.debug_ground_point_label = BLACK;
             continue;
         }
 
@@ -468,188 +490,185 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
         {
             // now we found the first point outside the ego vehicle box
             first_point_found = true;
-            if (std::abs(cur_point_in_base_link.z() - height_ref_to_ground_) < config_.first_ring_max_height_diff)
+            if (std::abs(current_position_in_ego_robot_frame.z() - height_ref_to_ground_) <
+                config_.first_ring_max_height_diff)
             {
                 point.ground_point_label = GP_GROUND;
-                point.debug_ground_point_label = GREEN;
-                point.height_over_ground = 0.f;
-                last_ground_point_wrt_sensor = current_position_wrt_sensor;
-                obstacle_mode = false;
+                point.debug_ground_point_label = GRAY;
+                // point.height_over_ground = 0.f;
+                // last_ground_point_wrt_sensor = current_position_wrt_sensor;
+                // obstacle_mode = false;
+                last_point_was_obstacle = false;
             }
             else
             {
                 point.ground_point_label = GP_OBSTACLE;
-                point.debug_ground_point_label = RED;
-                point.height_over_ground = current_position_wrt_sensor.z - last_ground_point_wrt_sensor.z;
-                obstacle_mode = true;
+                point.debug_ground_point_label = ORANGE;
+                // point.height_over_ground = current_position_wrt_sensor.z - last_ground_point_wrt_sensor.z;
+                // obstacle_mode = true;
+                last_point_was_obstacle = true;
             }
             previous_position = current_position;
             previous_position_wrt_sensor = current_position_wrt_sensor;
             continue;
         }
 
-        float distance_xy = (current_position - previous_position).lengthXY();
-        float slope = (current_position.z - previous_position.z) / distance_xy;
-        if (std::abs(slope) < config_.max_slope &&
-            previous_position_wrt_sensor.lengthXY() < current_position_wrt_sensor.lengthXY())
+        Point2D current_position_wrt_sensor_2d = to2D(current_position_wrt_sensor);
+        Point2D previous_position_wrt_sensor_2d = to2D(previous_position_wrt_sensor);
+        Point2D previous_to_current = current_position_wrt_sensor_2d - previous_position_wrt_sensor_2d;
+        float slope = previous_to_current.y / previous_to_current.x;
+        bool is_flat =
+            std::abs(slope) < config_.max_slope && previous_position_wrt_sensor_2d.x < current_position_wrt_sensor_2d.x;
+
+        float distance_from_line =
+            line_initialized ? distance_point_from_line(current_position_wrt_sensor_2d, line_start, line_direction) :
+                               std::numeric_limits<float>::max();
+        bool fits_to_line = distance_from_line < config_.max_z_distance_to_connection_line;
+
+        bool update_line = false;
+        if (!last_point_was_obstacle)
         {
-            // quite flat
-            if (obstacle_mode)
+            if (is_flat || fits_to_line)
             {
-                if (distance_xy < 2)
-                {
-                    // if there were enough flat points after obstacle we leave obstacle mode
-                    number_of_flat_points_after_obstacle++;
-                    if (row_index_of_first_flat_point_after_obstacle < 0)
-                        row_index_of_first_flat_point_after_obstacle = row_index;
-
-                    // obtain point
-                    Point3D& first_position_after_obstacle =
-                        range_image_[local_column_index * num_rows + row_index_of_first_flat_point_after_obstacle].xyz;
-
-                    if (number_of_flat_points_after_obstacle >= config_.flat_section_after_obstacle_min_points &&
-                        (current_position - first_position_after_obstacle).lengthXY() >=
-                            config_.flat_section_after_obstacle_min_length)
-                    {
-                        // disable obstacle mode
-                        obstacle_mode = false;
-                        // and undo previous obstacle classifications
-                        int previous_row_index = row_index + 1;
-                        while (previous_row_index <= row_index_of_first_flat_point_after_obstacle)
-                        {
-                            int previous_data_index = local_column_index * num_rows + previous_row_index;
-                            Point* previous_point = &range_image_[previous_data_index];
-                            if (!std::isnan(previous_point->distance))
-                            {
-                                previous_point->ground_point_label = GP_GROUND;
-                                previous_point->debug_ground_point_label = GREENYELLOW;
-                                previous_point->height_over_ground = 0.f;
-                            }
-                            previous_row_index++;
-                        }
-                    }
-                }
-                else
-                {
-                    // large gap -> reset flat point count after obstacle
-                    number_of_flat_points_after_obstacle = 0;
-                    row_index_of_first_flat_point_after_obstacle = -1;
-                }
+                point.ground_point_label = GP_GROUND;
+                point.debug_ground_point_label = is_flat ? GREEN : YELLOWGREEN;
+                update_line = is_flat; // TODO: maybe only if is_flat
+            }
+            else
+            {
+                point.ground_point_label = GP_OBSTACLE;
+                point.debug_ground_point_label = RED;
+                last_point_was_obstacle = true;
             }
         }
         else
         {
-            point.ground_point_label = GP_OBSTACLE;
-            // too steep
-            obstacle_mode = true;
-            // reset flat point count after obstacle
-            number_of_flat_points_after_obstacle = 0;
-            row_index_of_first_flat_point_after_obstacle = -1;
+            if (fits_to_line)
+            {
+                point.ground_point_label = GP_GROUND;
+                point.debug_ground_point_label = PINK;
+                update_line = true;
+                last_point_was_obstacle = false;
+            }
+            else if (false)
+            {
+                // go back x meter and create a line
+                bool was_able_to_go_at_least_x_meter_back = false;
+                int recover_line_start_row_index = row_index + 1;
+                Point2D recover_line_start;
+                Point2D recover_line_direction;
+                while (recover_line_start_row_index < num_rows)
+                {
+                    // TODO: make more efficient, update this point online
+                    Point& p = range_image_[local_column_index * num_rows + recover_line_start_row_index];
+                    recover_line_start = to2D(p.xyz - sgps_sensor_position);
+                    Point2D recover_line_start_to_end = current_position_wrt_sensor_2d - recover_line_start;
+                    if (recover_line_start_to_end.x > 1.f) // TODO: break after too many NaNs?
+                    {
+                        was_able_to_go_at_least_x_meter_back =
+                            std::abs(recover_line_start_to_end.y / recover_line_start_to_end.x) < config_.max_slope &&
+                            recover_line_start.x < current_position_wrt_sensor_2d.x;
+                        recover_line_direction = get_line_direction(recover_line_start, current_position_wrt_sensor_2d);
+                        break;
+                    }
+                    recover_line_start_row_index++;
+                }
+
+                // go forward x meter and check if all points are on the line
+                bool last_x_meter_flat = false;
+                if (was_able_to_go_at_least_x_meter_back)
+                {
+                    last_x_meter_flat = true;
+                    for (int recover_line_current_row_index = recover_line_start_row_index - 1;
+                         recover_line_current_row_index > row_index;
+                         recover_line_current_row_index--)
+                    {
+                        Point& p = range_image_[local_column_index * num_rows + recover_line_current_row_index];
+                        Point2D pos = to2D(p.xyz - sgps_sensor_position);
+                        if (distance_point_from_line(pos, recover_line_start, recover_line_direction) >
+                            config_.max_z_distance_to_connection_line)
+                        {
+                            last_x_meter_flat = false;
+                            break;
+                        }
+                    }
+                }
+
+                // if all points on this line -> ground
+                if (last_x_meter_flat)
+                {
+                    for (int recover_line_current_row_index = recover_line_start_row_index;
+                         recover_line_current_row_index >= row_index;
+                         recover_line_current_row_index--)
+                    {
+                        Point& p = range_image_[local_column_index * num_rows + recover_line_current_row_index];
+                        p.ground_point_label = GP_GROUND;
+                        p.debug_ground_point_label = BLUEVIOLET;
+                    }
+                    line_start = recover_line_start;
+                    line_direction = recover_line_direction;
+                    last_point_was_obstacle = false;
+                }
+                else
+                {
+                    point.ground_point_label = GP_OBSTACLE;
+                    point.debug_ground_point_label = RED;
+                }
+            }
+            else
+            {
+                point.ground_point_label = GP_OBSTACLE;
+                point.debug_ground_point_label = RED;
+            }
         }
 
-        if (obstacle_mode)
+        if (update_line)
         {
-            point.ground_point_label = GP_OBSTACLE;
-            point.debug_ground_point_label = RED;
-            if (current_position_wrt_sensor.lengthXY() - last_ground_point_wrt_sensor.lengthXY() > -10)
-                point.height_over_ground = current_position_wrt_sensor.z - last_ground_point_wrt_sensor.z;
-        }
-        else
-        {
-            point.ground_point_label = GP_GROUND;
-            point.debug_ground_point_label = GREEN;
-            point.height_over_ground = 0.f;
-            last_ground_point_wrt_sensor = current_position_wrt_sensor;
+            Point2D line_end = current_position_wrt_sensor_2d;
+            if (!line_initialized)
+            {
+                line_start = previous_position_wrt_sensor_2d;
+                line_initialized = true;
+                line_start_row_index = row_index;
+            }
+            else
+            {
+                // try to update line start
+                int preliminary_line_start_row_index = line_start_row_index - 1;
+                while (preliminary_line_start_row_index > row_index)
+                {
+                    // TODO: make more efficient
+                    Point& p = range_image_.at(local_column_index * num_rows + preliminary_line_start_row_index);
+                    Point2D pos = to2D(p.xyz - sgps_sensor_position);
+                    if (!std::isnan(pos.x) && p.ground_point_label == GP_GROUND) // TODO: second cond. enough?
+                    {
+                        Point2D preliminary_start_to_end = line_end - pos;
+
+                        // check that line start and line end are not too close
+                        if (preliminary_start_to_end.x < 1.f)
+                            break;
+
+                        // check if slope of line would be small
+                        if (preliminary_start_to_end.y / preliminary_start_to_end.x < 0.2) // (TODO: necessary?)
+                        {
+                            line_start = pos;
+                            line_start_row_index = preliminary_line_start_row_index;
+                        }
+                    }
+                    preliminary_line_start_row_index--;
+                }
+            }
+            line_direction = get_line_direction(line_start, line_end);
         }
 
         previous_position = current_position;
         previous_position_wrt_sensor = current_position_wrt_sensor;
     }
 
-    // iterate again from bottom to top and find remaining obstacle points
     for (int row_index = num_rows - 1; row_index >= 0; row_index--)
     {
         int current_data_index_ri = local_column_index * num_rows + row_index; // column major
         Point& point = range_image_[current_data_index_ri];
-
-        if (std::isnan(point.distance) || point.ground_point_label == GP_GROUND)
-            continue;
-
-        // get left ground point
-        int64_t global_column_index_of_left_ground_point = sgps_previous_ground_points_[row_index];
-        int64_t col_diff_left = job.ring_buffer_current_global_column_index - global_column_index_of_left_ground_point;
-        if (global_column_index_of_left_ground_point < 0 || col_diff_left >= num_columns / 4)
-            continue;
-
-        point.local_column_index_of_left_ground_neighbor =
-            static_cast<int>(global_column_index_of_left_ground_point % ring_buffer_max_columns);
-        Point left_neighbor_point =
-            range_image_[point.local_column_index_of_left_ground_neighbor * num_rows + row_index];
-
-        // get right ground point
-
-        // get same cell of previous rotation since is has maybe saved its next ground neighbor
-        int64_t global_column_index_previous_rotation = job.ring_buffer_current_global_column_index - num_columns;
-        if (global_column_index_previous_rotation < 0)
-            continue;
-        int local_column_index_previous_rotation =
-            static_cast<int>(global_column_index_previous_rotation % ring_buffer_max_columns);
-        Point& same_point_of_previous_rotation =
-            range_image_[local_column_index_previous_rotation * num_rows + row_index];
-
-        // obtain next ground neighbor
-        if (!same_point_of_previous_rotation.pointer_to_global_column_index_of_next_ground_point)
-            continue;
-        int64_t global_column_index_of_right_ground_point =
-            *(same_point_of_previous_rotation.pointer_to_global_column_index_of_next_ground_point);
-        int64_t col_diff_right =
-            job.ring_buffer_current_global_column_index - global_column_index_of_right_ground_point;
-        if (global_column_index_of_right_ground_point < 0 || col_diff_right <= static_cast<int>(0.75 * num_columns) ||
-            col_diff_right >= num_columns)
-            continue;
-        point.local_column_index_of_right_ground_neighbor =
-            static_cast<int>(global_column_index_of_right_ground_point % ring_buffer_max_columns);
-        Point right_neighbor_point =
-            range_image_[point.local_column_index_of_right_ground_neighbor * num_rows + row_index];
-
-        // create a line between those neighbors
-        const Point3D& point_position = point.xyz;
-        const Point3D& neighbor_left_position = left_neighbor_point.xyz;
-        const Point3D& neighbor_right_position = right_neighbor_point.xyz;
-        Point3D left_to_right = neighbor_right_position - neighbor_left_position;
-        Point3D left_to_point = point_position - neighbor_left_position;
-
-        // get point of line which is closest to current point
-        float lambda = (left_to_point * left_to_right) / left_to_right.lengthSquared();
-        Point3D closest_position_on_line = (neighbor_left_position + (lambda * left_to_right));
-
-        // new check if they are close enough
-        Point3D point_to_closest_point_on_line = closest_position_on_line - point_position;
-        if (point_to_closest_point_on_line.xy().length() < config_.max_xy_distance_to_connection_line &&
-            std::abs(point_to_closest_point_on_line.z) < config_.max_z_distance_to_connection_line)
-        {
-            point.debug_ground_point_label = YELLOW;
-            point.ground_point_label = GP_GROUND;
-            point.height_over_ground = 0.f;
-        }
-    }
-
-    for (int row_index = num_rows - 1; row_index >= 0; row_index--)
-    {
-        int current_data_index_ri = local_column_index * num_rows + row_index; // column major
-        Point& point = range_image_[current_data_index_ri];
-
-        // save the latest ground point for each row (TODO: points with ground label shouldn't be nan)
-        if (!std::isnan(point.xyz.z) &&
-            (point.debug_ground_point_label == GREENYELLOW || point.debug_ground_point_label == GREEN))
-        {
-            sgps_previous_ground_points_[row_index] = job.ring_buffer_current_global_column_index;
-            *(sgps_next_ground_points_[row_index]) = job.ring_buffer_current_global_column_index;
-            sgps_next_ground_points_[row_index] = std::make_shared<int64_t>(-1);
-        }
-
-        // save for each point a pointer to the next ground point (will be determined in the future!)
-        point.pointer_to_global_column_index_of_next_ground_point = sgps_next_ground_points_[row_index];
 
         // prepare everything for next step in pipeline (point association)
         point.is_ignored = false;
@@ -1209,14 +1228,9 @@ void StreamingClustering::publishColumns(int64_t from_global_column_index,
     }
 
     if (minimum_point_stamp.sec != std::numeric_limits<int32_t>::max())
-    {
         msg->header.stamp = minimum_point_stamp;
-    }
     else
-    {
-        ROS_WARN_STREAM("This column had no timestamps!");
-        return;
-    }
+        ROS_WARN_STREAM("This column had no timestamps. Unable to publish message with timestamp.");
 
     pub.publish(msg);
 }

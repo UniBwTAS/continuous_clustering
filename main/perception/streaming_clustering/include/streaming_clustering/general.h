@@ -20,11 +20,62 @@ struct Point2D
     {
         return x * x + y * y;
     }
+
+    inline Point2D min(Point2D& other) const
+    {
+        Point2D min = other;
+        if (x < min.x)
+            min.x = x;
+        if (y < min.y)
+            min.y = y;
+        return min;
+    }
+
+    inline Point2D max(Point2D& other) const
+    {
+        Point2D max = other;
+        if (x > max.x)
+            max.x = x;
+        if (y > max.y)
+            max.y = y;
+        return max;
+    }
+
+    inline Point2D normed() const
+    {
+        float l = 1.f / length();
+        return {x * l, y * l};
+    }
 };
 
 inline Point2D operator-(const Point2D& p1, const Point2D& p2)
 {
     return {p1.x - p2.x, p1.y - p2.y};
+}
+
+inline Point2D operator+(const Point2D& p1, const Point2D& p2)
+{
+    return {p1.x + p2.x, p1.y + p2.y};
+}
+
+inline float operator*(const Point2D& p1, const Point2D& p2)
+{
+    return p1.x * p2.x + p1.y * p2.y;
+}
+
+inline Point2D operator*(const Point2D& p, float s)
+{
+    return {p.x * s, p.y * s};
+}
+
+inline Point2D operator*(float s, const Point2D& p)
+{
+    return {p.x * s, p.y * s};
+}
+
+inline Point2D operator/(const Point2D& p, float s)
+{
+    return {p.x / s, p.y / s};
 }
 
 struct Point3D
@@ -99,6 +150,12 @@ struct Point3D
             max.z = z;
         return max;
     }
+
+    inline Point3D normed() const
+    {
+        float l = 1.f / length();
+        return {x * l, y * l, z * l};
+    }
 };
 
 inline Point3D operator-(const Point3D& p1, const Point3D& p2)
@@ -129,6 +186,20 @@ inline Point3D operator*(float s, const Point3D& p)
 inline Point3D operator/(const Point3D& p, float s)
 {
     return {p.x / s, p.y / s, p.z / s};
+}
+
+template<typename PointXD>
+inline PointXD get_line_direction(PointXD line_start, PointXD line_end)
+{
+    return (line_end - line_start).normed();
+}
+
+template<typename PointXD>
+inline float distance_point_from_line(PointXD point, PointXD line_start, PointXD line_direction)
+{
+    // see e.g.: https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line#Vector_formulation (from 28. July 2023)
+    PointXD start_to_point = point - line_start;
+    return (start_to_point - (start_to_point * line_direction) * line_direction).length();
 }
 
 struct PointCloudLine

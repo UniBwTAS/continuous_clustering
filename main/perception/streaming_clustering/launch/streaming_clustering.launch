@@ -23,7 +23,8 @@
         <arg name="ouster_metadata_service"/>  <!-- full service name to get metadata -->
     </group>
 
-    <!-- ros specific parameters -->
+    <!-- other ros specific parameters -->
+    <arg name="ego_robot_frame" default="base_link"/>
     <arg name="odom_frame" default="odom"/>
     <arg name="namespace" default="perception/detections/lidar_$(arg sensor_position)/cluster"/>
 
