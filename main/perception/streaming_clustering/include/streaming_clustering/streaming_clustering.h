@@ -179,7 +179,7 @@ class StreamingClustering
 
     // ground point segmentation
     inline void performGroundPointSegmentationForColumn(SegmentationJob&& job);
-    static inline Point2D to2D(const Point3D& p)
+    static inline Point2D to2dInAzimuthPlane(const Point3D& p)
     {
         return {p.xy().length(), p.z};
     }

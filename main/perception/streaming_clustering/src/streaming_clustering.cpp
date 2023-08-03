@@ -372,6 +372,7 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
                 tf_synchronizer.getTfBuffer()->lookupTransform(ego_robot_frame, sensor_frame, ros::Time());
             sgps_ego_robot_frame_from_sensor_frame_ = std::make_unique<tf2::Transform>();
             tf2::fromMsg(tf.transform, *sgps_ego_robot_frame_from_sensor_frame_);
+            height_sensor_to_ground_ = -static_cast<float>(tf.transform.translation.z) + height_ref_to_ground_;
         }
         catch (tf2::TransformException& ex)
         {
@@ -381,20 +382,15 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
     tf2::Transform ego_robot_frame_from_odom_frame =
         *sgps_ego_robot_frame_from_sensor_frame_ * job.odom_frame_from_sensor_frame.inverse();
 
-    // new TODO
-    bool last_point_was_obstacle = true;
-    Point2D line_start, line_direction;
-    bool line_initialized = false;
-    int line_start_row_index = -1;
-
     // iterate rows from bottom to top and find ground points
+    bool first_obstacle_detected = false;
     bool first_point_found = false;
-    Point3D last_ground_point_wrt_sensor = Point3D(0, 0, height_sensor_to_ground_);
-    Point3D previous_position, previous_position_wrt_sensor;
-    int number_of_flat_points_after_obstacle = 0;
-    int row_index_of_first_flat_point_after_obstacle = -1;
-    bool obstacle_mode = false;
+    Point3D last_ground_position_wrt_sensor{0, 0, height_sensor_to_ground_};
+    Point3D ground_x_meter_behind_position_wrt_sensor = {0, 0, 0};
+    int ground_x_meter_behind_row_index = -1;
+    Point3D previous_position_wrt_sensor;
     float inclination_previous_laser = 0; // calculate difference between inclination angles for subsequent steps
+
     for (int row_index = num_rows - 1; row_index >= 0; row_index--)
     {
         // obtain point
@@ -469,17 +465,6 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
         {
             point.ground_point_label = GP_EGO_VEHICLE;
             point.debug_ground_point_label = VIOLET;
-            // last_point_was_obstacle = true;
-            // number_of_flat_points_after_obstacle = 0;
-            // row_index_of_first_flat_point_after_obstacle = -1;
-            continue;
-        }
-
-        // special handling for points below ego vehicle, which are reflections from mirror (only ouster, TODO)
-        if (current_position_in_ego_robot_frame.z() < height_ref_to_ground_ - 0.2)
-        {
-            point.ground_point_label = GP_EGO_VEHICLE;
-            point.debug_ground_point_label = BLACK;
             continue;
         }
 
@@ -490,178 +475,79 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
         {
             // now we found the first point outside the ego vehicle box
             first_point_found = true;
-            if (std::abs(current_position_in_ego_robot_frame.z() - height_ref_to_ground_) <
-                config_.first_ring_max_height_diff)
+            float height_over_predicted_ground = current_position_wrt_sensor.z - height_sensor_to_ground_;
+            if (height_over_predicted_ground > config_.first_ring_as_ground_min_allowed_z_diff &&
+                height_over_predicted_ground < config_.first_ring_as_ground_max_allowed_z_diff)
             {
                 point.ground_point_label = GP_GROUND;
                 point.debug_ground_point_label = GRAY;
-                // point.height_over_ground = 0.f;
-                // last_ground_point_wrt_sensor = current_position_wrt_sensor;
-                // obstacle_mode = false;
-                last_point_was_obstacle = false;
+                last_ground_position_wrt_sensor = current_position_wrt_sensor;
+                ground_x_meter_behind_row_index = row_index;
+                first_obstacle_detected = false;
             }
             else
             {
                 point.ground_point_label = GP_OBSTACLE;
                 point.debug_ground_point_label = ORANGE;
-                // point.height_over_ground = current_position_wrt_sensor.z - last_ground_point_wrt_sensor.z;
-                // obstacle_mode = true;
-                last_point_was_obstacle = true;
+                first_obstacle_detected = true;
             }
-            previous_position = current_position;
             previous_position_wrt_sensor = current_position_wrt_sensor;
             continue;
         }
 
-        Point2D current_position_wrt_sensor_2d = to2D(current_position_wrt_sensor);
-        Point2D previous_position_wrt_sensor_2d = to2D(previous_position_wrt_sensor);
+        // calculate the slope w.r.t previous point
+        Point2D current_position_wrt_sensor_2d = to2dInAzimuthPlane(current_position_wrt_sensor);
+        Point2D previous_position_wrt_sensor_2d = to2dInAzimuthPlane(previous_position_wrt_sensor);
         Point2D previous_to_current = current_position_wrt_sensor_2d - previous_position_wrt_sensor_2d;
-        float slope = previous_to_current.y / previous_to_current.x;
-        bool is_flat =
-            std::abs(slope) < config_.max_slope && previous_position_wrt_sensor_2d.x < current_position_wrt_sensor_2d.x;
+        float slope_to_prev = previous_to_current.y / previous_to_current.x;
+        bool is_flat_wrt_prev = std::abs(slope_to_prev) < config_.max_slope && previous_to_current.x > 0;
 
-        float distance_from_line =
-            line_initialized ? distance_point_from_line(current_position_wrt_sensor_2d, line_start, line_direction) :
-                               std::numeric_limits<float>::max();
-        bool fits_to_line = distance_from_line < config_.max_z_distance_to_connection_line;
+        // calculate slope w.r.t. last seen (quite certain) ground point
+        Point2D last_ground_position_wrt_sensor_2d = to2dInAzimuthPlane(last_ground_position_wrt_sensor);
+        Point2D last_ground_to_current = current_position_wrt_sensor_2d - last_ground_position_wrt_sensor_2d;
+        float slope_to_last_ground = last_ground_to_current.y / last_ground_to_current.x;
+        bool is_flat_wrt_last_ground = std::abs(slope_to_last_ground) < config_.max_slope &&
+                                       last_ground_to_current.x > 0;
 
-        bool update_line = false;
-        if (!last_point_was_obstacle)
+        if (!first_obstacle_detected && is_flat_wrt_prev)
         {
-            if (is_flat || fits_to_line)
-            {
-                point.ground_point_label = GP_GROUND;
-                point.debug_ground_point_label = is_flat ? GREEN : YELLOWGREEN;
-                update_line = is_flat; // TODO: maybe only if is_flat
-            }
-            else
-            {
-                point.ground_point_label = GP_OBSTACLE;
-                point.debug_ground_point_label = RED;
-                last_point_was_obstacle = true;
-            }
+            point.ground_point_label = GP_GROUND;
+            point.debug_ground_point_label = GREEN;
+        }
+        else if (first_obstacle_detected && is_flat_wrt_prev && is_flat_wrt_last_ground)
+        {
+            point.ground_point_label = GP_GROUND;
+            point.debug_ground_point_label = YELLOWGREEN;
         }
         else
         {
-            if (fits_to_line)
-            {
-                point.ground_point_label = GP_GROUND;
-                point.debug_ground_point_label = PINK;
-                update_line = true;
-                last_point_was_obstacle = false;
-            }
-            else if (false)
-            {
-                // go back x meter and create a line
-                bool was_able_to_go_at_least_x_meter_back = false;
-                int recover_line_start_row_index = row_index + 1;
-                Point2D recover_line_start;
-                Point2D recover_line_direction;
-                while (recover_line_start_row_index < num_rows)
-                {
-                    // TODO: make more efficient, update this point online
-                    Point& p = range_image_[local_column_index * num_rows + recover_line_start_row_index];
-                    recover_line_start = to2D(p.xyz - sgps_sensor_position);
-                    Point2D recover_line_start_to_end = current_position_wrt_sensor_2d - recover_line_start;
-                    if (recover_line_start_to_end.x > 1.f) // TODO: break after too many NaNs?
-                    {
-                        was_able_to_go_at_least_x_meter_back =
-                            std::abs(recover_line_start_to_end.y / recover_line_start_to_end.x) < config_.max_slope &&
-                            recover_line_start.x < current_position_wrt_sensor_2d.x;
-                        recover_line_direction = get_line_direction(recover_line_start, current_position_wrt_sensor_2d);
-                        break;
-                    }
-                    recover_line_start_row_index++;
-                }
-
-                // go forward x meter and check if all points are on the line
-                bool last_x_meter_flat = false;
-                if (was_able_to_go_at_least_x_meter_back)
-                {
-                    last_x_meter_flat = true;
-                    for (int recover_line_current_row_index = recover_line_start_row_index - 1;
-                         recover_line_current_row_index > row_index;
-                         recover_line_current_row_index--)
-                    {
-                        Point& p = range_image_[local_column_index * num_rows + recover_line_current_row_index];
-                        Point2D pos = to2D(p.xyz - sgps_sensor_position);
-                        if (distance_point_from_line(pos, recover_line_start, recover_line_direction) >
-                            config_.max_z_distance_to_connection_line)
-                        {
-                            last_x_meter_flat = false;
-                            break;
-                        }
-                    }
-                }
-
-                // if all points on this line -> ground
-                if (last_x_meter_flat)
-                {
-                    for (int recover_line_current_row_index = recover_line_start_row_index;
-                         recover_line_current_row_index >= row_index;
-                         recover_line_current_row_index--)
-                    {
-                        Point& p = range_image_[local_column_index * num_rows + recover_line_current_row_index];
-                        p.ground_point_label = GP_GROUND;
-                        p.debug_ground_point_label = BLUEVIOLET;
-                    }
-                    line_start = recover_line_start;
-                    line_direction = recover_line_direction;
-                    last_point_was_obstacle = false;
-                }
-                else
-                {
-                    point.ground_point_label = GP_OBSTACLE;
-                    point.debug_ground_point_label = RED;
-                }
-            }
-            else
-            {
-                point.ground_point_label = GP_OBSTACLE;
-                point.debug_ground_point_label = RED;
-            }
+            point.ground_point_label = GP_OBSTACLE;
+            point.debug_ground_point_label = RED;
         }
 
-        if (update_line)
+        // check whether we have ever seen an obstacle
+        first_obstacle_detected |= point.ground_point_label == GP_OBSTACLE;
+
+        // keep track of last ground point
+        if (point.ground_point_label == GP_GROUND)
         {
-            Point2D line_end = current_position_wrt_sensor_2d;
-            if (!line_initialized)
+            // only use current point as the new last ground point when it was plausible. On wet streets there are often
+            // false points below the ground surface because of reflections. Therefore, we do not want the slope to be
+            // too much going down. Furthermore, in this case often there is a larger distance jump.
+            if (slope_to_prev > config_.last_ground_point_slope_higher_than &&
+                std::abs(previous_to_current.x) < config_.last_ground_point_distance_smaller_than)
             {
-                line_start = previous_position_wrt_sensor_2d;
-                line_initialized = true;
-                line_start_row_index = row_index;
+                last_ground_position_wrt_sensor = current_position_wrt_sensor;
+                if (ground_x_meter_behind_row_index == -1)
+                    ground_x_meter_behind_row_index = row_index;
             }
             else
             {
-                // try to update line start
-                int preliminary_line_start_row_index = line_start_row_index - 1;
-                while (preliminary_line_start_row_index > row_index)
-                {
-                    // TODO: make more efficient
-                    Point& p = range_image_.at(local_column_index * num_rows + preliminary_line_start_row_index);
-                    Point2D pos = to2D(p.xyz - sgps_sensor_position);
-                    if (!std::isnan(pos.x) && p.ground_point_label == GP_GROUND) // TODO: second cond. enough?
-                    {
-                        Point2D preliminary_start_to_end = line_end - pos;
-
-                        // check that line start and line end are not too close
-                        if (preliminary_start_to_end.x < 1.f)
-                            break;
-
-                        // check if slope of line would be small
-                        if (preliminary_start_to_end.y / preliminary_start_to_end.x < 0.2) // (TODO: necessary?)
-                        {
-                            line_start = pos;
-                            line_start_row_index = preliminary_line_start_row_index;
-                        }
-                    }
-                    preliminary_line_start_row_index--;
-                }
+                point.debug_ground_point_label = BLACK;
             }
-            line_direction = get_line_direction(line_start, line_end);
         }
 
-        previous_position = current_position;
+        // keep track of previous point
         previous_position_wrt_sensor = current_position_wrt_sensor;
     }
 
