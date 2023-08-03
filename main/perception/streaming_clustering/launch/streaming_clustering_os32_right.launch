@@ -1,0 +1,4 @@
+<launch>
+    <arg name="sensor_position" default="right"/>
+    <include file="$(find streaming_clustering)/launch/streaming_clustering_os32_left.launch" pass_all_args="true"/>
+</launch>

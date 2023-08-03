@@ -35,6 +35,8 @@
 
     <!-- clustering parameters -->
     <arg name="use_last_point_for_cluster_stamp" default="false"/>
+    <arg name="ignore_points_in_chessboard_pattern" default="true"/>
+    <arg name="ignore_points_with_too_big_inclination_angle_diff" default="true"/>
 
     <group ns="$(arg namespace)">
 
@@ -58,6 +60,9 @@
             <param name="supplement_inclination_angle_for_nan_cells"
                    value="$(arg supplement_inclination_angle_for_nan_cells)"/>
             <param name="use_last_point_for_cluster_stamp" value="$(arg use_last_point_for_cluster_stamp)"/>
+            <param name="ignore_points_in_chessboard_pattern" value="$(arg ignore_points_in_chessboard_pattern)"/>
+            <param name="ignore_points_with_too_big_inclination_angle_diff"
+                   value="$(arg ignore_points_with_too_big_inclination_angle_diff)"/>
         </node>
 
     </group>

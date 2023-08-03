@@ -4,11 +4,14 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /StreamingPointClouds1/GroundPointSegmentation1/Enable streaming1
-        - /StreamingRangeImages1/Firings1/Enable streaming1
-        - /StreamingRangeImages1/GroundPointSegmentation1/Enable streaming1
+        - /LidarRoof1
+        - /LidarRoof1/StreamingPointClouds1/Firings1/Enable streaming1
+        - /LidarLeft1
+        - /LidarLeft1/StreamingPointClouds1/Firings1/Enable streaming1
+        - /LidarLeft1/StreamingRangeImages1/InstanceSegmentation1/Enable streaming1
+        - /LidarRight1
       Splitter Ratio: 0.6441441178321838
-    Tree Height: 726
+    Tree Height: 601
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -24,10 +27,9 @@ Panels:
     Name: Views
     Splitter Ratio: 0.5
   - Class: rviz/Time
-    Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: Firings
+    SyncSource: PointCloudFullRevolution
   - Class: rosbag_panel/RosbagPanel
     LastOpenedDirectory: /data/rosbags/MultiObjectTracking/MultiSensor/out.bag
     Name: RosbagPanel
@@ -327,81 +329,8 @@ Visualization Manager:
       Update Interval: 0
       Value: true
       Visual Enabled: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: sem_label
-      Class: rviz/PointCloud2
-      Color: 238; 238; 236
-      Color Transformer: FlatColor
-      Continuous Transform: false
-      Decay Time: 0
-      Enabled: false
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Min Color: 0; 0; 0
-      Name: PointCloudFullRevolution
-      Position Transformer: XYZ
-      Queue Size: 10
-      Selectable: true
-      Show only:
-        Channel Name: sem_label
-        Equal To: 0
-        Value: false
-      Size (Pixels): 3
-      Size (m): 0.20000000298023224
-      Style: Spheres
-      Topic: /sensor/lidar/vls128_roof/velodyne_points_corrected
-      Unreliable: false
-      Use Fixed Frame: true
-      Use rainbow: true
-      Value: false
     - Class: rviz/Group
       Displays:
-        - Alpha: 1
-          Autocompute Intensity Bounds: false
-          Autocompute Value Bounds:
-            Max Value: 6.749253273010254
-            Min Value: -1.0877271890640259
-            Value: true
-          Axis: Z
-          Channel Name: ground_point_label
-          Class: rviz/StreamingPointCloud2
-          Color: 136; 138; 133
-          Color Transformer: FlatColor
-          Decay Time: 0
-          Enable streaming:
-            Flip: false
-            Maximum Columns: 0
-            Upside Down: false
-            Value: false
-          Enabled: true
-          Invert Rainbow: false
-          Max Color: 255; 255; 255
-          Max Intensity: 255
-          Min Color: 0; 0; 0
-          Min Intensity: 0
-          Name: Firings
-          Position Transformer: XYZ
-          Queue Size: 1000
-          Selectable: true
-          Show only:
-            Channel Name: sem_label
-            Equal To: 0
-            Value: false
-          Size (Pixels): 3
-          Size (m): 0.4000000059604645
-          Style: Spheres
-          Topic: /perception/detections/lidar_roof/cluster/raw_firings
-          Unreliable: false
-          Use Fixed Frame: true
-          Use rainbow: true
-          Value: true
-          Wait for transform: false
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
@@ -409,23 +338,19 @@ Visualization Manager:
             Min Value: -10
             Value: true
           Axis: Z
-          Channel Name: ground_point_label
-          Class: rviz/StreamingPointCloud2
-          Color: 255; 255; 255
-          Color Transformer: Label
+          Channel Name: sem_label
+          Class: rviz/PointCloud2
+          Color: 238; 238; 236
+          Color Transformer: FlatColor
+          Continuous Transform: false
           Decay Time: 0
-          Enable streaming:
-            Flip: false
-            Maximum Columns: 1700
-            Upside Down: false
-            Value: true
-          Enabled: true
+          Enabled: false
           Invert Rainbow: false
           Max Color: 255; 255; 255
           Min Color: 0; 0; 0
-          Name: GroundPointSegmentation
+          Name: PointCloudFullRevolution
           Position Transformer: XYZ
-          Queue Size: 1000
+          Queue Size: 10
           Selectable: true
           Show only:
             Channel Name: sem_label
@@ -434,154 +359,231 @@ Visualization Manager:
           Size (Pixels): 3
           Size (m): 0.20000000298023224
           Style: Spheres
-          Topic: /perception/detections/lidar_roof/cluster/streaming_ground_point_segmentation
-          Unreliable: false
-          Use Fixed Frame: true
-          Use rainbow: true
-          Value: true
-          Wait for transform: true
-        - Alpha: 1
-          Autocompute Intensity Bounds: true
-          Autocompute Value Bounds:
-            Max Value: 16.709793090820312
-            Min Value: -0.5691378116607666
-            Value: true
-          Axis: Z
-          Channel Name: id
-          Class: rviz/StreamingPointCloud2
-          Color: 255; 255; 255
-          Color Transformer: Label
-          Decay Time: 0
-          Enable streaming:
-            Flip: false
-            Maximum Columns: 1700
-            Upside Down: false
-            Value: true
-          Enabled: false
-          Invert Rainbow: false
-          Max Color: 255; 255; 255
-          Min Color: 0; 0; 0
-          Name: InstanceSegmentation
-          Position Transformer: XYZ
-          Queue Size: 1000
-          Selectable: true
-          Show only:
-            Channel Name: sem_label
-            Equal To: 0
-            Value: false
-          Size (Pixels): 3
-          Size (m): 0.20000000298023224
-          Style: Spheres
-          Topic: /perception/detections/lidar_roof/cluster/streaming_instance_segmentation
+          Topic: /sensor/lidar/vls128_roof/velodyne_points_corrected
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
           Value: false
-          Wait for transform: true
-      Enabled: false
-      Name: StreamingPointClouds
-    - Class: rviz/Group
-      Displays:
-        - Autocompute Intensity Bounds: true
-          Autocompute Value Bounds:
-            Max Value: 26.081483840942383
-            Min Value: -9.621848106384277
-            Value: true
-          Axis: Z
-          Channel Name: ground_point_label
-          Class: rviz/RangeImage
-          Color: 255; 255; 255
-          Color Transformer: Intensity
-          Enable streaming:
-            Maximum Columns: 1700
-            Value: true
+        - Class: rviz/Group
+          Displays:
+            - Alpha: 1
+              Autocompute Intensity Bounds: false
+              Autocompute Value Bounds:
+                Max Value: 6.749253273010254
+                Min Value: -1.0877271890640259
+                Value: true
+              Axis: Z
+              Channel Name: ground_point_label
+              Class: rviz/StreamingPointCloud2
+              Color: 136; 138; 133
+              Color Transformer: FlatColor
+              Decay Time: 0
+              Enable streaming:
+                Flip: false
+                Maximum Columns: 1
+                Upside Down: false
+                Value: true
+              Enabled: false
+              Invert Rainbow: false
+              Max Color: 255; 255; 255
+              Max Intensity: 255
+              Min Color: 0; 0; 0
+              Min Intensity: 0
+              Name: Firings
+              Position Transformer: XYZ
+              Queue Size: 1000
+              Selectable: true
+              Show only:
+                Channel Name: sem_label
+                Equal To: 0
+                Value: false
+              Size (Pixels): 3
+              Size (m): 0.4000000059604645
+              Style: Spheres
+              Topic: /perception/detections/lidar_roof/cluster/raw_firings
+              Unreliable: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: false
+              Wait for transform: false
+            - Alpha: 1
+              Autocompute Intensity Bounds: true
+              Autocompute Value Bounds:
+                Max Value: 10
+                Min Value: -10
+                Value: true
+              Axis: Z
+              Channel Name: ground_point_label
+              Class: rviz/StreamingPointCloud2
+              Color: 255; 255; 255
+              Color Transformer: Label
+              Decay Time: 0
+              Enable streaming:
+                Flip: false
+                Maximum Columns: 1700
+                Upside Down: false
+                Value: true
+              Enabled: true
+              Invert Rainbow: false
+              Max Color: 255; 255; 255
+              Min Color: 0; 0; 0
+              Name: GroundPointSegmentation
+              Position Transformer: XYZ
+              Queue Size: 1000
+              Selectable: true
+              Show only:
+                Channel Name: sem_label
+                Equal To: 0
+                Value: false
+              Size (Pixels): 3
+              Size (m): 0.20000000298023224
+              Style: Spheres
+              Topic: /perception/detections/lidar_roof/cluster/streaming_ground_point_segmentation
+              Unreliable: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: true
+              Wait for transform: true
+            - Alpha: 1
+              Autocompute Intensity Bounds: true
+              Autocompute Value Bounds:
+                Max Value: 16.709793090820312
+                Min Value: -0.5691378116607666
+                Value: true
+              Axis: Z
+              Channel Name: id
+              Class: rviz/StreamingPointCloud2
+              Color: 255; 255; 255
+              Color Transformer: Label
+              Decay Time: 0
+              Enable streaming:
+                Flip: false
+                Maximum Columns: 1700
+                Upside Down: false
+                Value: true
+              Enabled: false
+              Invert Rainbow: false
+              Max Color: 255; 255; 255
+              Min Color: 0; 0; 0
+              Name: InstanceSegmentation
+              Position Transformer: XYZ
+              Queue Size: 1000
+              Selectable: true
+              Show only:
+                Channel Name: sem_label
+                Equal To: 0
+                Value: false
+              Size (Pixels): 3
+              Size (m): 0.20000000298023224
+              Style: Spheres
+              Topic: /perception/detections/lidar_roof/cluster/streaming_instance_segmentation
+              Unreliable: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: false
+              Wait for transform: true
           Enabled: false
-          Flip: false
-          Invert Rainbow: false
-          Keep Aspect Ratio: true
-          Mark NaN Pixels:
-            NaN Pixel Color: 255; 0; 0
-            Value: false
-          Max Color: 255; 255; 255
-          Min Color: 0; 0; 0
-          Name: Firings
-          Show only:
-            Channel Name: sem_label
-            Equal To: 0
-            Value: false
-          Topic: /perception/detections/lidar_roof/cluster/raw_firings
-          Upside Down: false
-          Use Fixed Frame: true
-          Use rainbow: true
-          Value: false
-        - Autocompute Intensity Bounds: true
-          Autocompute Value Bounds:
-            Max Value: 25.598407745361328
-            Min Value: -7.141951560974121
-            Value: true
-          Axis: Z
-          Channel Name: ground_point_label
-          Class: rviz/RangeImage
-          Color: 255; 255; 255
-          Color Transformer: Label
-          Enable streaming:
-            Maximum Columns: 1700
-            Value: true
+          Name: StreamingPointClouds
+        - Class: rviz/Group
+          Displays:
+            - Autocompute Intensity Bounds: true
+              Autocompute Value Bounds:
+                Max Value: 26.081483840942383
+                Min Value: -9.621848106384277
+                Value: true
+              Axis: Z
+              Channel Name: ground_point_label
+              Class: rviz/RangeImage
+              Color: 255; 255; 255
+              Color Transformer: Intensity
+              Enable streaming:
+                Maximum Columns: 1700
+                Value: true
+              Enabled: false
+              Flip: false
+              Invert Rainbow: false
+              Keep Aspect Ratio: true
+              Mark NaN Pixels:
+                NaN Pixel Color: 255; 0; 0
+                Value: false
+              Max Color: 255; 255; 255
+              Min Color: 0; 0; 0
+              Name: Firings
+              Show only:
+                Channel Name: sem_label
+                Equal To: 0
+                Value: false
+              Topic: /perception/detections/lidar_roof/cluster/raw_firings
+              Upside Down: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: false
+            - Autocompute Intensity Bounds: true
+              Autocompute Value Bounds:
+                Max Value: 25.598407745361328
+                Min Value: -7.141951560974121
+                Value: true
+              Axis: Z
+              Channel Name: ground_point_label
+              Class: rviz/RangeImage
+              Color: 255; 255; 255
+              Color Transformer: Label
+              Enable streaming:
+                Maximum Columns: 1700
+                Value: true
+              Enabled: true
+              Flip: false
+              Invert Rainbow: false
+              Keep Aspect Ratio: true
+              Mark NaN Pixels:
+                NaN Pixel Color: 255; 0; 0
+                Value: false
+              Max Color: 255; 255; 255
+              Min Color: 0; 0; 0
+              Name: GroundPointSegmentation
+              Show only:
+                Channel Name: sem_label
+                Equal To: 0
+                Value: false
+              Topic: /perception/detections/lidar_roof/cluster/streaming_ground_point_segmentation
+              Upside Down: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: true
+            - Autocompute Intensity Bounds: true
+              Autocompute Value Bounds:
+                Max Value: 23.944974899291992
+                Min Value: -7.839169025421143
+                Value: true
+              Axis: Z
+              Channel Name: id
+              Class: rviz/RangeImage
+              Color: 255; 255; 255
+              Color Transformer: Label
+              Enable streaming:
+                Maximum Columns: 1700
+                Value: true
+              Enabled: false
+              Flip: false
+              Invert Rainbow: false
+              Keep Aspect Ratio: true
+              Mark NaN Pixels:
+                NaN Pixel Color: 255; 0; 0
+                Value: false
+              Max Color: 255; 255; 255
+              Min Color: 0; 0; 0
+              Name: InstanceSegmentation
+              Show only:
+                Channel Name: sem_label
+                Equal To: 0
+                Value: false
+              Topic: /perception/detections/lidar_roof/cluster/streaming_instance_segmentation
+              Upside Down: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: false
           Enabled: false
-          Flip: false
-          Invert Rainbow: false
-          Keep Aspect Ratio: true
-          Mark NaN Pixels:
-            NaN Pixel Color: 255; 0; 0
-            Value: false
-          Max Color: 255; 255; 255
-          Min Color: 0; 0; 0
-          Name: GroundPointSegmentation
-          Show only:
-            Channel Name: sem_label
-            Equal To: 0
-            Value: false
-          Topic: /perception/detections/lidar_roof/cluster/streaming_ground_point_segmentation
-          Upside Down: false
-          Use Fixed Frame: true
-          Use rainbow: true
-          Value: false
-        - Autocompute Intensity Bounds: true
-          Autocompute Value Bounds:
-            Max Value: 23.944974899291992
-            Min Value: -7.839169025421143
-            Value: true
-          Axis: Z
-          Channel Name: id
-          Class: rviz/RangeImage
-          Color: 255; 255; 255
-          Color Transformer: Label
-          Enable streaming:
-            Maximum Columns: 1700
-            Value: true
-          Enabled: true
-          Flip: false
-          Invert Rainbow: false
-          Keep Aspect Ratio: true
-          Mark NaN Pixels:
-            NaN Pixel Color: 255; 0; 0
-            Value: false
-          Max Color: 255; 255; 255
-          Min Color: 0; 0; 0
-          Name: InstanceSegmentation
-          Show only:
-            Channel Name: sem_label
-            Equal To: 0
-            Value: false
-          Topic: /perception/detections/lidar_roof/cluster/streaming_instance_segmentation
-          Upside Down: false
-          Use Fixed Frame: true
-          Use rainbow: true
-          Value: true
-      Enabled: false
-      Name: StreamingRangeImages
-    - Class: rviz/Group
-      Displays:
+          Name: StreamingRangeImages
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
@@ -603,7 +605,7 @@ Visualization Manager:
           Invert Rainbow: false
           Max Color: 255; 255; 255
           Min Color: 0; 0; 0
-          Name: Clusters
+          Name: StreamingInstances
           Position Transformer: XYZ
           Queue Size: 1000
           Selectable: true
@@ -621,7 +623,597 @@ Visualization Manager:
           Value: true
           Wait for transform: true
       Enabled: true
-      Name: StreamingInstances
+      Name: LidarRoof
+    - Class: rviz/Group
+      Displays:
+        - Alpha: 1
+          Autocompute Intensity Bounds: true
+          Autocompute Value Bounds:
+            Max Value: 10
+            Min Value: -10
+            Value: true
+          Axis: Z
+          Channel Name: sem_label
+          Class: rviz/PointCloud2
+          Color: 238; 238; 236
+          Color Transformer: FlatColor
+          Continuous Transform: false
+          Decay Time: 0
+          Enabled: false
+          Invert Rainbow: false
+          Max Color: 255; 255; 255
+          Min Color: 0; 0; 0
+          Name: PointCloudFullRevolution
+          Position Transformer: XYZ
+          Queue Size: 10
+          Selectable: true
+          Show only:
+            Channel Name: sem_label
+            Equal To: 0
+            Value: false
+          Size (Pixels): 3
+          Size (m): 0.20000000298023224
+          Style: Spheres
+          Topic: /sensor/lidar/os32_left/points
+          Unreliable: false
+          Use Fixed Frame: true
+          Use rainbow: true
+          Value: false
+        - Class: rviz/Group
+          Displays:
+            - Alpha: 1
+              Autocompute Intensity Bounds: false
+              Autocompute Value Bounds:
+                Max Value: 6.749253273010254
+                Min Value: -1.0877271890640259
+                Value: true
+              Axis: Z
+              Channel Name: ground_point_label
+              Class: rviz/StreamingPointCloud2
+              Color: 136; 138; 133
+              Color Transformer: FlatColor
+              Decay Time: 0
+              Enable streaming:
+                Flip: false
+                Maximum Columns: 1
+                Upside Down: false
+                Value: true
+              Enabled: false
+              Invert Rainbow: false
+              Max Color: 255; 255; 255
+              Max Intensity: 255
+              Min Color: 0; 0; 0
+              Min Intensity: 0
+              Name: Firings
+              Position Transformer: XYZ
+              Queue Size: 1000
+              Selectable: true
+              Show only:
+                Channel Name: sem_label
+                Equal To: 0
+                Value: false
+              Size (Pixels): 3
+              Size (m): 0.4000000059604645
+              Style: Spheres
+              Topic: /perception/detections/lidar_left/cluster/raw_firings
+              Unreliable: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: false
+              Wait for transform: false
+            - Alpha: 1
+              Autocompute Intensity Bounds: true
+              Autocompute Value Bounds:
+                Max Value: 10
+                Min Value: -10
+                Value: true
+              Axis: Z
+              Channel Name: ground_point_label
+              Class: rviz/StreamingPointCloud2
+              Color: 255; 255; 255
+              Color Transformer: Label
+              Decay Time: 0
+              Enable streaming:
+                Flip: false
+                Maximum Columns: 1024
+                Upside Down: false
+                Value: true
+              Enabled: true
+              Invert Rainbow: false
+              Max Color: 255; 255; 255
+              Min Color: 0; 0; 0
+              Name: GroundPointSegmentation
+              Position Transformer: XYZ
+              Queue Size: 1000
+              Selectable: true
+              Show only:
+                Channel Name: local_column_index
+                Equal To: 0
+                Value: false
+              Size (Pixels): 3
+              Size (m): 0.20000000298023224
+              Style: Spheres
+              Topic: /perception/detections/lidar_left/cluster/streaming_ground_point_segmentation
+              Unreliable: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: true
+              Wait for transform: true
+            - Alpha: 1
+              Autocompute Intensity Bounds: true
+              Autocompute Value Bounds:
+                Max Value: 16.709793090820312
+                Min Value: -0.5691378116607666
+                Value: true
+              Axis: Z
+              Channel Name: id
+              Class: rviz/StreamingPointCloud2
+              Color: 255; 255; 255
+              Color Transformer: Label
+              Decay Time: 0
+              Enable streaming:
+                Flip: false
+                Maximum Columns: 1024
+                Upside Down: false
+                Value: true
+              Enabled: false
+              Invert Rainbow: false
+              Max Color: 255; 255; 255
+              Min Color: 0; 0; 0
+              Name: InstanceSegmentation
+              Position Transformer: XYZ
+              Queue Size: 1000
+              Selectable: true
+              Show only:
+                Channel Name: sem_label
+                Equal To: 0
+                Value: false
+              Size (Pixels): 3
+              Size (m): 0.20000000298023224
+              Style: Spheres
+              Topic: /perception/detections/lidar_left/cluster/streaming_instance_segmentation
+              Unreliable: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: false
+              Wait for transform: true
+          Enabled: false
+          Name: StreamingPointClouds
+        - Class: rviz/Group
+          Displays:
+            - Autocompute Intensity Bounds: true
+              Autocompute Value Bounds:
+                Max Value: 26.081483840942383
+                Min Value: -9.621848106384277
+                Value: true
+              Axis: Z
+              Channel Name: ground_point_label
+              Class: rviz/RangeImage
+              Color: 255; 255; 255
+              Color Transformer: Intensity
+              Enable streaming:
+                Maximum Columns: 1024
+                Value: true
+              Enabled: false
+              Flip: false
+              Invert Rainbow: false
+              Keep Aspect Ratio: true
+              Mark NaN Pixels:
+                NaN Pixel Color: 255; 0; 0
+                Value: false
+              Max Color: 255; 255; 255
+              Min Color: 0; 0; 0
+              Name: Firings
+              Show only:
+                Channel Name: sem_label
+                Equal To: 0
+                Value: false
+              Topic: /perception/detections/lidar_left/cluster/raw_firings
+              Upside Down: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: false
+            - Autocompute Intensity Bounds: true
+              Autocompute Value Bounds:
+                Max Value: 25.598407745361328
+                Min Value: -7.141951560974121
+                Value: true
+              Axis: Z
+              Channel Name: ground_point_label
+              Class: rviz/RangeImage
+              Color: 255; 255; 255
+              Color Transformer: Label
+              Enable streaming:
+                Maximum Columns: 1024
+                Value: true
+              Enabled: true
+              Flip: false
+              Invert Rainbow: false
+              Keep Aspect Ratio: true
+              Mark NaN Pixels:
+                NaN Pixel Color: 255; 0; 0
+                Value: false
+              Max Color: 255; 255; 255
+              Min Color: 0; 0; 0
+              Name: GroundPointSegmentation
+              Show only:
+                Channel Name: sem_label
+                Equal To: 0
+                Value: false
+              Topic: /perception/detections/lidar_left/cluster/streaming_ground_point_segmentation
+              Upside Down: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: true
+            - Autocompute Intensity Bounds: true
+              Autocompute Value Bounds:
+                Max Value: 23.944974899291992
+                Min Value: -7.839169025421143
+                Value: true
+              Axis: Z
+              Channel Name: id
+              Class: rviz/RangeImage
+              Color: 255; 255; 255
+              Color Transformer: Label
+              Enable streaming:
+                Maximum Columns: 1024
+                Value: true
+              Enabled: false
+              Flip: false
+              Invert Rainbow: false
+              Keep Aspect Ratio: true
+              Mark NaN Pixels:
+                NaN Pixel Color: 255; 0; 0
+                Value: false
+              Max Color: 255; 255; 255
+              Min Color: 0; 0; 0
+              Name: InstanceSegmentation
+              Show only:
+                Channel Name: sem_label
+                Equal To: 0
+                Value: false
+              Topic: /perception/detections/lidar_left/cluster/streaming_instance_segmentation
+              Upside Down: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: false
+          Enabled: false
+          Name: StreamingRangeImages
+        - Alpha: 1
+          Autocompute Intensity Bounds: true
+          Autocompute Value Bounds:
+            Max Value: 5.040472984313965
+            Min Value: 1.1614373922348022
+            Value: true
+          Axis: Z
+          Channel Name: id
+          Class: rviz/StreamingPointCloud2
+          Color: 255; 255; 255
+          Color Transformer: Label
+          Decay Time: 0.10000000149011612
+          Enable streaming:
+            Flip: false
+            Maximum Columns: 0
+            Upside Down: false
+            Value: false
+          Enabled: true
+          Invert Rainbow: false
+          Max Color: 255; 255; 255
+          Min Color: 0; 0; 0
+          Name: StreamingInstances
+          Position Transformer: XYZ
+          Queue Size: 1000
+          Selectable: true
+          Show only:
+            Channel Name: sem_label
+            Equal To: 0
+            Value: false
+          Size (Pixels): 3
+          Size (m): 0.20000000298023224
+          Style: Spheres
+          Topic: /perception/detections/lidar_left/cluster/streaming_clusters
+          Unreliable: false
+          Use Fixed Frame: true
+          Use rainbow: true
+          Value: true
+          Wait for transform: true
+      Enabled: true
+      Name: LidarLeft
+    - Class: rviz/Group
+      Displays:
+        - Alpha: 1
+          Autocompute Intensity Bounds: true
+          Autocompute Value Bounds:
+            Max Value: 10
+            Min Value: -10
+            Value: true
+          Axis: Z
+          Channel Name: sem_label
+          Class: rviz/PointCloud2
+          Color: 238; 238; 236
+          Color Transformer: FlatColor
+          Continuous Transform: false
+          Decay Time: 0
+          Enabled: false
+          Invert Rainbow: false
+          Max Color: 255; 255; 255
+          Min Color: 0; 0; 0
+          Name: PointCloudFullRevolution
+          Position Transformer: XYZ
+          Queue Size: 10
+          Selectable: true
+          Show only:
+            Channel Name: sem_label
+            Equal To: 0
+            Value: false
+          Size (Pixels): 3
+          Size (m): 0.20000000298023224
+          Style: Spheres
+          Topic: /sensor/lidar/os32_right/points
+          Unreliable: false
+          Use Fixed Frame: true
+          Use rainbow: true
+          Value: false
+        - Class: rviz/Group
+          Displays:
+            - Alpha: 1
+              Autocompute Intensity Bounds: false
+              Autocompute Value Bounds:
+                Max Value: 6.749253273010254
+                Min Value: -1.0877271890640259
+                Value: true
+              Axis: Z
+              Channel Name: ground_point_label
+              Class: rviz/StreamingPointCloud2
+              Color: 136; 138; 133
+              Color Transformer: FlatColor
+              Decay Time: 0
+              Enable streaming:
+                Flip: false
+                Maximum Columns: 1
+                Upside Down: false
+                Value: true
+              Enabled: false
+              Invert Rainbow: false
+              Max Color: 255; 255; 255
+              Max Intensity: 255
+              Min Color: 0; 0; 0
+              Min Intensity: 0
+              Name: Firings
+              Position Transformer: XYZ
+              Queue Size: 1000
+              Selectable: true
+              Show only:
+                Channel Name: sem_label
+                Equal To: 0
+                Value: false
+              Size (Pixels): 3
+              Size (m): 0.4000000059604645
+              Style: Spheres
+              Topic: /perception/detections/lidar_right/cluster/raw_firings
+              Unreliable: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: false
+              Wait for transform: false
+            - Alpha: 1
+              Autocompute Intensity Bounds: true
+              Autocompute Value Bounds:
+                Max Value: 10
+                Min Value: -10
+                Value: true
+              Axis: Z
+              Channel Name: ground_point_label
+              Class: rviz/StreamingPointCloud2
+              Color: 255; 255; 255
+              Color Transformer: Label
+              Decay Time: 0
+              Enable streaming:
+                Flip: false
+                Maximum Columns: 1024
+                Upside Down: false
+                Value: true
+              Enabled: false
+              Invert Rainbow: false
+              Max Color: 255; 255; 255
+              Min Color: 0; 0; 0
+              Name: GroundPointSegmentation
+              Position Transformer: XYZ
+              Queue Size: 1000
+              Selectable: true
+              Show only:
+                Channel Name: local_column_index
+                Equal To: 0
+                Value: false
+              Size (Pixels): 3
+              Size (m): 0.20000000298023224
+              Style: Spheres
+              Topic: /perception/detections/lidar_right/cluster/streaming_ground_point_segmentation
+              Unreliable: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: false
+              Wait for transform: true
+            - Alpha: 1
+              Autocompute Intensity Bounds: true
+              Autocompute Value Bounds:
+                Max Value: 16.709793090820312
+                Min Value: -0.5691378116607666
+                Value: true
+              Axis: Z
+              Channel Name: id
+              Class: rviz/StreamingPointCloud2
+              Color: 255; 255; 255
+              Color Transformer: Label
+              Decay Time: 0
+              Enable streaming:
+                Flip: false
+                Maximum Columns: 1024
+                Upside Down: false
+                Value: true
+              Enabled: false
+              Invert Rainbow: false
+              Max Color: 255; 255; 255
+              Min Color: 0; 0; 0
+              Name: InstanceSegmentation
+              Position Transformer: XYZ
+              Queue Size: 1000
+              Selectable: true
+              Show only:
+                Channel Name: sem_label
+                Equal To: 0
+                Value: false
+              Size (Pixels): 3
+              Size (m): 0.20000000298023224
+              Style: Spheres
+              Topic: /perception/detections/lidar_right/cluster/streaming_instance_segmentation
+              Unreliable: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: false
+              Wait for transform: true
+          Enabled: false
+          Name: StreamingPointClouds
+        - Class: rviz/Group
+          Displays:
+            - Autocompute Intensity Bounds: true
+              Autocompute Value Bounds:
+                Max Value: 26.081483840942383
+                Min Value: -9.621848106384277
+                Value: true
+              Axis: Z
+              Channel Name: ground_point_label
+              Class: rviz/RangeImage
+              Color: 255; 255; 255
+              Color Transformer: Intensity
+              Enable streaming:
+                Maximum Columns: 1024
+                Value: true
+              Enabled: false
+              Flip: false
+              Invert Rainbow: false
+              Keep Aspect Ratio: true
+              Mark NaN Pixels:
+                NaN Pixel Color: 255; 0; 0
+                Value: false
+              Max Color: 255; 255; 255
+              Min Color: 0; 0; 0
+              Name: Firings
+              Show only:
+                Channel Name: sem_label
+                Equal To: 0
+                Value: false
+              Topic: /perception/detections/lidar_right/cluster/raw_firings
+              Upside Down: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: false
+            - Autocompute Intensity Bounds: true
+              Autocompute Value Bounds:
+                Max Value: 25.598407745361328
+                Min Value: -7.141951560974121
+                Value: true
+              Axis: Z
+              Channel Name: ground_point_label
+              Class: rviz/RangeImage
+              Color: 255; 255; 255
+              Color Transformer: Label
+              Enable streaming:
+                Maximum Columns: 1024
+                Value: true
+              Enabled: true
+              Flip: false
+              Invert Rainbow: false
+              Keep Aspect Ratio: true
+              Mark NaN Pixels:
+                NaN Pixel Color: 255; 0; 0
+                Value: false
+              Max Color: 255; 255; 255
+              Min Color: 0; 0; 0
+              Name: GroundPointSegmentation
+              Show only:
+                Channel Name: sem_label
+                Equal To: 0
+                Value: false
+              Topic: /perception/detections/lidar_right/cluster/streaming_ground_point_segmentation
+              Upside Down: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: true
+            - Autocompute Intensity Bounds: true
+              Autocompute Value Bounds:
+                Max Value: 23.944974899291992
+                Min Value: -7.839169025421143
+                Value: true
+              Axis: Z
+              Channel Name: id
+              Class: rviz/RangeImage
+              Color: 255; 255; 255
+              Color Transformer: Label
+              Enable streaming:
+                Maximum Columns: 1024
+                Value: true
+              Enabled: false
+              Flip: false
+              Invert Rainbow: false
+              Keep Aspect Ratio: true
+              Mark NaN Pixels:
+                NaN Pixel Color: 255; 0; 0
+                Value: false
+              Max Color: 255; 255; 255
+              Min Color: 0; 0; 0
+              Name: InstanceSegmentation
+              Show only:
+                Channel Name: sem_label
+                Equal To: 0
+                Value: false
+              Topic: /perception/detections/lidar_right/cluster/raw_firings
+              Upside Down: false
+              Use Fixed Frame: true
+              Use rainbow: true
+              Value: false
+          Enabled: false
+          Name: StreamingRangeImages
+        - Alpha: 1
+          Autocompute Intensity Bounds: true
+          Autocompute Value Bounds:
+            Max Value: 5.040472984313965
+            Min Value: 1.1614373922348022
+            Value: true
+          Axis: Z
+          Channel Name: id
+          Class: rviz/StreamingPointCloud2
+          Color: 255; 255; 255
+          Color Transformer: Label
+          Decay Time: 0.10000000149011612
+          Enable streaming:
+            Flip: false
+            Maximum Columns: 0
+            Upside Down: false
+            Value: false
+          Enabled: true
+          Invert Rainbow: false
+          Max Color: 255; 255; 255
+          Min Color: 0; 0; 0
+          Name: StreamingInstances
+          Position Transformer: XYZ
+          Queue Size: 1000
+          Selectable: true
+          Show only:
+            Channel Name: sem_label
+            Equal To: 0
+            Value: false
+          Size (Pixels): 3
+          Size (m): 0.20000000298023224
+          Style: Spheres
+          Topic: /perception/detections/lidar_right/cluster/streaming_clusters
+          Unreliable: false
+          Use Fixed Frame: true
+          Use rainbow: true
+          Value: true
+          Wait for transform: true
+      Enabled: true
+      Name: LidarRight
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
@@ -650,7 +1242,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 113.30565643310547
+      Distance: 28.877195358276367
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -658,17 +1250,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 29.371004104614258
-        Y: 1.0958318710327148
-        Z: -2.9848390568076866e-06
+        X: 0
+        Y: 0
+        Z: 0
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.15539859235286713
+      Pitch: 0.28539830446243286
       Target Frame: base_link
-      Yaw: 3.400367021560669
+      Yaw: 3.125401735305786
     Saved: ~
 Window Geometry:
   Displays:
@@ -677,12 +1269,12 @@ Window Geometry:
     collapsed: false
   GroundPointSegmentation:
     collapsed: false
-  Height: 1136
+  Height: 1016
   Hide Left Dock: false
-  Hide Right Dock: true
+  Hide Right Dock: false
   InstanceSegmentation:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd00000004000000000000023f00000416fc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d00000361000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000160052006f007300620061006700500061006e0065006c01000003a4000000af0000008c00ffffff000000010000010f00000348fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d00000348000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000738000000c8fc0100000002fc00000000000007380000000000fffffffaffffffff0200000004fb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000001600fffffffb0000000e0046006900720069006e006700730000000000ffffffff0000001600fffffffb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000001600fffffffb0000000800540069006d006500000004150000003e0000003900fffffffb0000000800540069006d00650100000000000004500000000000000000000004f30000041600000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000023f0000039efc0200000008fb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d000002e4000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000160052006f007300620061006700500061006e0065006c0100000327000000b40000008c00ffffff000000010000010f0000039efc0200000004fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000001200530065006c0065006300740069006f006e010000003d000001840000005c00fffffffb0000000a0056006900650077007301000001c700000214000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000738000000c8fc0100000008fb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e000000000000000738000000ce00fffffffb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e000000000000000738000000eb00fffffffb0000000e0046006900720069006e006700730000000000000007380000006200fffffffc00000000000007380000000000fffffffaffffffff0200000003fb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000001600fffffffb0000000e0046006900720069006e006700730000000000ffffffff0000001600fffffffb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e0000000313000000c80000001600fffffffc00000000000007380000000000fffffffaffffffff0200000002fb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000001600fffffffb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e0000000313000000c80000001600fffffffb0000000e0046006900720069006e006700730000000000000007380000006200fffffffc00000000000007380000000000fffffffa000000000200000004fb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000000000000000fb0000000e0046006900720069006e006700730000000000ffffffff0000000000000000fb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000000000000000fb0000000800540069006d006500000004150000003e0000003900fffffffb0000000800540069006d00650100000000000004500000000000000000000003de0000039e00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   RosbagPanel:
     collapsed: false
   Selection:
@@ -692,7 +1284,7 @@ Window Geometry:
   Tool Properties:
     collapsed: false
   Views:
-    collapsed: true
+    collapsed: false
   Width: 1848
   X: 72
   Y: 27
