@@ -279,10 +279,10 @@ void StreamingClustering::insertFiringIntoRangeImage(InsertionJob&& job)
         if (srig_first_unfinished_global_column_index >= 0 &&
             global_column_index < srig_first_unfinished_global_column_index)
         {
-            ROS_WARN_STREAM("Ignore point of firing because it would be inserted into a already published column. "
+            /*ROS_WARN_STREAM("Ignore point of firing because it would be inserted into a already published column. "
                             "Wanted to insert at "
                             << global_column_index << ", but first unfinished global column index is already at "
-                            << srig_first_unfinished_global_column_index << " (row index: " << row_index << ")");
+                            << srig_first_unfinished_global_column_index << " (row index: " << row_index << ")");*/
 
             laser_to_far_behind = true;
         }
@@ -1115,8 +1115,8 @@ void StreamingClustering::publishColumns(int64_t from_global_column_index,
 
     if (minimum_point_stamp.sec != std::numeric_limits<int32_t>::max())
         msg->header.stamp = minimum_point_stamp;
-    else
-        ROS_WARN_STREAM("This column had no timestamps. Unable to publish message with timestamp.");
+    /*else
+        ROS_WARN_STREAM("This column had no timestamps. Unable to publish message with timestamp.");*/
 
     pub.publish(msg);
 }
