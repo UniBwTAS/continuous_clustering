@@ -389,6 +389,7 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
     Point3D ground_x_meter_behind_position_wrt_sensor = {0, 0, 0};
     int ground_x_meter_behind_row_index = -1;
     Point3D previous_position_wrt_sensor;
+    uint8_t previous_label;
     float inclination_previous_laser = 0; // calculate difference between inclination angles for subsequent steps
 
     for (int row_index = num_rows - 1; row_index >= 0; row_index--)
@@ -492,6 +493,7 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
                 first_obstacle_detected = true;
             }
             previous_position_wrt_sensor = current_position_wrt_sensor;
+            previous_label = point.debug_ground_point_label;
             continue;
         }
 
@@ -506,8 +508,8 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
         Point2D last_ground_position_wrt_sensor_2d = to2dInAzimuthPlane(last_ground_position_wrt_sensor);
         Point2D last_ground_to_current = current_position_wrt_sensor_2d - last_ground_position_wrt_sensor_2d;
         float slope_to_last_ground = last_ground_to_current.y / last_ground_to_current.x;
-        bool is_flat_wrt_last_ground = std::abs(slope_to_last_ground) < config_.max_slope &&
-                                       last_ground_to_current.x > 0;
+        bool is_flat_wrt_last_ground =
+            std::abs(slope_to_last_ground) < config_.max_slope && last_ground_to_current.x > 0;
 
         if (!first_obstacle_detected && is_flat_wrt_prev)
         {
@@ -519,27 +521,63 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
             point.ground_point_label = GP_GROUND;
             point.debug_ground_point_label = YELLOWGREEN;
         }
+        else if (std::abs(last_ground_to_current.x) <
+                     config_.ground_because_close_to_last_certain_ground_max_dist_diff &&
+                 std::abs(last_ground_to_current.y) < config_.ground_because_close_to_last_certain_ground_max_z_diff)
+        {
+            point.ground_point_label = GP_GROUND;
+            point.debug_ground_point_label = YELLOW;
+        }
         else
         {
             point.ground_point_label = GP_OBSTACLE;
             point.debug_ground_point_label = RED;
+
+            // go down in the rows and mark very close points also as obstacle
+            int prev_row_index = row_index + 1;
+            while (prev_row_index < num_rows)
+            {
+                Point& cur_point = range_image_[local_column_index * num_rows + prev_row_index];
+                Point2D prev_position_wrt_sensor_2d = to2dInAzimuthPlane(cur_point.xyz - sgps_sensor_position);
+                if (cur_point.debug_ground_point_label == YELLOW ||
+                    (cur_point.ground_point_label == GP_GROUND &&
+                     std::abs((current_position_wrt_sensor_2d - prev_position_wrt_sensor_2d).x) <
+                         config_.obstacle_because_next_certain_obstacle_max_dist_diff))
+                {
+                    if (cur_point.ground_point_label == GP_GROUND)
+                    {
+                        cur_point.ground_point_label = GP_OBSTACLE;
+                        cur_point.debug_ground_point_label = DARKRED;
+                    }
+                    prev_row_index++;
+                }
+                else
+                {
+                    break;
+                }
+            }
         }
 
         // check whether we have ever seen an obstacle
         first_obstacle_detected |= point.ground_point_label == GP_OBSTACLE;
 
         // keep track of last ground point
-        if (point.ground_point_label == GP_GROUND)
+        if (point.debug_ground_point_label == GREEN || point.debug_ground_point_label == YELLOWGREEN)
         {
             // only use current point as the new last ground point when it was plausible. On wet streets there are often
             // false points below the ground surface because of reflections. Therefore, we do not want the slope to be
             // too much going down. Furthermore, in this case often there is a larger distance jump.
             if (slope_to_prev > config_.last_ground_point_slope_higher_than &&
-                std::abs(previous_to_current.x) < config_.last_ground_point_distance_smaller_than)
+                std::abs(previous_to_current.x) < config_.last_ground_point_distance_smaller_than &&
+                previous_label != YELLOW)
             {
                 last_ground_position_wrt_sensor = current_position_wrt_sensor;
                 if (ground_x_meter_behind_row_index == -1)
                     ground_x_meter_behind_row_index = row_index;
+            }
+            else if (previous_label == YELLOW)
+            {
+                point.debug_ground_point_label = CYAN;
             }
             else
             {
@@ -549,6 +587,7 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
 
         // keep track of previous point
         previous_position_wrt_sensor = current_position_wrt_sensor;
+        previous_label = point.debug_ground_point_label;
     }
 
     for (int row_index = num_rows - 1; row_index >= 0; row_index--)
