@@ -22,6 +22,7 @@ enum
     GP_GROUND = GREEN,        // ground point: ground
     GP_OBSTACLE = RED,        // ground point: unknown
     GP_EGO_VEHICLE = MAGENTA, // ground point: point on ego vehicle
+    GP_FOG = LIGHTGRAY,       // ground point: classified as fog
 };
 
 class RangeImageIndex

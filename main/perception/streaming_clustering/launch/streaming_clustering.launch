@@ -33,6 +33,12 @@
     <arg name="wait_for_tf" default="true"/>
     <arg name="supplement_inclination_angle_for_nan_cells" default="true"/>
 
+    <!-- ground point segmentation parameters -->
+    <arg name="fog_filtering_enabled" default="False"/>
+    <arg name="fog_filtering_intensity_below" default="2"/>
+    <arg name="fog_filtering_distance_below" default="18"/>
+    <arg name="fog_filtering_inclination_above" default="-0.06"/>
+
     <!-- clustering parameters -->
     <arg name="use_last_point_for_cluster_stamp" default="false"/>
     <arg name="ignore_points_in_chessboard_pattern" default="true"/>
@@ -51,14 +57,28 @@
             <!-- ouster specific parameters/re-mappings -->
             <remap from="get_metadata" to="$(arg ouster_metadata_service)" if="$(arg is_ouster)"/>
 
+            <!-- lidar sensor -->
             <remap from="raw_data" to="$(arg sensor_raw_data_topic)"/>
             <param name="sensor_manufacturer" value="$(arg sensor_manufacturer)"/>
             <param name="sensor_frame" value="$(arg sensor_frame)"/>
+
+            <!-- other ros specific parameters -->
+            <param name="ego_robot_frame" value="$(arg ego_robot_frame)"/>
             <param name="odom_frame" value="$(arg odom_frame)"/>
+
+            <!-- range image parameters -->
             <param name="columns_per_full_rotation" value="$(arg columns_per_full_rotation)"/>
             <param name="wait_for_tf" value="$(arg wait_for_tf)"/>
             <param name="supplement_inclination_angle_for_nan_cells"
                    value="$(arg supplement_inclination_angle_for_nan_cells)"/>
+
+            <!-- ground point segmentation parameters -->
+            <param name="fog_filtering_enabled" value="$(arg fog_filtering_enabled)"/>
+            <param name="fog_filtering_intensity_below" value="$(arg fog_filtering_intensity_below)"/>
+            <param name="fog_filtering_distance_below" value="$(arg fog_filtering_distance_below)"/>
+            <param name="fog_filtering_inclination_above" value="$(arg fog_filtering_inclination_above)"/>
+
+            <!-- clustering parameters -->
             <param name="use_last_point_for_cluster_stamp" value="$(arg use_last_point_for_cluster_stamp)"/>
             <param name="ignore_points_in_chessboard_pattern" value="$(arg ignore_points_in_chessboard_pattern)"/>
             <param name="ignore_points_with_too_big_inclination_angle_diff"
