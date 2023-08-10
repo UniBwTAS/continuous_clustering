@@ -15,6 +15,11 @@
     <!-- range image parameters -->
     <arg name="columns_per_full_rotation" default="1024"/> <!-- TODO: obtain this dynamically? -->
 
+    <!-- ground point segmentation parameters -->
+    <arg name="fog_filtering_intensity_below" default="3"/>
+    <arg name="fog_filtering_distance_below" default="5"/>
+    <arg name="fog_filtering_inclination_above" default="-0.17"/>
+
     <!-- clustering parameters -->
     <arg name="ignore_points_in_chessboard_pattern" default="false"/>
     <arg name="ignore_points_with_too_big_inclination_angle_diff" default="false"/>

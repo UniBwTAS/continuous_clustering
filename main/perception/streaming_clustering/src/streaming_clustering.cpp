@@ -452,6 +452,16 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
             continue;
         }
 
+        // skip points which seem to be fog
+        if (config_.fog_filtering_enabled && point.intensity < config_.fog_filtering_intensity_below &&
+            point.distance < config_.fog_filtering_distance_below &&
+            point.inclination_angle > config_.fog_filtering_inclination_above)
+        {
+            point.ground_point_label = GP_FOG;
+            point.debug_ground_point_label = LIGHTGRAY;
+            continue;
+        }
+
         const Point3D& current_position = point.xyz;
 
         // special handling for points on ego vehicle surface
