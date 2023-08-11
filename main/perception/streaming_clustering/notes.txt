@@ -26,4 +26,10 @@ Interessante Überlegungen/Analysen:
 - Droppe Spalten statt Zeilen wenn zu viel Last??
 
 - TODO:
-    - Global column index mit uint64 statt uint32 (Nutze double? 2^52 >> 2^32)
+    - Global column index mit uint64 statt uint32, leider unterstützt PointCloud2 kein (u)int64 -> nutze double? 2^52 >> 2^32
+    - Entferne leere PointCloud2 members
+    - middleware agnostisch (für ROS1, ROS2, ...)
+    - möglichkeit sub-range image (mit ground point segmentation) mit kleinerer distanz weiter zerfallen zu lassen
+    - fixe selection in rviz Visualisierung
+    - fülle möglichst viele Zellen mit passendem inclination & azimuth Winkel im Range Image durch Nutzung des Richtungsvektors eines NaN Strahls
+    - Abbruchkriterium für 360 Grad Cluster
