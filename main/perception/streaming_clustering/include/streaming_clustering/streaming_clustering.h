@@ -1,6 +1,7 @@
 #pragma once
 
 #include <dynamic_reconfigure/server.h>
+#include <grid_map_msgs/GridMap.h>
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
@@ -180,6 +181,7 @@ class StreamingClustering
 
     // ground point segmentation
     inline void performGroundPointSegmentationForColumn(SegmentationJob&& job);
+    void onNewTerrainCallback(const grid_map_msgs::GridMap::ConstPtr& msg);
     static inline Point2D to2dInAzimuthPlane(const Point3D& p)
     {
         return {p.xy().length(), p.z};
@@ -212,6 +214,7 @@ class StreamingClustering
     float max_distance_squared_{};
 
     // init ROS specific stuff
+    ros::Subscriber sub_terrain;
     ros::Publisher pub_raw_firings;
     ros::Publisher pub_ground_point_segmentation;
     ros::Publisher pub_instance_segmentation;
@@ -243,6 +246,7 @@ class StreamingClustering
     int64_t srig_first_unfinished_global_column_index{-1};
     tf2::Vector3 srig_sensor_position{0, 0, 0};
     bool srig_reset_because_of_bad_start{false};
+    bool srig_supplement_inclination_angle_for_nan_cells{true}; // allows faster association
 
     // streaming ground point segmentation (sgps)
     float height_ref_to_maximum_{}, height_ref_to_ground_{};
@@ -254,6 +258,8 @@ class StreamingClustering
     std::vector<int64_t> sgps_previous_ground_points_;
     std::vector<std::shared_ptr<int64_t>> sgps_next_ground_points_;
     ros::Time sgps_previous_column_stamp_;
+    grid_map_msgs::GridMap::ConstPtr last_terrain_msg_;
+    bool sgps_use_terrain_;
 
     // streaming clustering (sc)
     int64_t sc_first_unpublished_global_column_index{-1};
@@ -262,7 +268,6 @@ class StreamingClustering
     std::list<RangeImageIndex> sc_unfinished_point_trees_;
     uint32_t sc_cluster_counter_{1};
     std::vector<float> sc_inclination_angles_between_lasers_;
-    bool sc_supplement_inclination_angle_for_nan_cells{true}; // allows faster association
     bool sc_use_last_point_for_cluster_stamp{false};
 
     // multi-threading

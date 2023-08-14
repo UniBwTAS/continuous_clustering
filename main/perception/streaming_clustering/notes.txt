@@ -33,3 +33,4 @@ Interessante Überlegungen/Analysen:
     - fixe selection in rviz Visualisierung
     - fülle möglichst viele Zellen mit passendem inclination & azimuth Winkel im Range Image durch Nutzung des Richtungsvektors eines NaN Strahls
     - Abbruchkriterium für 360 Grad Cluster
+    - Nebel: intensity normiert über (quadrat der) distanz?

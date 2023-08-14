@@ -20,7 +20,8 @@ StreamingClustering::StreamingClustering(ros::NodeHandle nh, const ros::NodeHand
     nh_private.param<int>("columns_per_full_rotation", num_columns, 1877);
     nh_private.param<bool>("wait_for_tf", wait_for_tf, true);
     nh_private.param<bool>(
-        "supplement_inclination_angle_for_nan_cells", sc_supplement_inclination_angle_for_nan_cells, true);
+        "supplement_inclination_angle_for_nan_cells", srig_supplement_inclination_angle_for_nan_cells, true);
+    nh_private.param<bool>("use_terrain", sgps_use_terrain_, false);
     nh_private.param<bool>("use_last_point_for_cluster_stamp", sc_use_last_point_for_cluster_stamp, false);
     srig_azimuth_width_per_column = static_cast<float>((2 * M_PI)) / static_cast<float>(num_columns);
     ring_buffer_max_columns = num_columns * 10;
@@ -50,6 +51,8 @@ StreamingClustering::StreamingClustering(ros::NodeHandle nh, const ros::NodeHand
         throw std::runtime_error("Not all vehicle parameters are available");
 
     // init ROS subscribers and publishers
+    if (sgps_use_terrain_)
+        sub_terrain = nh.subscribe("terrain", 1, &StreamingClustering::onNewTerrainCallback, this);
     pub_raw_firings = nh.advertise<sensor_msgs::PointCloud2>("raw_firings", 1000);
     pub_ground_point_segmentation = nh.advertise<sensor_msgs::PointCloud2>("streaming_ground_point_segmentation", 1000);
     pub_instance_segmentation = nh.advertise<sensor_msgs::PointCloud2>("streaming_instance_segmentation", 1000);
@@ -275,7 +278,7 @@ void StreamingClustering::insertFiringIntoRangeImage(InsertionJob&& job)
             continue;
 
         // do not insert into columns that were passed to the next processing step
-        bool laser_to_far_behind = false;
+        bool laser_too_far_behind = false;
         if (srig_first_unfinished_global_column_index >= 0 &&
             global_column_index < srig_first_unfinished_global_column_index)
         {
@@ -284,11 +287,11 @@ void StreamingClustering::insertFiringIntoRangeImage(InsertionJob&& job)
                             << global_column_index << ", but first unfinished global column index is already at "
                             << srig_first_unfinished_global_column_index << " (row index: " << row_index << ")");*/
 
-            laser_to_far_behind = true;
+            laser_too_far_behind = true;
         }
 
         // fill point data
-        if (!laser_to_far_behind)
+        if (!laser_too_far_behind)
         {
             point->xyz.x = static_cast<float>(p_odom.x());
             point->xyz.y = static_cast<float>(p_odom.y());
@@ -387,7 +390,6 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
     bool first_point_found = false;
     Point3D last_ground_position_wrt_sensor{0, 0, height_sensor_to_ground_};
     Point3D ground_x_meter_behind_position_wrt_sensor = {0, 0, 0};
-    int ground_x_meter_behind_row_index = -1;
     Point3D previous_position_wrt_sensor;
     uint8_t previous_label;
     float inclination_previous_laser = 0; // calculate difference between inclination angles for subsequent steps
@@ -440,7 +442,7 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
         {
             // use inclination angle from previous column (it is useful to supplement nan cells with an inclination
             // angle in order to be able to break the while loop earlier during association
-            if (sc_supplement_inclination_angle_for_nan_cells && row_index < num_rows - 1)
+            if (srig_supplement_inclination_angle_for_nan_cells && row_index < num_rows - 1)
             {
                 Point& point_below = range_image_[local_column_index * num_rows + (row_index + 1)];
                 point.inclination_angle =
@@ -493,7 +495,6 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
                 point.ground_point_label = GP_GROUND;
                 point.debug_ground_point_label = GRAY;
                 last_ground_position_wrt_sensor = current_position_wrt_sensor;
-                ground_x_meter_behind_row_index = row_index;
                 first_obstacle_detected = false;
             }
             else
@@ -513,6 +514,7 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
         Point2D previous_to_current = current_position_wrt_sensor_2d - previous_position_wrt_sensor_2d;
         float slope_to_prev = previous_to_current.y / previous_to_current.x;
         bool is_flat_wrt_prev = std::abs(slope_to_prev) < config_.max_slope && previous_to_current.x > 0;
+        is_flat_wrt_prev = is_flat_wrt_prev && (!sgps_use_terrain_ || previous_to_current.x < 5); // TODO
 
         // calculate slope w.r.t. last seen (quite certain) ground point
         Point2D last_ground_position_wrt_sensor_2d = to2dInAzimuthPlane(last_ground_position_wrt_sensor);
@@ -521,24 +523,69 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
         bool is_flat_wrt_last_ground =
             std::abs(slope_to_last_ground) < config_.max_slope && last_ground_to_current.x > 0;
 
+        // quite certain ground points
         if (!first_obstacle_detected && is_flat_wrt_prev)
         {
             point.ground_point_label = GP_GROUND;
             point.debug_ground_point_label = GREEN;
         }
-        else if (first_obstacle_detected && is_flat_wrt_prev && is_flat_wrt_last_ground)
+        else // try to find remaining ground points
         {
-            point.ground_point_label = GP_GROUND;
-            point.debug_ground_point_label = YELLOWGREEN;
+            if (sgps_use_terrain_)
+            {
+                if (last_terrain_msg_)
+                {
+                    auto& info = last_terrain_msg_->info;
+                    Point3D terrain_min_corner(static_cast<float>(info.pose.position.x - info.length_x / 2),
+                                               static_cast<float>(info.pose.position.y - info.length_y / 2),
+                                               static_cast<float>(info.pose.position.z));
+                    Point3D current_position_in_terrain = current_position - terrain_min_corner;
+                    auto& data = last_terrain_msg_->data[0];
+                    int num_cells_x = static_cast<int>(data.layout.dim[0].size);
+                    int num_cells_y = static_cast<int>(data.layout.dim[1].size);
+                    int idx_x = num_cells_x -
+                                static_cast<int>(
+                                    std::floor(current_position_in_terrain.x / static_cast<float>(info.resolution))) -
+                                1;
+                    int idx_y = num_cells_y -
+                                static_cast<int>(
+                                    std::floor(current_position_in_terrain.y / static_cast<float>(info.resolution))) -
+                                1;
+                    if (idx_x >= 0 && idx_x < num_cells_x && idx_y >= 0 && idx_y < num_cells_y)
+                    {
+                        uint32_t data_idx = idx_y * num_cells_x + idx_x;
+                        if (data_idx >= 0 && data_idx < data.data.size())
+                        {
+                            float relative_height = current_position.z - data.data[data_idx];
+                            if (std::abs(relative_height) < config_.terrain_max_allowed_z_diff)
+                            {
+                                point.ground_point_label = GP_GROUND;
+                                point.debug_ground_point_label = BURLYWOOD;
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                if (first_obstacle_detected && is_flat_wrt_prev && is_flat_wrt_last_ground)
+                {
+                    point.ground_point_label = GP_GROUND;
+                    point.debug_ground_point_label = YELLOWGREEN;
+                }
+                else if (std::abs(last_ground_to_current.x) <
+                             config_.ground_because_close_to_last_certain_ground_max_dist_diff &&
+                         std::abs(last_ground_to_current.y) <
+                             config_.ground_because_close_to_last_certain_ground_max_z_diff)
+                {
+                    point.ground_point_label = GP_GROUND;
+                    point.debug_ground_point_label = YELLOW;
+                }
+            }
         }
-        else if (std::abs(last_ground_to_current.x) <
-                     config_.ground_because_close_to_last_certain_ground_max_dist_diff &&
-                 std::abs(last_ground_to_current.y) < config_.ground_because_close_to_last_certain_ground_max_z_diff)
-        {
-            point.ground_point_label = GP_GROUND;
-            point.debug_ground_point_label = YELLOW;
-        }
-        else
+
+        // mark remaining points as obstacle
+        if (point.ground_point_label != GP_GROUND)
         {
             point.ground_point_label = GP_OBSTACLE;
             point.debug_ground_point_label = RED;
@@ -571,7 +618,7 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
         // check whether we have ever seen an obstacle
         first_obstacle_detected |= point.ground_point_label == GP_OBSTACLE;
 
-        // keep track of last ground point
+        // keep track of last (certain) ground point
         if (point.debug_ground_point_label == GREEN || point.debug_ground_point_label == YELLOWGREEN)
         {
             // only use current point as the new last ground point when it was plausible. On wet streets there are often
@@ -582,17 +629,15 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
                 previous_label != YELLOW)
             {
                 last_ground_position_wrt_sensor = current_position_wrt_sensor;
-                if (ground_x_meter_behind_row_index == -1)
-                    ground_x_meter_behind_row_index = row_index;
             }
-            else if (previous_label == YELLOW)
+            /*else if (previous_label == YELLOW)
             {
                 point.debug_ground_point_label = CYAN;
             }
             else
             {
                 point.debug_ground_point_label = BLACK;
-            }
+            }*/
         }
 
         // keep track of previous point
@@ -656,6 +701,11 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
 
     // lets enqueue the association job for this column to do it in a separate thread
     association_thread_pool.enqueue({job.ring_buffer_current_global_column_index});
+}
+
+void StreamingClustering::onNewTerrainCallback(const grid_map_msgs::GridMap::ConstPtr& msg)
+{
+    last_terrain_msg_ = msg;
 }
 
 void StreamingClustering::associatePointsInColumn(AssociationJob&& job)
@@ -1076,7 +1126,7 @@ void StreamingClustering::clearColumns(int64_t from_global_column_index, int64_t
             point.stamp.nsec = 0;
 
             // clear ground point segmentation
-            point.ground_point_label = 0;
+            point.ground_point_label = GP_UNKNOWN;
             point.height_over_ground = std::nanf("");
             point.debug_ground_point_label = WHITE;
             // can be cleared because we ensure that at least one rotation is still available when
