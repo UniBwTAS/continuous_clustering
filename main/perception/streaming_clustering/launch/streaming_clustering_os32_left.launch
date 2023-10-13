@@ -8,6 +8,7 @@
     <arg name="sensor_position" default="left"/>
     <arg name="sensor_frame" default="sensor/lidar/$(arg sensor_model)_$(arg sensor_position)/os_sensor"/>
     <arg name="sensor_raw_data_topic" default="/bus/$(arg sensor_model)_$(arg sensor_position)/lidar_packets"/>
+    <arg name="sensor_is_clockwise" default="true"/>
 
     <!-- manufacturer specific: ouster -->
     <arg name="ouster_metadata_service" default="/bus/$(arg sensor_model)_$(arg sensor_position)/get_metadata"/>

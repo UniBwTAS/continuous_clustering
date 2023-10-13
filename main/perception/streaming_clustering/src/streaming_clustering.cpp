@@ -1,3 +1,4 @@
+#include <streaming_clustering/kitti_input.h>
 #include <streaming_clustering/ouster_input.h>
 #include <streaming_clustering/velodyne_input.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
@@ -15,6 +16,7 @@ StreamingClustering::StreamingClustering(ros::NodeHandle nh, const ros::NodeHand
     // obtain parameters
     nh_private.param<std::string>("sensor_manufacturer", sensor_manufacturer, "velodyne");
     nh_private.param<std::string>("sensor_frame", sensor_frame, "sensor/lidar/vls128_roof");
+    nh_private.param<bool>("sensor_is_clockwise", sensor_is_clockwise_, true);
     nh_private.param<std::string>("odom_frame", odom_frame, "odom");
     nh_private.param<std::string>("ego_robot_frame", ego_robot_frame, "base_link");
     nh_private.param<int>("columns_per_full_rotation", num_columns, 1877);
@@ -31,6 +33,8 @@ StreamingClustering::StreamingClustering(ros::NodeHandle nh, const ros::NodeHand
         sensor_input_.reset(new VelodyneInput(nh, nh_private));
     else if (sensor_manufacturer == "ouster")
         sensor_input_.reset(new OusterInput(nh, nh_private));
+    else if (sensor_manufacturer == "kitti")
+        sensor_input_.reset(new KittiInput(nh, nh_private));
     else
         throw std::runtime_error("Unknown manufacturer: " + sensor_manufacturer);
     sensor_input_->subscribe();
@@ -217,7 +221,8 @@ void StreamingClustering::insertFiringIntoRangeImage(InsertionJob&& job)
 
         // calculate azimuth angle which starts at negative X-axis with 0 and increases with ongoing lidar rotation
         // to 2 pi, which is more intuitive and important for fast array index calculation
-        float increasing_azimuth_angle = -azimuth_angle + static_cast<float>(M_PI);
+        float increasing_azimuth_angle =
+            sensor_is_clockwise_ ? -azimuth_angle + static_cast<float>(M_PI) : azimuth_angle + static_cast<float>(M_PI);
 
         // global column index
         int column_index_within_rotation = static_cast<int>(increasing_azimuth_angle / srig_azimuth_width_per_column);

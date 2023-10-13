@@ -8,6 +8,7 @@
     <arg name="sensor_position" default="roof"/>
     <arg name="sensor_frame" default="sensor/lidar/$(arg sensor_model)_$(arg sensor_position)"/>
     <arg name="sensor_raw_data_topic" default="/bus/$(arg sensor_model)_$(arg sensor_position)/eth_scan/bus_to_host"/>
+    <arg name="sensor_is_clockwise" default="true"/>
 
     <!-- manufacturer specific: velodyne -->
     <arg name="velodyne_model" default="VLS128"/>

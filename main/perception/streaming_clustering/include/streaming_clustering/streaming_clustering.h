@@ -230,6 +230,7 @@ class StreamingClustering
     // sensor specific stuff
     std::string sensor_manufacturer;
     std::shared_ptr<SensorInput> sensor_input_;
+    bool sensor_is_clockwise_{true};
 
     // range image (implemented as ring buffer)
     int ring_buffer_max_columns{0};
@@ -259,7 +260,7 @@ class StreamingClustering
     std::vector<std::shared_ptr<int64_t>> sgps_next_ground_points_;
     ros::Time sgps_previous_column_stamp_;
     grid_map_msgs::GridMap::ConstPtr last_terrain_msg_;
-    bool sgps_use_terrain_;
+    bool sgps_use_terrain_{false};
 
     // streaming clustering (sc)
     int64_t sc_first_unpublished_global_column_index{-1};
