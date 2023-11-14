@@ -1,0 +1,23 @@
+<launch>
+    <!-- flag if rviz should be started -->
+    <arg name="use_rviz" default="true"/>
+
+    <!-- lidar sensor -->
+    <arg name="sensor_manufacturer" default="velodyne"/>
+    <arg name="sensor_model" default="vls128"/>
+    <arg name="sensor_position" default="roof"/>
+    <arg name="sensor_frame" default="sensor/lidar/$(arg sensor_model)_$(arg sensor_position)"/>
+    <arg name="sensor_raw_data_topic" default="/bus/$(arg sensor_model)_$(arg sensor_position)/eth_scan/bus_to_host"/>
+    <arg name="sensor_is_clockwise" default="true"/>
+
+    <!-- manufacturer specific: velodyne -->
+    <arg name="velodyne_model" default="VLS128"/>
+    <arg name="velodyne_calibration_path" default="$(find io_velodyne)/calibrations/velodyne_vls128_tas.yaml"/>
+    <arg name="velodyne_rpm" default="600.0"/>
+
+    <!-- range image parameters -->
+    <arg name="num_columns" default="1700"/>
+
+    <!-- clustering -->
+    <include file="$(find continuous_clustering)/launch/continuous_clustering.launch" pass_all_args="true"/>
+</launch>
