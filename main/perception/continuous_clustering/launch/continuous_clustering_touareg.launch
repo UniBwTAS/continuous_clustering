@@ -1,0 +1,22 @@
+<launch>
+    <!-- flag if rviz should be started -->
+    <arg name="use_rviz" default="true"/>
+
+    <!-- flags for enable/disable individual sensors -->
+    <arg name="use_vls128_roof" default="true"/>
+    <arg name="use_os32_left" default="true"/>
+    <arg name="use_os32_right" default="true"/>
+
+    <include file="$(find continuous_clustering)/launch/continuous_clustering_vls128_roof.launch" pass_all_args="true"
+             if="$(arg use_vls128_roof)">
+        <arg name="use_rviz" value="$(arg use_rviz)"/>
+    </include>
+    <include file="$(find continuous_clustering)/launch/continuous_clustering_os32_left.launch" pass_all_args="true"
+             if="$(arg use_os32_left)">
+        <arg name="use_rviz" value="false"/>
+    </include>
+    <include file="$(find continuous_clustering)/launch/continuous_clustering_os32_right.launch" pass_all_args="true"
+             if="$(arg use_os32_right)">
+        <arg name="use_rviz" value="false"/>
+    </include>
+</launch>

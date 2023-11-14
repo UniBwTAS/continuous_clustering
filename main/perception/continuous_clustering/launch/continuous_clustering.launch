@@ -1,0 +1,99 @@
+<launch>
+    <!-- flag if rviz should be started -->
+    <arg name="use_rviz" default="true"/>
+
+    <!-- lidar sensor -->
+    <arg name="sensor_manufacturer"/> <!-- velodyne, ouster, kitti (other manufacturers are currently not supported) -->
+    <arg name="sensor_model"/> <!-- arbitrary: e.g. vls128, hdl64, hdl32, os32, kitti ... -->
+    <arg name="sensor_position"/> <!-- arbitrary: e.g. roof, left, right -->
+    <arg name="sensor_frame"/>  <!-- the ROS frame id of the velodyne sensor -->
+    <arg name="sensor_raw_data_topic"/> <!-- input topic for raw data -->
+    <arg name="sensor_is_clockwise"/> <!-- whether the lidar sensor rotates clockwise -->
+
+    <!-- manufacturer specific: velodyne -->
+    <arg name="is_velodyne" value="$(eval sensor_manufacturer == 'velodyne')"/>
+    <group if="$(arg is_velodyne)">
+        <arg name="velodyne_model"/> <!-- e.g. VLS128, VLP16, 32C, 32E, VLS128, 64E (see: raw_data.cc) -->
+        <arg name="velodyne_calibration_path"/> <!-- path to calibration YAML file -->
+        <arg name="velodyne_rpm"/>  <!-- rotations per minute: e.g. 600 -->
+    </group>
+
+    <!-- manufacturer specific: ouster -->
+    <arg name="is_ouster" value="$(eval sensor_manufacturer == 'ouster')"/>
+    <group if="$(arg is_ouster)">
+        <arg name="ouster_metadata_service"/>  <!-- full service name to get metadata -->
+    </group>
+
+    <!-- other ros specific parameters -->
+    <arg name="ego_robot_frame" default="base_link"/>
+    <arg name="odom_frame" default="odom"/>
+    <arg name="namespace" default="perception/detections/lidar_$(arg sensor_position)/cluster"/>
+
+    <!-- range image parameters -->
+    <arg name="num_columns"/>  <!-- number of columns of range image -->
+    <arg name="wait_for_tf" default="true"/>
+    <arg name="supplement_inclination_angle_for_nan_cells" default="true"/>
+
+    <!-- ground point segmentation parameters -->
+    <arg name="use_terrain" default="False"/>
+    <arg name="fog_filtering_enabled" default="False"/>
+    <arg name="fog_filtering_intensity_below" default="2"/>
+    <arg name="fog_filtering_distance_below" default="18"/>
+    <arg name="fog_filtering_inclination_above" default="-0.06"/>
+
+    <!-- clustering parameters -->
+    <arg name="use_last_point_for_cluster_stamp" default="false"/>
+    <arg name="ignore_points_in_chessboard_pattern" default="true"/>
+    <arg name="ignore_points_with_too_big_inclination_angle_diff" default="true"/>
+
+    <group ns="$(arg namespace)">
+
+        <!-- Continuous Clustering Node/Nodelet -->
+        <node name="continuous_clustering" pkg="continuous_clustering" type="continuous_clustering_node"
+              output="screen">
+
+            <!-- velodyne specific parameters/re-mappings -->
+            <param name="model" value="$(arg velodyne_model)" if="$(arg is_velodyne)"/>
+            <param name="rpm" value="$(arg velodyne_rpm)" if="$(arg is_velodyne)"/>
+            <param name="calibration" value="$(arg velodyne_calibration_path)" if="$(arg is_velodyne)"/>
+
+            <!-- ouster specific parameters/re-mappings -->
+            <remap from="get_metadata" to="$(arg ouster_metadata_service)" if="$(arg is_ouster)"/>
+
+            <!-- lidar sensor -->
+            <remap from="raw_data" to="$(arg sensor_raw_data_topic)"/>
+            <param name="sensor_manufacturer" value="$(arg sensor_manufacturer)"/>
+            <param name="sensor_frame" value="$(arg sensor_frame)"/>
+            <param name="sensor_is_clockwise" value="$(arg sensor_is_clockwise)"/>
+
+            <!-- other ros specific parameters -->
+            <param name="ego_robot_frame" value="$(arg ego_robot_frame)"/>
+            <param name="odom_frame" value="$(arg odom_frame)"/>
+
+            <!-- range image -->
+            <param name="num_columns" value="$(arg num_columns)"/>
+            <param name="wait_for_tf" value="$(arg wait_for_tf)"/>
+            <param name="supplement_inclination_angle_for_nan_cells"
+                   value="$(arg supplement_inclination_angle_for_nan_cells)"/>
+
+            <!-- ground point segmentation -->
+            <remap from="terrain" to="/perception/static_environment_model/estimated_terrain/anre"/>
+            <param name="use_terrain" value="$(arg use_terrain)"/>
+            <param name="fog_filtering_enabled" value="$(arg fog_filtering_enabled)"/>
+            <param name="fog_filtering_intensity_below" value="$(arg fog_filtering_intensity_below)"/>
+            <param name="fog_filtering_distance_below" value="$(arg fog_filtering_distance_below)"/>
+            <param name="fog_filtering_inclination_above" value="$(arg fog_filtering_inclination_above)"/>
+
+            <!-- clustering -->
+            <param name="use_last_point_for_cluster_stamp" value="$(arg use_last_point_for_cluster_stamp)"/>
+            <param name="ignore_points_in_chessboard_pattern" value="$(arg ignore_points_in_chessboard_pattern)"/>
+            <param name="ignore_points_with_too_big_inclination_angle_diff"
+                   value="$(arg ignore_points_with_too_big_inclination_angle_diff)"/>
+        </node>
+
+    </group>
+
+    <node name="rviz" pkg="rviz" type="rviz"
+          args="--display-config $(find continuous_clustering)/rviz/continuous_clustering.rviz"
+          if="$(arg use_rviz)"/>
+</launch>

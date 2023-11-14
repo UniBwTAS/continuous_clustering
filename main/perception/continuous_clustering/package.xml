@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>continuous_clustering</name>
+    <version>0.0.1</version>
+    <description>The continuous_clustering package</description>
+    <license>BSD</license>
+    <maintainer email="andreas.reich@unibw.de">Andreas Reich</maintainer>
+    <author email="andreas.reich@unibw.de">Andreas Reich</author>
+    <url type="website">https://github.com/UniBwTAS/continuous-clustering</url>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <depend>roscpp</depend>
+    <depend>sensor_msgs</depend>
+    <depend>grid_map_msgs</depend>
+    <depend>dynamic_reconfigure</depend>
+    <depend>velodyne_pointcloud</depend>
+    <depend>ouster_ros</depend>
+
+    <exec_depend>vis_range_image</exec_depend>
+    <exec_depend>vis_continuous_point_cloud</exec_depend>
+    <exec_depend>vis_point_cloud_transformers</exec_depend>
+
+</package>
