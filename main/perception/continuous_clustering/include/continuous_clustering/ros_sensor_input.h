@@ -1,12 +1,12 @@
-#ifndef STREAMING_CLUSTERING_ROS_SENSOR_INPUT_H
-#define STREAMING_CLUSTERING_ROS_SENSOR_INPUT_H
+#ifndef CONTINUOUS_CLUSTERING_ROS_SENSOR_INPUT_H
+#define CONTINUOUS_CLUSTERING_ROS_SENSOR_INPUT_H
 
 #include <ros/callback_queue.h>
 #include <ros/ros.h>
-#include <streaming_clustering/sensor_input.h>
+#include <continuous_clustering/sensor_input.h>
 #include "thread_pool.h"
 
-namespace streaming_clustering
+namespace continuous_clustering
 {
 
 template<typename Message>
@@ -59,6 +59,6 @@ class RosSensorInput : public SensorInput
     ThreadPool<MessageJob<Message>> message_thread_pool_{"M"};
 };
 
-} // namespace streaming_clustering
+} // namespace continuous_clustering
 
-#endif // STREAMING_CLUSTERING_ROS_SENSOR_INPUT_H
+#endif // CONTINUOUS_CLUSTERING_ROS_SENSOR_INPUT_H

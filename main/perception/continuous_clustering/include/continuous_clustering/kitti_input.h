@@ -1,5 +1,5 @@
-#ifndef STREAMING_CLUSTERING_KITTI_INPUT_H
-#define STREAMING_CLUSTERING_KITTI_INPUT_H
+#ifndef CONTINUOUS_CLUSTERING_KITTI_INPUT_H
+#define CONTINUOUS_CLUSTERING_KITTI_INPUT_H
 
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -7,7 +7,7 @@
 
 #include "ros_sensor_input.h"
 
-namespace streaming_clustering
+namespace continuous_clustering
 {
 
 class KittiInput : public RosSensorInput<sensor_msgs::PointCloud2>
@@ -47,5 +47,5 @@ class KittiInput : public RosSensorInput<sensor_msgs::PointCloud2>
     }
 };
 
-} // namespace streaming_clustering
+} // namespace continuous_clustering
 #endif

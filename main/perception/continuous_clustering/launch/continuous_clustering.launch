@@ -48,8 +48,8 @@
 
     <group ns="$(arg namespace)">
 
-        <!-- Streaming Clustering Node/Nodelet -->
-        <node name="streaming_clustering" pkg="streaming_clustering" type="streaming_clustering_node" output="screen">
+        <!-- Continuous Clustering Node/Nodelet -->
+        <node name="continuous_clustering" pkg="continuous_clustering" type="continuous_clustering_node" output="screen">
 
             <!-- velodyne specific parameters/re-mappings -->
             <param name="model" value="$(arg velodyne_model)" if="$(arg is_velodyne)"/>
@@ -93,6 +93,6 @@
     </group>
 
     <node name="rviz" pkg="rviz" type="rviz"
-          args="--display-config $(find streaming_clustering)/rviz/streaming_clustering.rviz"
+          args="--display-config $(find continuous_clustering)/rviz/continuous_clustering.rviz"
           if="$(arg use_rviz)"/>
 </launch>

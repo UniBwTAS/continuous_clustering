@@ -1,12 +1,12 @@
-#ifndef STREAMING_CLUSTERING_THREAD_SAVE_QUEUE_H
-#define STREAMING_CLUSTERING_THREAD_SAVE_QUEUE_H
+#ifndef CONTINUOUS_CLUSTERING_THREAD_SAVE_QUEUE_H
+#define CONTINUOUS_CLUSTERING_THREAD_SAVE_QUEUE_H
 
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
 #include <queue>
 
-namespace streaming_clustering
+namespace continuous_clustering
 {
 
 template<class T>
@@ -61,5 +61,5 @@ class ThreadSaveQueue
     bool terminated{false};
 };
 
-} // namespace streaming_clustering
+} // namespace continuous_clustering
 #endif

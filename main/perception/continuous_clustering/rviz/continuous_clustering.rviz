@@ -7,14 +7,14 @@ Panels:
         - /Status1
         - /Camera1/Visibility1
         - /LidarRoof1
-        - /LidarRoof1/StreamingPointClouds1
-        - /LidarRoof1/StreamingPointClouds1/Firings1/Enable streaming1
-        - /LidarRoof1/StreamingPointClouds1/GroundPointSegmentation1/Enable streaming1
-        - /LidarRoof1/StreamingPointClouds1/GroundPointSegmentation1/Show only1
-        - /LidarRoof1/StreamingRangeImages1/InstanceSegmentation1
+        - /LidarRoof1/ContinuousPointClouds1
+        - /LidarRoof1/ContinuousPointClouds1/Firings1/Enable continuous1
+        - /LidarRoof1/ContinuousPointClouds1/GroundPointSegmentation1/Enable continuous1
+        - /LidarRoof1/ContinuousPointClouds1/GroundPointSegmentation1/Show only1
+        - /LidarRoof1/ContinuousRangeImages1/InstanceSegmentation1
         - /LidarLeft1
-        - /LidarLeft1/StreamingPointClouds1/Firings1/Enable streaming1
-        - /LidarLeft1/StreamingRangeImages1/InstanceSegmentation1/Enable streaming1
+        - /LidarLeft1/ContinuousPointClouds1/Firings1/Enable continuous1
+        - /LidarLeft1/ContinuousRangeImages1/InstanceSegmentation1/Enable continuous1
         - /LidarRight1
       Splitter Ratio: 0.6441441178321838
     Tree Height: 372
@@ -95,13 +95,13 @@ Visualization Manager:
         Grid: false
         LidarLeft:
           PointCloudFullRevolution: true
-          StreamingInstances: true
-          StreamingPointClouds:
+          ContinuousInstances: true
+          ContinuousPointClouds:
             Firings: true
             GroundPointSegmentation: true
             InstanceSegmentation: true
             Value: true
-          StreamingRangeImages:
+          ContinuousRangeImages:
             Firings: true
             GroundPointSegmentation: true
             InstanceSegmentation: true
@@ -109,13 +109,13 @@ Visualization Manager:
           Value: false
         LidarRight:
           PointCloudFullRevolution: true
-          StreamingInstances: true
-          StreamingPointClouds:
+          ContinuousInstances: true
+          ContinuousPointClouds:
             Firings: true
             GroundPointSegmentation: true
             InstanceSegmentation: true
             Value: true
-          StreamingRangeImages:
+          ContinuousRangeImages:
             Firings: true
             GroundPointSegmentation: true
             InstanceSegmentation: true
@@ -123,13 +123,13 @@ Visualization Manager:
           Value: false
         LidarRoof:
           PointCloudFullRevolution: true
-          StreamingInstances: true
-          StreamingPointClouds:
+          ContinuousInstances: true
+          ContinuousPointClouds:
             Firings: true
             GroundPointSegmentation: true
             InstanceSegmentation: true
             Value: true
-          StreamingRangeImages:
+          ContinuousRangeImages:
             Firings: true
             GroundPointSegmentation: true
             InstanceSegmentation: true
@@ -211,11 +211,11 @@ Visualization Manager:
                 Value: true
               Axis: Z
               Channel Name: firing_index
-              Class: rviz/StreamingPointCloud2
+              Class: rviz/ContinuousPointCloud2
               Color: 136; 138; 133
               Color Transformer: FlatColor
               Decay Time: 0
-              Enable streaming:
+              Enable continuous:
                 Flip: false
                 Maximum Columns: 1
                 Upside Down: false
@@ -251,11 +251,11 @@ Visualization Manager:
                 Value: true
               Axis: Z
               Channel Name: debug_ground_point_label
-              Class: rviz/StreamingPointCloud2
+              Class: rviz/ContinuousPointCloud2
               Color: 255; 255; 255
               Color Transformer: Label
               Decay Time: 0
-              Enable streaming:
+              Enable continuous:
                 Flip: false
                 Maximum Columns: 2200
                 Upside Down: false
@@ -275,7 +275,7 @@ Visualization Manager:
               Size (Pixels): 3
               Size (m): 0.20000000298023224
               Style: Spheres
-              Topic: /perception/detections/lidar_roof/cluster/streaming_ground_point_segmentation
+              Topic: /perception/detections/lidar_roof/cluster/continuous_ground_point_segmentation
               Unreliable: false
               Use Fixed Frame: true
               Use rainbow: true
@@ -289,11 +289,11 @@ Visualization Manager:
                 Value: true
               Axis: Z
               Channel Name: id
-              Class: rviz/StreamingPointCloud2
+              Class: rviz/ContinuousPointCloud2
               Color: 255; 255; 255
               Color Transformer: Label
               Decay Time: 0
-              Enable streaming:
+              Enable continuous:
                 Flip: false
                 Maximum Columns: 1700
                 Upside Down: false
@@ -313,14 +313,14 @@ Visualization Manager:
               Size (Pixels): 3
               Size (m): 0.20000000298023224
               Style: Spheres
-              Topic: /perception/detections/lidar_roof/cluster/streaming_instance_segmentation
+              Topic: /perception/detections/lidar_roof/cluster/continuous_instance_segmentation
               Unreliable: false
               Use Fixed Frame: true
               Use rainbow: true
               Value: false
               Wait for transform: true
           Enabled: true
-          Name: StreamingPointClouds
+          Name: ContinuousPointClouds
         - Class: rviz/Group
           Displays:
             - Autocompute Intensity Bounds: true
@@ -333,7 +333,7 @@ Visualization Manager:
               Class: rviz/RangeImage
               Color: 255; 255; 255
               Color Transformer: Intensity
-              Enable streaming:
+              Enable continuous:
                 Maximum Columns: 1700
                 Value: true
               Enabled: false
@@ -365,7 +365,7 @@ Visualization Manager:
               Class: rviz/RangeImage
               Color: 255; 255; 255
               Color Transformer: Label
-              Enable streaming:
+              Enable continuous:
                 Maximum Columns: 1700
                 Value: true
               Enabled: false
@@ -382,7 +382,7 @@ Visualization Manager:
                 Channel Name: sem_label
                 Equal To: 0
                 Value: false
-              Topic: /perception/detections/lidar_roof/cluster/streaming_ground_point_segmentation
+              Topic: /perception/detections/lidar_roof/cluster/continuous_ground_point_segmentation
               Upside Down: false
               Use Fixed Frame: true
               Use rainbow: true
@@ -397,7 +397,7 @@ Visualization Manager:
               Class: rviz/RangeImage
               Color: 255; 255; 255
               Color Transformer: Label
-              Enable streaming:
+              Enable continuous:
                 Maximum Columns: 1700
                 Value: true
               Enabled: true
@@ -414,13 +414,13 @@ Visualization Manager:
                 Channel Name: sem_label
                 Equal To: 0
                 Value: false
-              Topic: /perception/detections/lidar_roof/cluster/streaming_instance_segmentation
+              Topic: /perception/detections/lidar_roof/cluster/continuous_instance_segmentation
               Upside Down: false
               Use Fixed Frame: true
               Use rainbow: true
               Value: true
           Enabled: false
-          Name: StreamingRangeImages
+          Name: ContinuousRangeImages
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
@@ -429,11 +429,11 @@ Visualization Manager:
             Value: true
           Axis: Z
           Channel Name: id
-          Class: rviz/StreamingPointCloud2
+          Class: rviz/ContinuousPointCloud2
           Color: 255; 255; 255
           Color Transformer: Label
           Decay Time: 0.10000000149011612
-          Enable streaming:
+          Enable continuous:
             Flip: false
             Maximum Columns: 0
             Upside Down: false
@@ -442,7 +442,7 @@ Visualization Manager:
           Invert Rainbow: false
           Max Color: 255; 255; 255
           Min Color: 0; 0; 0
-          Name: StreamingInstances
+          Name: ContinuousInstances
           Position Transformer: XYZ
           Queue Size: 1000
           Selectable: true
@@ -453,7 +453,7 @@ Visualization Manager:
           Size (Pixels): 12
           Size (m): 0.20000000298023224
           Style: Spheres
-          Topic: /perception/detections/lidar_roof/cluster/streaming_clusters
+          Topic: /perception/detections/lidar_roof/cluster/continuous_clusters
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -506,11 +506,11 @@ Visualization Manager:
                 Value: true
               Axis: Z
               Channel Name: ground_point_label
-              Class: rviz/StreamingPointCloud2
+              Class: rviz/ContinuousPointCloud2
               Color: 136; 138; 133
               Color Transformer: FlatColor
               Decay Time: 0
-              Enable streaming:
+              Enable continuous:
                 Flip: false
                 Maximum Columns: 1
                 Upside Down: false
@@ -546,11 +546,11 @@ Visualization Manager:
                 Value: true
               Axis: Z
               Channel Name: ground_point_label
-              Class: rviz/StreamingPointCloud2
+              Class: rviz/ContinuousPointCloud2
               Color: 255; 255; 255
               Color Transformer: Label
               Decay Time: 0
-              Enable streaming:
+              Enable continuous:
                 Flip: false
                 Maximum Columns: 1024
                 Upside Down: false
@@ -570,7 +570,7 @@ Visualization Manager:
               Size (Pixels): 3
               Size (m): 0.20000000298023224
               Style: Spheres
-              Topic: /perception/detections/lidar_left/cluster/streaming_ground_point_segmentation
+              Topic: /perception/detections/lidar_left/cluster/continuous_ground_point_segmentation
               Unreliable: false
               Use Fixed Frame: true
               Use rainbow: true
@@ -584,11 +584,11 @@ Visualization Manager:
                 Value: true
               Axis: Z
               Channel Name: id
-              Class: rviz/StreamingPointCloud2
+              Class: rviz/ContinuousPointCloud2
               Color: 255; 255; 255
               Color Transformer: Label
               Decay Time: 0
-              Enable streaming:
+              Enable continuous:
                 Flip: false
                 Maximum Columns: 1024
                 Upside Down: false
@@ -608,14 +608,14 @@ Visualization Manager:
               Size (Pixels): 3
               Size (m): 0.20000000298023224
               Style: Spheres
-              Topic: /perception/detections/lidar_left/cluster/streaming_instance_segmentation
+              Topic: /perception/detections/lidar_left/cluster/continuous_instance_segmentation
               Unreliable: false
               Use Fixed Frame: true
               Use rainbow: true
               Value: false
               Wait for transform: true
           Enabled: false
-          Name: StreamingPointClouds
+          Name: ContinuousPointClouds
         - Class: rviz/Group
           Displays:
             - Autocompute Intensity Bounds: true
@@ -628,7 +628,7 @@ Visualization Manager:
               Class: rviz/RangeImage
               Color: 255; 255; 255
               Color Transformer: Intensity
-              Enable streaming:
+              Enable continuous:
                 Maximum Columns: 1024
                 Value: true
               Enabled: false
@@ -660,7 +660,7 @@ Visualization Manager:
               Class: rviz/RangeImage
               Color: 255; 255; 255
               Color Transformer: Label
-              Enable streaming:
+              Enable continuous:
                 Maximum Columns: 1024
                 Value: true
               Enabled: true
@@ -677,7 +677,7 @@ Visualization Manager:
                 Channel Name: sem_label
                 Equal To: 0
                 Value: false
-              Topic: /perception/detections/lidar_left/cluster/streaming_ground_point_segmentation
+              Topic: /perception/detections/lidar_left/cluster/continuous_ground_point_segmentation
               Upside Down: false
               Use Fixed Frame: true
               Use rainbow: true
@@ -692,7 +692,7 @@ Visualization Manager:
               Class: rviz/RangeImage
               Color: 255; 255; 255
               Color Transformer: Label
-              Enable streaming:
+              Enable continuous:
                 Maximum Columns: 1024
                 Value: true
               Enabled: false
@@ -709,13 +709,13 @@ Visualization Manager:
                 Channel Name: sem_label
                 Equal To: 0
                 Value: false
-              Topic: /perception/detections/lidar_left/cluster/streaming_instance_segmentation
+              Topic: /perception/detections/lidar_left/cluster/continuous_instance_segmentation
               Upside Down: false
               Use Fixed Frame: true
               Use rainbow: true
               Value: false
           Enabled: false
-          Name: StreamingRangeImages
+          Name: ContinuousRangeImages
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
@@ -724,11 +724,11 @@ Visualization Manager:
             Value: true
           Axis: Z
           Channel Name: id
-          Class: rviz/StreamingPointCloud2
+          Class: rviz/ContinuousPointCloud2
           Color: 255; 255; 255
           Color Transformer: Label
           Decay Time: 0.10000000149011612
-          Enable streaming:
+          Enable continuous:
             Flip: false
             Maximum Columns: 0
             Upside Down: false
@@ -737,7 +737,7 @@ Visualization Manager:
           Invert Rainbow: false
           Max Color: 255; 255; 255
           Min Color: 0; 0; 0
-          Name: StreamingInstances
+          Name: ContinuousInstances
           Position Transformer: XYZ
           Queue Size: 1000
           Selectable: true
@@ -748,7 +748,7 @@ Visualization Manager:
           Size (Pixels): 3
           Size (m): 0.20000000298023224
           Style: Spheres
-          Topic: /perception/detections/lidar_left/cluster/streaming_clusters
+          Topic: /perception/detections/lidar_left/cluster/continuous_clusters
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -801,11 +801,11 @@ Visualization Manager:
                 Value: true
               Axis: Z
               Channel Name: ground_point_label
-              Class: rviz/StreamingPointCloud2
+              Class: rviz/ContinuousPointCloud2
               Color: 136; 138; 133
               Color Transformer: FlatColor
               Decay Time: 0
-              Enable streaming:
+              Enable continuous:
                 Flip: false
                 Maximum Columns: 1
                 Upside Down: false
@@ -841,11 +841,11 @@ Visualization Manager:
                 Value: true
               Axis: Z
               Channel Name: ground_point_label
-              Class: rviz/StreamingPointCloud2
+              Class: rviz/ContinuousPointCloud2
               Color: 255; 255; 255
               Color Transformer: Label
               Decay Time: 0
-              Enable streaming:
+              Enable continuous:
                 Flip: false
                 Maximum Columns: 1024
                 Upside Down: false
@@ -865,7 +865,7 @@ Visualization Manager:
               Size (Pixels): 3
               Size (m): 0.20000000298023224
               Style: Spheres
-              Topic: /perception/detections/lidar_right/cluster/streaming_ground_point_segmentation
+              Topic: /perception/detections/lidar_right/cluster/continuous_ground_point_segmentation
               Unreliable: false
               Use Fixed Frame: true
               Use rainbow: true
@@ -879,11 +879,11 @@ Visualization Manager:
                 Value: true
               Axis: Z
               Channel Name: id
-              Class: rviz/StreamingPointCloud2
+              Class: rviz/ContinuousPointCloud2
               Color: 255; 255; 255
               Color Transformer: Label
               Decay Time: 0
-              Enable streaming:
+              Enable continuous:
                 Flip: false
                 Maximum Columns: 1024
                 Upside Down: false
@@ -903,14 +903,14 @@ Visualization Manager:
               Size (Pixels): 3
               Size (m): 0.20000000298023224
               Style: Spheres
-              Topic: /perception/detections/lidar_right/cluster/streaming_instance_segmentation
+              Topic: /perception/detections/lidar_right/cluster/continuous_instance_segmentation
               Unreliable: false
               Use Fixed Frame: true
               Use rainbow: true
               Value: false
               Wait for transform: true
           Enabled: false
-          Name: StreamingPointClouds
+          Name: ContinuousPointClouds
         - Class: rviz/Group
           Displays:
             - Autocompute Intensity Bounds: true
@@ -923,7 +923,7 @@ Visualization Manager:
               Class: rviz/RangeImage
               Color: 255; 255; 255
               Color Transformer: Intensity
-              Enable streaming:
+              Enable continuous:
                 Maximum Columns: 1024
                 Value: true
               Enabled: false
@@ -955,7 +955,7 @@ Visualization Manager:
               Class: rviz/RangeImage
               Color: 255; 255; 255
               Color Transformer: Label
-              Enable streaming:
+              Enable continuous:
                 Maximum Columns: 1024
                 Value: true
               Enabled: true
@@ -972,7 +972,7 @@ Visualization Manager:
                 Channel Name: sem_label
                 Equal To: 0
                 Value: false
-              Topic: /perception/detections/lidar_right/cluster/streaming_ground_point_segmentation
+              Topic: /perception/detections/lidar_right/cluster/continuous_ground_point_segmentation
               Upside Down: false
               Use Fixed Frame: true
               Use rainbow: true
@@ -987,7 +987,7 @@ Visualization Manager:
               Class: rviz/RangeImage
               Color: 255; 255; 255
               Color Transformer: Label
-              Enable streaming:
+              Enable continuous:
                 Maximum Columns: 1024
                 Value: true
               Enabled: false
@@ -1010,7 +1010,7 @@ Visualization Manager:
               Use rainbow: true
               Value: false
           Enabled: false
-          Name: StreamingRangeImages
+          Name: ContinuousRangeImages
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
@@ -1019,11 +1019,11 @@ Visualization Manager:
             Value: true
           Axis: Z
           Channel Name: id
-          Class: rviz/StreamingPointCloud2
+          Class: rviz/ContinuousPointCloud2
           Color: 255; 255; 255
           Color Transformer: Label
           Decay Time: 0.10000000149011612
-          Enable streaming:
+          Enable continuous:
             Flip: false
             Maximum Columns: 0
             Upside Down: false
@@ -1032,7 +1032,7 @@ Visualization Manager:
           Invert Rainbow: false
           Max Color: 255; 255; 255
           Min Color: 0; 0; 0
-          Name: StreamingInstances
+          Name: ContinuousInstances
           Position Transformer: XYZ
           Queue Size: 1000
           Selectable: true
@@ -1043,7 +1043,7 @@ Visualization Manager:
           Size (Pixels): 3
           Size (m): 0.20000000298023224
           Style: Spheres
-          Topic: /perception/detections/lidar_right/cluster/streaming_clusters
+          Topic: /perception/detections/lidar_right/cluster/continuous_clusters
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true

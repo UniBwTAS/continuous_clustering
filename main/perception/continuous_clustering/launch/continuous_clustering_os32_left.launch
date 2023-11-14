@@ -25,5 +25,5 @@
     <arg name="ignore_points_in_chessboard_pattern" default="false"/>
     <arg name="ignore_points_with_too_big_inclination_angle_diff" default="false"/>
 
-    <include file="$(find streaming_clustering)/launch/streaming_clustering.launch" pass_all_args="true"/>
+    <include file="$(find continuous_clustering)/launch/continuous_clustering.launch" pass_all_args="true"/>
 </launch>

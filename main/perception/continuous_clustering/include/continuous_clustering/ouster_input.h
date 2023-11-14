@@ -1,5 +1,5 @@
-#ifndef STREAMING_CLUSTERING_OUSTER_INPUT_H
-#define STREAMING_CLUSTERING_OUSTER_INPUT_H
+#ifndef CONTINUOUS_CLUSTERING_OUSTER_INPUT_H
+#define CONTINUOUS_CLUSTERING_OUSTER_INPUT_H
 
 // prevent clang-format from altering the location of "ouster_ros/ros.h", the
 // header file needs to be the first include due to PCL_NO_PRECOMPILE flag
@@ -16,7 +16,7 @@
 
 #include "ros_sensor_input.h"
 
-namespace streaming_clustering
+namespace continuous_clustering
 {
 
 /*
@@ -199,5 +199,5 @@ class OusterInput : public RosSensorInput<ouster_ros::PacketMsg>
     ouster_ros::Cloud cloud;
 };
 
-} // namespace streaming_clustering
+} // namespace continuous_clustering
 #endif

@@ -19,5 +19,5 @@
     <arg name="columns_per_full_rotation" default="1700"/>
 
     <!-- clustering -->
-    <include file="$(find streaming_clustering)/launch/streaming_clustering.launch" pass_all_args="true"/>
+    <include file="$(find continuous_clustering)/launch/continuous_clustering.launch" pass_all_args="true"/>
 </launch>

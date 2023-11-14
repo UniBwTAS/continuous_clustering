@@ -1,15 +1,15 @@
-#ifndef STREAMING_CLUSTERING_VELODYNE_INPUT_H
-#define STREAMING_CLUSTERING_VELODYNE_INPUT_H
+#ifndef CONTINUOUS_CLUSTERING_VELODYNE_INPUT_H
+#define CONTINUOUS_CLUSTERING_VELODYNE_INPUT_H
 
 #include <ethernet_msgs/Packet.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
-#include <streaming_clustering/ros_sensor_input.h>
+#include <continuous_clustering/ros_sensor_input.h>
 #include <string>
 #include <velodyne_pointcloud/calibration.h>
 #include <velodyne_pointcloud/datacontainerbase.h>
 #include <velodyne_pointcloud/rawdata.h>
 
-namespace streaming_clustering
+namespace continuous_clustering
 {
 
 class VelodyneInput : public velodyne_rawdata::DataContainerBase, public RosSensorInput<ethernet_msgs::Packet>
@@ -95,5 +95,5 @@ class VelodyneInput : public velodyne_rawdata::DataContainerBase, public RosSens
     bool interrupt_message{false};
 };
 
-} // namespace streaming_clustering
+} // namespace continuous_clustering
 #endif

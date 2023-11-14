@@ -1,6 +1,6 @@
 #pragma once
 
-namespace streaming_clustering
+namespace continuous_clustering
 {
 
 struct Point2D
@@ -397,4 +397,4 @@ enum PointCloudColors
     YELLOW = 146,
     YELLOWGREEN = 147
 };
-} // namespace streaming_clustering
+} // namespace continuous_clustering

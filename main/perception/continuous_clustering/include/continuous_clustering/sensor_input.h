@@ -1,7 +1,7 @@
-#ifndef STREAMING_CLUSTERING_SENSOR_INPUT_H
-#define STREAMING_CLUSTERING_SENSOR_INPUT_H
+#ifndef CONTINUOUS_CLUSTERING_SENSOR_INPUT_H
+#define CONTINUOUS_CLUSTERING_SENSOR_INPUT_H
 
-namespace streaming_clustering
+namespace continuous_clustering
 {
 
 struct RawPoint
@@ -61,6 +61,6 @@ class SensorInput
     uint64_t firing_index{0};
 };
 
-} // namespace streaming_clustering
+} // namespace continuous_clustering
 
-#endif // STREAMING_CLUSTERING_SENSOR_INPUT_H
+#endif // CONTINUOUS_CLUSTERING_SENSOR_INPUT_H

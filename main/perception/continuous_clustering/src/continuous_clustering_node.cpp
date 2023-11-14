@@ -1,12 +1,12 @@
 #include <ros/ros.h>
 
-#include <streaming_clustering/streaming_clustering.h>
+#include <continuous_clustering/continuous_clustering.h>
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "streaming_clustering");
+    ros::init(argc, argv, "continuous_clustering");
 
-    streaming_clustering::StreamingClustering node(ros::NodeHandle(), ros::NodeHandle("~"));
+    continuous_clustering::ContinuousClustering node(ros::NodeHandle(), ros::NodeHandle("~"));
 
     ros::spin();
 

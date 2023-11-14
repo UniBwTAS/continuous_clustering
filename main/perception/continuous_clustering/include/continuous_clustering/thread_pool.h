@@ -1,5 +1,5 @@
-#ifndef STREAMING_CLUSTERING_THREAD_POOL_H
-#define STREAMING_CLUSTERING_THREAD_POOL_H
+#ifndef CONTINUOUS_CLUSTERING_THREAD_POOL_H
+#define CONTINUOUS_CLUSTERING_THREAD_POOL_H
 
 #include <pthread.h>
 #include <thread>
@@ -7,7 +7,7 @@
 
 #include "thread_save_queue.h"
 
-namespace streaming_clustering
+namespace continuous_clustering
 {
 
 template<class T>
@@ -31,7 +31,7 @@ class ThreadPool
             threads.template emplace_back(
                 [this, f, i]()
                 {
-                    std::string thread_name = "streaming_" + thread_name_prefix + std::to_string(i);
+                    std::string thread_name = "continuous_" + thread_name_prefix + std::to_string(i);
                     pthread_setname_np(pthread_self(), thread_name.c_str());
                     while (!terminated)
                     {
@@ -78,5 +78,5 @@ class ThreadPool
     std::string thread_name_prefix;
 };
 
-} // namespace streaming_clustering
+} // namespace continuous_clustering
 #endif

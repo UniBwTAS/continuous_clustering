@@ -5,16 +5,16 @@
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
-#include <streaming_clustering/StreamingClusteringConfig.h>
-#include <streaming_clustering/general.h>
-#include <streaming_clustering/ros_transform_synchronizer.h>
-#include <streaming_clustering/sensor_input.h>
-#include <streaming_clustering/thread_pool.h>
+#include <continuous_clustering/ContinuousClusteringConfig.h>
+#include <continuous_clustering/general.h>
+#include <continuous_clustering/ros_transform_synchronizer.h>
+#include <continuous_clustering/sensor_input.h>
+#include <continuous_clustering/thread_pool.h>
 #include <tf2/LinearMath/Transform.h>
 #include <tf2_ros/transform_listener.h>
 #include <velodyne_pointcloud/calibration.h>
 
-namespace streaming_clustering
+namespace continuous_clustering
 {
 
 enum
@@ -119,7 +119,7 @@ struct PointCloud2Iterators
     sensor_msgs::PointCloud2Iterator<int32_t> iter_dbg_c_n_right_out;
     sensor_msgs::PointCloud2Iterator<float> iter_height_over_ground_out;
 
-    // streaming clustering
+    // continuous clustering
     sensor_msgs::PointCloud2Iterator<double> iter_finished_at_azimuth_angle;
     sensor_msgs::PointCloud2Iterator<uint16_t> iter_num_child_points;
     sensor_msgs::PointCloud2Iterator<uint16_t> iter_tree_root_row_index;
@@ -163,11 +163,11 @@ struct PublishingJob
     std::list<std::list<RangeImageIndex>> trees_per_finished_cluster;
 };
 
-class StreamingClustering
+class ContinuousClustering
 {
 
   public:
-    StreamingClustering(ros::NodeHandle nh, const ros::NodeHandle& nh_private);
+    ContinuousClustering(ros::NodeHandle nh, const ros::NodeHandle& nh_private);
 
   private:
     // general
@@ -187,7 +187,7 @@ class StreamingClustering
         return {p.xy().length(), p.z};
     }
 
-    // streaming clustering
+    // continuous clustering
     inline void associatePointsInColumn(AssociationJob&& job);
     inline void findFinishedTreesAndAssignSameId(TreeCombinationJob&& job);
     inline void collectPointsForCusterAndPublish(PublishingJob&& job);
@@ -204,12 +204,12 @@ class StreamingClustering
     addRawPointToMessage(PointCloud2Iterators& container, int data_index_message, const RawPoint& point);
     inline void publishColumns(int64_t from_global_column_index, int64_t to_global_column_index, ros::Publisher& pub);
     inline void publishFiring(const RawPoints::ConstPtr& firing);
-    void callbackReconfigure(StreamingClusteringConfig& config, uint32_t level);
+    void callbackReconfigure(ContinuousClusteringConfig& config, uint32_t level);
 
   private:
     // reconfigure
-    dynamic_reconfigure::Server<StreamingClusteringConfig> reconfigure_server_;
-    StreamingClusteringConfig config_;
+    dynamic_reconfigure::Server<ContinuousClusteringConfig> reconfigure_server_;
+    ContinuousClusteringConfig config_;
     float max_distance_{};
     float max_distance_squared_{};
 
@@ -240,7 +240,7 @@ class StreamingClustering
     int64_t ring_buffer_start_global_column_index{};
     int64_t ring_buffer_end_global_column_index{};
 
-    // streaming range image generation (srig)
+    // continuous range image generation (srig)
     float srig_azimuth_width_per_column{};
     int64_t srig_previous_global_column_index_of_rearmost_laser{0};
     int64_t srig_previous_global_column_index_of_foremost_laser{0};
@@ -249,7 +249,7 @@ class StreamingClustering
     bool srig_reset_because_of_bad_start{false};
     bool srig_supplement_inclination_angle_for_nan_cells{true}; // allows faster association
 
-    // streaming ground point segmentation (sgps)
+    // continuous ground point segmentation (sgps)
     float height_ref_to_maximum_{}, height_ref_to_ground_{};
     float length_ref_to_front_end_{}, length_ref_to_rear_end_{};
     float width_ref_to_left_mirror_{}, width_ref_to_right_mirror_{};
@@ -262,7 +262,7 @@ class StreamingClustering
     grid_map_msgs::GridMap::ConstPtr last_terrain_msg_;
     bool sgps_use_terrain_{false};
 
-    // streaming clustering (sc)
+    // continuous clustering (sc)
     int64_t sc_first_unpublished_global_column_index{-1};
     std::mutex sc_first_unfinished_global_column_index_mutex;
     std::list<int64_t> sc_minimum_required_global_column_indices;
@@ -282,4 +282,4 @@ class StreamingClustering
     bool stop_statistics = false;
     std::list<size_t> num_pending_jobs;
 };
-} // namespace streaming_clustering
+} // namespace continuous_clustering

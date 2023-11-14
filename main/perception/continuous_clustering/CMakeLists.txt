@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(streaming_clustering)
+project(continuous_clustering)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++14)
@@ -90,7 +90,7 @@ find_package(PCL REQUIRED COMPONENTS common)
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
 generate_dynamic_reconfigure_options(
-        cfg/StreamingClustering.cfg
+        cfg/ContinuousClustering.cfg
 )
 
 ###################################
@@ -104,7 +104,7 @@ generate_dynamic_reconfigure_options(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
         INCLUDE_DIRS include
-        LIBRARIES streaming_clustering
+        LIBRARIES continuous_clustering
         CATKIN_DEPENDS roscpp sensor_msgs grid_map_msgs dynamic_reconfigure velodyne_pointcloud ouster_ros
         #  DEPENDS system_lib
 )
@@ -122,8 +122,8 @@ include_directories(
 )
 
 ## Declare a C++ library
-add_library(streaming_clustering src/streaming_clustering.cpp)
-target_link_libraries(streaming_clustering ${catkin_LIBRARIES} pcl_common)
+add_library(continuous_clustering src/continuous_clustering.cpp)
+target_link_libraries(continuous_clustering ${catkin_LIBRARIES} pcl_common)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -133,7 +133,7 @@ target_link_libraries(streaming_clustering ${catkin_LIBRARIES} pcl_common)
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(streaming_clustering_node src/streaming_clustering_node.cpp)
+add_executable(continuous_clustering_node src/continuous_clustering_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -147,9 +147,9 @@ add_executable(streaming_clustering_node src/streaming_clustering_node.cpp)
 
 ## Specify libraries to link a library or executable target against
 
-target_link_libraries(streaming_clustering_node
+target_link_libraries(continuous_clustering_node
         ${catkin_LIBRARIES}
-        streaming_clustering
+        continuous_clustering
         )
 
 #############
@@ -199,7 +199,7 @@ target_link_libraries(streaming_clustering_node
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_streaming_clustering.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_continuous_clustering.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

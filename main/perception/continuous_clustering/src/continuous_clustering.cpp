@@ -1,17 +1,17 @@
-#include <streaming_clustering/kitti_input.h>
-#include <streaming_clustering/ouster_input.h>
-#include <streaming_clustering/velodyne_input.h>
+#include <continuous_clustering/kitti_input.h>
+#include <continuous_clustering/ouster_input.h>
+#include <continuous_clustering/velodyne_input.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
-#include <streaming_clustering/streaming_clustering.h>
+#include <continuous_clustering/continuous_clustering.h>
 
 #include <fstream>
 #include <memory>
 
-namespace streaming_clustering
+namespace continuous_clustering
 {
 
-StreamingClustering::StreamingClustering(ros::NodeHandle nh, const ros::NodeHandle& nh_private)
+ContinuousClustering::ContinuousClustering(ros::NodeHandle nh, const ros::NodeHandle& nh_private)
 {
     // obtain parameters
     nh_private.param<std::string>("sensor_manufacturer", sensor_manufacturer, "velodyne");
@@ -56,21 +56,21 @@ StreamingClustering::StreamingClustering(ros::NodeHandle nh, const ros::NodeHand
 
     // init ROS subscribers and publishers
     if (sgps_use_terrain_)
-        sub_terrain = nh.subscribe("terrain", 1, &StreamingClustering::onNewTerrainCallback, this);
+        sub_terrain = nh.subscribe("terrain", 1, &ContinuousClustering::onNewTerrainCallback, this);
     pub_raw_firings = nh.advertise<sensor_msgs::PointCloud2>("raw_firings", 1000);
-    pub_ground_point_segmentation = nh.advertise<sensor_msgs::PointCloud2>("streaming_ground_point_segmentation", 1000);
-    pub_instance_segmentation = nh.advertise<sensor_msgs::PointCloud2>("streaming_instance_segmentation", 1000);
-    pub_clusters = nh.advertise<sensor_msgs::PointCloud2>("streaming_clusters", 1000);
+    pub_ground_point_segmentation = nh.advertise<sensor_msgs::PointCloud2>("continuous_ground_point_segmentation", 1000);
+    pub_instance_segmentation = nh.advertise<sensor_msgs::PointCloud2>("continuous_instance_segmentation", 1000);
+    pub_clusters = nh.advertise<sensor_msgs::PointCloud2>("continuous_clusters", 1000);
 
     // init TF synchronizer
-    tf_synchronizer.setCallback(&StreamingClustering::onNewFiringsWithTfCallback, this);
+    tf_synchronizer.setCallback(&ContinuousClustering::onNewFiringsWithTfCallback, this);
 
     // init dynamic reconfigure
-    reconfigure_server_.setCallback([this](StreamingClusteringConfig& config, uint32_t level)
+    reconfigure_server_.setCallback([this](ContinuousClusteringConfig& config, uint32_t level)
                                     { callbackReconfigure(config, level); });
 }
 
-void StreamingClustering::reset()
+void ContinuousClustering::reset()
 {
     // reset
     last_update_ = ros::Time(0, 0);
@@ -88,18 +88,18 @@ void StreamingClustering::reset()
     ring_buffer_start_global_column_index = -1; // does not start at zero but at the minimum laser of first firing
     ring_buffer_end_global_column_index = -1;
 
-    // reset members for streaming range image generation (srig)
+    // reset members for continuous range image generation (srig)
     srig_previous_global_column_index_of_rearmost_laser = 0;
     srig_previous_global_column_index_of_foremost_laser = -1;
     srig_first_unfinished_global_column_index = -1;
     srig_reset_because_of_bad_start = false;
 
-    // reset members for streaming ground point segmentation (sgps)
+    // reset members for continuous ground point segmentation (sgps)
     sgps_previous_ground_points_.resize(num_rows, -1);
     sgps_next_ground_points_.resize(num_rows, std::make_shared<int64_t>(-1));
     sgps_ego_robot_frame_from_sensor_frame_.reset();
 
-    // reset members for streaming clustering (sc)
+    // reset members for continuous clustering (sc)
     sc_first_unpublished_global_column_index = -1;
     sc_minimum_required_global_column_indices.clear();
     sc_unfinished_point_trees_.clear();
@@ -130,7 +130,7 @@ void StreamingClustering::reset()
     sensor_input_->reset();
 }
 
-void StreamingClustering::onNewFiringsCallback(const RawPoints::ConstPtr& firing)
+void ContinuousClustering::onNewFiringsCallback(const RawPoints::ConstPtr& firing)
 {
     // all points in one firing have approximately the same stamp
     ros::Time stamp_current_firing;
@@ -144,7 +144,7 @@ void StreamingClustering::onNewFiringsCallback(const RawPoints::ConstPtr& firing
     if (srig_reset_because_of_bad_start || (!first_firing_after_reset && std::abs(dt) > 0.1))
     {
         ROS_WARN_STREAM("Detected jump in time ("
-                        << dt << ") or bad start condition was encountered. Reset streaming clustering.");
+                        << dt << ") or bad start condition was encountered. Reset continuous clustering.");
         reset();
         return;
     }
@@ -169,13 +169,13 @@ void StreamingClustering::onNewFiringsCallback(const RawPoints::ConstPtr& firing
         num_pending_jobs.pop_front();
 }
 
-void StreamingClustering::onNewFiringsWithTfCallback(const RawPoints::ConstPtr& firing,
+void ContinuousClustering::onNewFiringsWithTfCallback(const RawPoints::ConstPtr& firing,
                                                      const geometry_msgs::TransformStamped& odom_from_sensor)
 {
     insertion_thread_pool.enqueue({firing, odom_from_sensor});
 }
 
-void StreamingClustering::insertFiringIntoRangeImage(InsertionJob&& job)
+void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
 {
     // all points in one firing have approximately the same stamp
     ros::Time stamp_current_firing;
@@ -331,7 +331,7 @@ void StreamingClustering::insertFiringIntoRangeImage(InsertionJob&& job)
                             std::to_string(global_column_index_of_rearmost_laser) + ", " +
                             std::to_string(global_column_index_of_foremost_laser) + ", " +
                             std::to_string(srig_previous_global_column_index_of_rearmost_laser) +
-                            ". This is invalid. Reset streaming clustering on next message.");
+                            ". This is invalid. Reset continuous clustering on next message.");
             srig_reset_because_of_bad_start = true;
             return;
         }
@@ -366,7 +366,7 @@ void StreamingClustering::insertFiringIntoRangeImage(InsertionJob&& job)
         segmentation_thread_pool.enqueue({srig_first_unfinished_global_column_index++, odom_from_sensor});
 }
 
-void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJob&& job)
+void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJob&& job)
 {
     int local_column_index = static_cast<int>(job.ring_buffer_current_global_column_index % ring_buffer_max_columns);
 
@@ -708,12 +708,12 @@ void StreamingClustering::performGroundPointSegmentationForColumn(SegmentationJo
     association_thread_pool.enqueue({job.ring_buffer_current_global_column_index});
 }
 
-void StreamingClustering::onNewTerrainCallback(const grid_map_msgs::GridMap::ConstPtr& msg)
+void ContinuousClustering::onNewTerrainCallback(const grid_map_msgs::GridMap::ConstPtr& msg)
 {
     last_terrain_msg_ = msg;
 }
 
-void StreamingClustering::associatePointsInColumn(AssociationJob&& job)
+void ContinuousClustering::associatePointsInColumn(AssociationJob&& job)
 {
     // collect new point trees
     std::list<RangeImageIndex> new_unfinished_point_trees{};
@@ -887,7 +887,7 @@ void StreamingClustering::associatePointsInColumn(AssociationJob&& job)
     tree_combination_thread_pool.enqueue(std::move(next_job));
 }
 
-void StreamingClustering::findFinishedTreesAndAssignSameId(TreeCombinationJob&& job)
+void ContinuousClustering::findFinishedTreesAndAssignSameId(TreeCombinationJob&& job)
 {
     sc_unfinished_point_trees_.splice(sc_unfinished_point_trees_.end(), std::move(job.new_unfinished_point_trees));
 
@@ -984,7 +984,7 @@ void StreamingClustering::findFinishedTreesAndAssignSameId(TreeCombinationJob&& 
     publishing_thread_pool.enqueue(std::move(next_job));
 }
 
-void StreamingClustering::collectPointsForCusterAndPublish(PublishingJob&& job)
+void ContinuousClustering::collectPointsForCusterAndPublish(PublishingJob&& job)
 {
     // keep track of minimum stamp for this message
     ros::Time min_stamp_for_this_msg(std::numeric_limits<int32_t>::max(), 0);
@@ -1100,7 +1100,7 @@ void StreamingClustering::collectPointsForCusterAndPublish(PublishingJob&& job)
     clearColumns(ring_buffer_start_global_column_index_old, ring_buffer_start_global_column_index_new - 1);
 }
 
-void StreamingClustering::clearColumns(int64_t from_global_column_index, int64_t to_global_column_index)
+void ContinuousClustering::clearColumns(int64_t from_global_column_index, int64_t to_global_column_index)
 {
     if (to_global_column_index < from_global_column_index)
         return;
@@ -1156,7 +1156,7 @@ void StreamingClustering::clearColumns(int64_t from_global_column_index, int64_t
     }
 }
 
-void StreamingClustering::createPointCloud2ForCluster(sensor_msgs::PointCloud2& msg,
+void ContinuousClustering::createPointCloud2ForCluster(sensor_msgs::PointCloud2& msg,
                                                       const std::vector<Point>& cluster_points,
                                                       const ros::Time& min_stamp_for_this_cluster,
                                                       const ros::Time& max_stamp_for_this_cluster)
@@ -1178,7 +1178,7 @@ void StreamingClustering::createPointCloud2ForCluster(sensor_msgs::PointCloud2& 
     }
 }
 
-void StreamingClustering::publishColumns(int64_t from_global_column_index,
+void ContinuousClustering::publishColumns(int64_t from_global_column_index,
                                          int64_t to_global_column_index,
                                          ros::Publisher& pub)
 {
@@ -1225,7 +1225,7 @@ void StreamingClustering::publishColumns(int64_t from_global_column_index,
     pub.publish(msg);
 }
 
-void StreamingClustering::publishFiring(const RawPoints::ConstPtr& firing)
+void ContinuousClustering::publishFiring(const RawPoints::ConstPtr& firing)
 {
     if (pub_raw_firings.getNumSubscribers() == 0)
         return;
@@ -1257,7 +1257,7 @@ void StreamingClustering::publishFiring(const RawPoints::ConstPtr& firing)
     pub_raw_firings.publish(msg);
 }
 
-PointCloud2Iterators StreamingClustering::prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& msg)
+PointCloud2Iterators ContinuousClustering::prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& msg)
 {
     msg.is_bigendian = false;
     msg.is_dense = false;
@@ -1371,7 +1371,7 @@ PointCloud2Iterators StreamingClustering::prepareMessageAndCreateIterators(senso
             {msg, "id"}};
 }
 
-void StreamingClustering::addPointToMessage(PointCloud2Iterators& container,
+void ContinuousClustering::addPointToMessage(PointCloud2Iterators& container,
                                             int data_index_message,
                                             const Point& point) const
 {
@@ -1404,7 +1404,7 @@ void StreamingClustering::addPointToMessage(PointCloud2Iterators& container,
     *(container.iter_id + data_index_message) = point.id;
 }
 
-void StreamingClustering::addRawPointToMessage(PointCloud2Iterators& container,
+void ContinuousClustering::addRawPointToMessage(PointCloud2Iterators& container,
                                                int data_index_message,
                                                const RawPoint& point)
 {
@@ -1420,11 +1420,11 @@ void StreamingClustering::addRawPointToMessage(PointCloud2Iterators& container,
     *(container.iter_time_nsec_out + data_index_message) = t.nsec;
 }
 
-void StreamingClustering::callbackReconfigure(StreamingClusteringConfig& config, uint32_t level)
+void ContinuousClustering::callbackReconfigure(ContinuousClusteringConfig& config, uint32_t level)
 {
     config_ = config;
     max_distance_ = static_cast<float>(config_.max_distance);
     max_distance_squared_ = static_cast<float>(config_.max_distance * config_.max_distance);
 }
 
-} // namespace streaming_clustering
+} // namespace continuous_clustering

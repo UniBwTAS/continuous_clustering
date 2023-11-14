@@ -32,5 +32,5 @@
     <param name="/vehicles/vw_passat_b6/geometric/width_ref_to_left_mirror" value="1.5"/>
     <param name="/vehicles/vw_passat_b6/geometric/width_ref_to_right_mirror" value="-1.5"/>
 
-    <include file="$(find streaming_clustering)/launch/streaming_clustering.launch" pass_all_args="true"/>
+    <include file="$(find continuous_clustering)/launch/continuous_clustering.launch" pass_all_args="true"/>
 </launch>
