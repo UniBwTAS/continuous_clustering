@@ -5,7 +5,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
 
-#include "ros_sensor_input.h"
+#include "ros_sensor_input.hpp"
 
 namespace continuous_clustering
 {

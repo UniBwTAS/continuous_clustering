@@ -5,7 +5,7 @@
 #include <thread>
 #include <utility>
 
-#include "thread_save_queue.h"
+#include "thread_save_queue.hpp"
 
 namespace continuous_clustering
 {

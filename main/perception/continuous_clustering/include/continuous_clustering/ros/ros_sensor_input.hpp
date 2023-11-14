@@ -3,8 +3,8 @@
 
 #include <ros/callback_queue.h>
 #include <ros/ros.h>
-#include <continuous_clustering/ros/sensor_input.h>
-#include <continuous_clustering/utils/thread_pool.h>
+#include <continuous_clustering/ros/sensor_input.hpp>
+#include <continuous_clustering/utils/thread_pool.hpp>
 
 namespace continuous_clustering
 {

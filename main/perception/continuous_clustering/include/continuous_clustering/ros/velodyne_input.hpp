@@ -3,7 +3,7 @@
 
 #include <ethernet_msgs/Packet.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
-#include <continuous_clustering/ros/ros_sensor_input.h>
+#include <continuous_clustering/ros/ros_sensor_input.hpp>
 #include <string>
 #include <velodyne_pointcloud/calibration.h>
 #include <velodyne_pointcloud/datacontainerbase.h>

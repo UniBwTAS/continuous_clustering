@@ -1,9 +1,9 @@
-#include <continuous_clustering/ros/kitti_input.h>
-#include <continuous_clustering/ros/ouster_input.h>
-#include <continuous_clustering/ros/velodyne_input.h>
+#include <continuous_clustering/ros/kitti_input.hpp>
+#include <continuous_clustering/ros/ouster_input.hpp>
+#include <continuous_clustering/ros/velodyne_input.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
-#include <continuous_clustering/clustering/continuous_clustering.h>
+#include <continuous_clustering/clustering/continuous_clustering.hpp>
 
 #include <fstream>
 #include <memory>

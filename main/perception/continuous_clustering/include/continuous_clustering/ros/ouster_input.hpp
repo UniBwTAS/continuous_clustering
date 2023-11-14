@@ -14,7 +14,7 @@
 #include "ouster_ros/GetMetadata.h"
 #include "ouster_ros/PacketMsg.h"
 
-#include "ros_sensor_input.h"
+#include "ros_sensor_input.hpp"
 
 namespace continuous_clustering
 {

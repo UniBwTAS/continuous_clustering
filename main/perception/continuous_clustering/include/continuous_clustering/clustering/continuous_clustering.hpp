@@ -6,10 +6,10 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
 #include <continuous_clustering/ContinuousClusteringConfig.h>
-#include <continuous_clustering/clustering/general.h>
-#include <continuous_clustering/ros/ros_transform_synchronizer.h>
-#include <continuous_clustering/ros/sensor_input.h>
-#include <continuous_clustering/utils/thread_pool.h>
+#include <continuous_clustering/clustering/general.hpp>
+#include <continuous_clustering/ros/ros_transform_synchronizer.hpp>
+#include <continuous_clustering/ros/sensor_input.hpp>
+#include <continuous_clustering/utils/thread_pool.hpp>
 #include <tf2/LinearMath/Transform.h>
 #include <tf2_ros/transform_listener.h>
 #include <velodyne_pointcloud/calibration.h>
