@@ -122,7 +122,7 @@ include_directories(
 )
 
 ## Declare a C++ library
-add_library(continuous_clustering src/continuous_clustering.cpp)
+add_library(continuous_clustering src/clustering/continuous_clustering.cpp)
 target_link_libraries(continuous_clustering ${catkin_LIBRARIES} pcl_common)
 
 ## Add cmake target dependencies of the library
@@ -133,7 +133,7 @@ target_link_libraries(continuous_clustering ${catkin_LIBRARIES} pcl_common)
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(continuous_clustering_node src/continuous_clustering_node.cpp)
+add_executable(continuous_clustering_node src/ros/continuous_clustering_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
