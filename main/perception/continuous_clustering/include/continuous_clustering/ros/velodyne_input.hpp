@@ -1,9 +1,9 @@
-#ifndef CONTINUOUS_CLUSTERING_VELODYNE_INPUT_H
-#define CONTINUOUS_CLUSTERING_VELODYNE_INPUT_H
+#ifndef CONTINUOUS_CLUSTERING_VELODYNE_INPUT_HPP
+#define CONTINUOUS_CLUSTERING_VELODYNE_INPUT_HPP
 
+#include <continuous_clustering/ros/ros_sensor_input.hpp>
 #include <ethernet_msgs/Packet.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
-#include <continuous_clustering/ros/ros_sensor_input.hpp>
 #include <string>
 #include <velodyne_pointcloud/calibration.h>
 #include <velodyne_pointcloud/datacontainerbase.h>
@@ -57,6 +57,7 @@ class VelodyneInput : public velodyne_rawdata::DataContainerBase, public RosSens
         auto offset_in_ns = static_cast<uint64_t>(time / 1e9);
         current_firing->points[row_index].stamp = cur_packet_stamp.toNSec() + offset_in_ns;
         current_firing->points[row_index].firing_index = firing_index;
+        keepTrackOfMinAndMaxStamp(current_firing->points[row_index].stamp);
 
         if (distance > 0)
         {

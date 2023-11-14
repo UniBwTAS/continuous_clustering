@@ -1,10 +1,10 @@
-#ifndef CONTINUOUS_CLUSTERING_ROS_SENSOR_INPUT_H
-#define CONTINUOUS_CLUSTERING_ROS_SENSOR_INPUT_H
+#ifndef CONTINUOUS_CLUSTERING_ROS_SENSOR_INPUT_HPP
+#define CONTINUOUS_CLUSTERING_ROS_SENSOR_INPUT_HPP
 
-#include <ros/callback_queue.h>
-#include <ros/ros.h>
 #include <continuous_clustering/ros/sensor_input.hpp>
 #include <continuous_clustering/utils/thread_pool.hpp>
+#include <ros/callback_queue.h>
+#include <ros/ros.h>
 
 namespace continuous_clustering
 {
@@ -27,10 +27,10 @@ class RosSensorInput : public SensorInput
     void subscribe() override
     {
         sub = nh_.subscribe("raw_data",
-                           100000,
-                           &RosSensorInput::onRawDataArrivedInternal,
-                           this,
-                           ros::TransportHints().tcpNoDelay(true));
+                            100000,
+                            &RosSensorInput::onRawDataArrivedInternal,
+                            this,
+                            ros::TransportHints().tcpNoDelay(true));
     }
 
     size_t dataCount() override
@@ -61,4 +61,4 @@ class RosSensorInput : public SensorInput
 
 } // namespace continuous_clustering
 
-#endif // CONTINUOUS_CLUSTERING_ROS_SENSOR_INPUT_H
+#endif

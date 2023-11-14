@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CONTINUOUS_CLUSTERING_GENERAL_HPP
+#define CONTINUOUS_CLUSTERING_GENERAL_HPP
 
 namespace continuous_clustering
 {
@@ -202,50 +203,8 @@ inline float distance_point_from_line(PointXD point, PointXD line_start, PointXD
     return (start_to_point - (start_to_point * line_direction) * line_direction).length();
 }
 
-struct PointCloudLine
-{
-    Point2D start{};
-    Point2D end{};
-    float length{0};
-    int point_count{0};
-    int id{-1};
-    int start_firing_idx{0};
-    int end_firing_idx{0};
-
-    inline bool operator==(const PointCloudLine& other) const
-    {
-        return id == other.id;
-    }
-
-    inline float distance(Point2D p) const
-    {
-        return std::abs((end.x - start.x) * (start.y - p.y) - (start.x - p.x) * (end.y - start.y)) / length;
-    }
-
-    inline bool inCloserHalfSpace(Point2D point, float offset = 0, int num_firings = 0) const
-    {
-        Point2D start_end = end - start;
-        Point2D point_start = start - point;
-
-        float start_end_length = start_end.length();
-        float norm_x = start_end.y / start_end_length;
-        float norm_y = -start_end.x / start_end_length;
-
-        float dist = point_start.x * norm_x + point_start.y * norm_y;
-
-        bool in_closer_half_space = dist < -offset;
-        if (num_firings > 0)
-        {
-            int line_length = end_firing_idx - start_firing_idx;
-            int half_rotation = num_firings / 2;
-            if ((line_length < 0 && -line_length < half_rotation) ||
-                ((line_length >= 0 && line_length > half_rotation)))
-                in_closer_half_space = dist > offset;
-        }
-        return in_closer_half_space;
-    }
-};
-
+// this enum corresponds to QColor::colorNames(), where "transparent" (140) was skipped for obvious reasons
+// our visualization uses the same color list, so it is easy to assign a color to a point for visualization/debugging
 enum PointCloudColors
 {
     ALICEBLUE = 0,
@@ -388,13 +347,14 @@ enum PointCloudColors
     TEAL = 137,
     THISTLE = 138,
     TOMATO = 139,
-    TRANSPARENT = 140,
-    TURQUOISE = 141,
-    VIOLET = 142,
-    WHEAT = 143,
-    WHITE = 144,
-    WHITESMOKE = 145,
-    YELLOW = 146,
-    YELLOWGREEN = 147
+    TURQUOISE = 140,
+    VIOLET = 141,
+    WHEAT = 142,
+    WHITE = 143,
+    WHITESMOKE = 144,
+    YELLOW = 145,
+    YELLOWGREEN = 146
 };
 } // namespace continuous_clustering
+
+#endif

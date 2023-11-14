@@ -14,7 +14,7 @@
     <arg name="ouster_metadata_service" default="/bus/$(arg sensor_model)_$(arg sensor_position)/get_metadata"/>
 
     <!-- range image parameters -->
-    <arg name="columns_per_full_rotation" default="1024"/> <!-- TODO: obtain this dynamically? -->
+    <arg name="num_columns" default="1024"/> <!-- TODO: obtain this dynamically? -->
 
     <!-- ground point segmentation parameters -->
     <arg name="fog_filtering_intensity_below" default="3"/>

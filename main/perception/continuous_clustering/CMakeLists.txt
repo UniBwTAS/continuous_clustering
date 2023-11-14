@@ -1,208 +1,82 @@
-cmake_minimum_required(VERSION 3.0.2)
-project(continuous_clustering)
+cmake_minimum_required(VERSION 3.16...3.26)
+project(continuous_clustering VERSION 0.0.1 LANGUAGES CXX)
 
-## Compile as C++11, supported in ROS Kinetic and newer
-add_compile_options(-std=c++14)
+## Compile as C++17, supported in ROS Kinetic and newer
+add_compile_options(-std=c++17)
+add_compile_options(-pthread)
 
 # recommended when using perf profiler
 # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
 
-## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
-find_package(catkin REQUIRED roscpp grid_map_msgs sensor_msgs dynamic_reconfigure velodyne_pointcloud ouster_ros pcl_conversions)
+set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-## System dependencies are found with CMake's conventions
+if ("$ENV{ROS_VERSION}" STREQUAL "1")
+    message(STATUS "steaming_clustering ROS 1 wrapper will be compiled")
+    add_compile_definitions(WITH_ROS)
+    set(COMPILE_WITH_ROS true)
+
+    # ROS/catkin specific setup
+    find_package(catkin REQUIRED roscpp grid_map_msgs sensor_msgs dynamic_reconfigure velodyne_pointcloud ouster_ros pcl_conversions)
+    generate_dynamic_reconfigure_options(cfg/ContinuousClustering.cfg)
+    catkin_package(
+            INCLUDE_DIRS include
+            LIBRARIES continuous_clustering kitti_loader kitti_evaluation continuous_clustering_ros
+            CATKIN_DEPENDS roscpp sensor_msgs grid_map_msgs dynamic_reconfigure velodyne_pointcloud ouster_ros
+            DEPENDS PCL EIGEN3
+    )
+endif ()
+
 find_package(Eigen3 REQUIRED)
-find_package(PCL REQUIRED COMPONENTS common)
+find_package(PCL REQUIRED COMPONENTS common segmentation)
 
+include_directories(include ${EIGEN3_INCLUDE_DIRS})
 
-## Uncomment this if the package has a setup.py. This macro ensures
-## modules and global scripts declared therein get installed
-## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
-# catkin_python_setup()
-
-################################################
-## Declare ROS messages, services and actions ##
-################################################
-
-## To declare and build messages, services or actions from within this
-## package, follow these steps:
-## * Let MSG_DEP_SET be the set of packages whose message types you use in
-##   your messages/services/actions (e.g. std_msgs, actionlib_msgs, ...).
-## * In the file package.xml:
-##   * add a build_depend tag for "message_generation"
-##   * add a build_depend and a exec_depend tag for each package in MSG_DEP_SET
-##   * If MSG_DEP_SET isn't empty the following dependency has been pulled in
-##     but can be declared for certainty nonetheless:
-##     * add a exec_depend tag for "message_runtime"
-## * In this file (CMakeLists.txt):
-##   * add "message_generation" and every package in MSG_DEP_SET to
-##     find_package(catkin REQUIRED COMPONENTS ...)
-##   * add "message_runtime" and every package in MSG_DEP_SET to
-##     catkin_package(CATKIN_DEPENDS ...)
-##   * uncomment the add_*_files sections below as needed
-##     and list every .msg/.srv/.action file to be processed
-##   * uncomment the generate_messages entry below
-##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
-
-## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
-
-## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
-
-## Generate actions in the 'action' folder
-# add_action_files(
-#   FILES
-#   Action1.action
-#   Action2.action
-# )
-
-## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs  # Or other packages containing msgs
-# )
-
-################################################
-## Declare ROS dynamic reconfigure parameters ##
-################################################
-
-## To declare and build dynamic reconfigure parameters within this
-## package, follow these steps:
-## * In the file package.xml:
-##   * add a build_depend and a exec_depend tag for "dynamic_reconfigure"
-## * In this file (CMakeLists.txt):
-##   * add "dynamic_reconfigure" to
-##     find_package(catkin REQUIRED COMPONENTS ...)
-##   * uncomment the "generate_dynamic_reconfigure_options" section below
-##     and list every .cfg file to be processed
-
-## Generate dynamic reconfigure parameters in the 'cfg' folder
-generate_dynamic_reconfigure_options(
-        cfg/ContinuousClustering.cfg
-)
-
-###################################
-## catkin specific configuration ##
-###################################
-## The catkin_package macro generates cmake config files for your package
-## Declare things to be passed to dependent projects
-## INCLUDE_DIRS: uncomment this if your package contains header files
-## LIBRARIES: libraries you create in this project that dependent projects also need
-## CATKIN_DEPENDS: catkin_packages dependent projects also need
-## DEPENDS: system dependencies of this project that dependent projects also need
-catkin_package(
-        INCLUDE_DIRS include
-        LIBRARIES continuous_clustering
-        CATKIN_DEPENDS roscpp sensor_msgs grid_map_msgs dynamic_reconfigure velodyne_pointcloud ouster_ros
-        #  DEPENDS system_lib
-)
-
-###########
-## Build ##
-###########
-
-## Specify additional locations of header files
-## Your package locations should be listed before other locations
-include_directories(
-        include
-        ${catkin_INCLUDE_DIRS}
-        ${EIGEN3_INCLUDE_DIRS}
-)
-
-## Declare a C++ library
+# core continuous clustering library
 add_library(continuous_clustering src/clustering/continuous_clustering.cpp)
-target_link_libraries(continuous_clustering ${catkin_LIBRARIES} pcl_common)
+target_link_libraries(continuous_clustering pthread)
 
-## Add cmake target dependencies of the library
-## as an example, code may need to be generated before libraries
-## either from message generation or dynamic reconfigure
-# add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# library to load kitti odometry dataset
+add_library(kitti_loader src/evaluation/kitti_loader.cpp)
 
-## Declare a C++ executable
-## With catkin_make all packages are built within a single CMake context
-## The recommended prefix ensures that target names across packages don't collide
-add_executable(continuous_clustering_node src/ros/continuous_clustering_node.cpp)
+# library to evaluate ground point segmentation (recall, ...) and clustering (over-/under-segmentation entropy)
+add_library(kitti_evaluation src/evaluation/kitti_evaluation.cpp)
+target_link_libraries(kitti_evaluation kitti_loader pcl_common pcl_segmentation)
 
-## Rename C++ executable without prefix
-## The above recommended prefix causes long target names, the following renames the
-## target back to the shorter version for ease of user use
-## e.g. "rosrun someones_pkg node" instead of "rosrun someones_pkg someones_pkg_node"
-# set_target_properties(${PROJECT_NAME}_node PROPERTIES OUTPUT_NAME node PREFIX "")
-
-## Add cmake target dependencies of the executable
-## same as for the library above
-# add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-## Specify libraries to link a library or executable target against
-
-target_link_libraries(continuous_clustering_node
-        ${catkin_LIBRARIES}
-        continuous_clustering
+# a tool which generates the ground truth labels for clustering evaluation
+add_executable(gt_label_generator_tool src/tools/gt_label_generator_tool.cpp)
+target_link_libraries(gt_label_generator_tool
+        kitti_loader
+        kitti_evaluation
+        pthread
         )
 
-#############
-## Install ##
-#############
+# a tool which is able to run clustering directly on kitti dataset (raw files) instead of rosbag (and runs evaluation)
+add_executable(kitti_demo src/tools/kitti_demo.cpp)
+target_link_libraries(kitti_demo
+        continuous_clustering
+        kitti_loader
+        kitti_evaluation
+        )
 
-# all install targets should use catkin DESTINATION variables
-# See http://ros.org/doc/api/catkin/html/adv_user_guide/variables.html
+if (${COMPILE_WITH_ROS})
+    include_directories(${catkin_INCLUDE_DIRS})
 
-## Mark executable scripts (Python etc.) for installation
-## in contrast to setup.py, you can choose the destination
-# catkin_install_python(PROGRAMS
-#   scripts/my_python_script
-#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+    # helper functions to publish clustering result to ROS
+    add_library(continuous_clustering_ros src/ros/ros_utils.cpp)
+    target_link_libraries(continuous_clustering ${catkin_LIBRARIES})
 
-## Mark executables for installation
-## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_executables.html
-# install(TARGETS ${PROJECT_NAME}_node
-#   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+    # a ROS node (wrapper), which subscribes to raw sensor data and publishes the clustering result
+    add_executable(continuous_clustering_node src/ros/continuous_clustering_node.cpp)
+    target_link_libraries(continuous_clustering_node
+            ${catkin_LIBRARIES}
+            continuous_clustering
+            continuous_clustering_ros
+            )
+    add_dependencies(continuous_clustering_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-## Mark libraries for installation
-## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_libraries.html
-# install(TARGETS ${PROJECT_NAME}
-#   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
-# )
-
-## Mark cpp header files for installation
-# install(DIRECTORY include/${PROJECT_NAME}/
-#   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-#   FILES_MATCHING PATTERN "*.h"
-#   PATTERN ".svn" EXCLUDE
-# )
-
-## Mark other files for installation (e.g. launch and bag files, etc.)
-# install(FILES
-#   # myfile1
-#   # myfile2
-#   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-# )
-
-#############
-## Testing ##
-#############
-
-## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_continuous_clustering.cpp)
-# if(TARGET ${PROJECT_NAME}-test)
-#   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
-# endif()
-
-## Add folders to be run by python nosetests
-# catkin_add_nosetests(test)
+    # link tools against ROS-specific libraries
+    target_link_libraries(gt_label_generator_tool ${catkin_LIBRARIES})
+    target_link_libraries(kitti_demo ${catkin_LIBRARIES} continuous_clustering_ros)
+endif ()

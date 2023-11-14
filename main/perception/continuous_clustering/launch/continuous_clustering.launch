@@ -30,7 +30,7 @@
     <arg name="namespace" default="perception/detections/lidar_$(arg sensor_position)/cluster"/>
 
     <!-- range image parameters -->
-    <arg name="columns_per_full_rotation"/>  <!-- number of columns of range image -->
+    <arg name="num_columns"/>  <!-- number of columns of range image -->
     <arg name="wait_for_tf" default="true"/>
     <arg name="supplement_inclination_angle_for_nan_cells" default="true"/>
 
@@ -49,7 +49,8 @@
     <group ns="$(arg namespace)">
 
         <!-- Continuous Clustering Node/Nodelet -->
-        <node name="continuous_clustering" pkg="continuous_clustering" type="continuous_clustering_node" output="screen">
+        <node name="continuous_clustering" pkg="continuous_clustering" type="continuous_clustering_node"
+              output="screen">
 
             <!-- velodyne specific parameters/re-mappings -->
             <param name="model" value="$(arg velodyne_model)" if="$(arg is_velodyne)"/>
@@ -70,7 +71,7 @@
             <param name="odom_frame" value="$(arg odom_frame)"/>
 
             <!-- range image -->
-            <param name="columns_per_full_rotation" value="$(arg columns_per_full_rotation)"/>
+            <param name="num_columns" value="$(arg num_columns)"/>
             <param name="wait_for_tf" value="$(arg wait_for_tf)"/>
             <param name="supplement_inclination_angle_for_nan_cells"
                    value="$(arg supplement_inclination_angle_for_nan_cells)"/>

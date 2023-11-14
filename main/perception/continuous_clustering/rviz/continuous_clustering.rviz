@@ -4,20 +4,15 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /Status1
-        - /Camera1/Visibility1
         - /LidarRoof1
-        - /LidarRoof1/ContinuousPointClouds1
         - /LidarRoof1/ContinuousPointClouds1/Firings1/Enable continuous1
-        - /LidarRoof1/ContinuousPointClouds1/GroundPointSegmentation1/Enable continuous1
         - /LidarRoof1/ContinuousPointClouds1/GroundPointSegmentation1/Show only1
-        - /LidarRoof1/ContinuousRangeImages1/InstanceSegmentation1
         - /LidarLeft1
         - /LidarLeft1/ContinuousPointClouds1/Firings1/Enable continuous1
         - /LidarLeft1/ContinuousRangeImages1/InstanceSegmentation1/Enable continuous1
         - /LidarRight1
       Splitter Ratio: 0.6441441178321838
-    Tree Height: 372
+    Tree Height: 354
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -37,7 +32,7 @@ Panels:
     SyncMode: 0
     SyncSource: Camera
   - Class: rosbag_panel/RosbagPanel
-    LastOpenedDirectory: /data/kitti_odometry/kitti_data_odometry_color_sequence_00.bag
+    LastOpenedDirectory: /data/rosbags/SingleObjectTracker/2022-04-21_13-14-03_tas/2022-04-21-13-14-04.bag
     Name: RosbagPanel
 Preferences:
   PromptSaveOnExit: true
@@ -50,7 +45,7 @@ Visualization Manager:
       Cell Size: 1
       Class: rviz/Grid
       Color: 160; 160; 164
-      Enabled: true
+      Enabled: false
       Line Style:
         Line Width: 0.029999999329447746
         Value: Lines
@@ -61,29 +56,284 @@ Visualization Manager:
         Y: 0
         Z: 0
       Plane: XY
-      Plane Cell Count: 2000
-      Reference Frame: odom
-      Value: true
+      Plane Cell Count: 10
+      Reference Frame: base_link
+      Value: false
     - Alpha: 1
       Class: rviz/RobotModel
       Collision Enabled: false
-      Enabled: false
+      Enabled: true
       Links:
         All Links Enabled: true
         Expand Joint Details: false
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
+        base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        base_link_ground:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/camera/marveye/left:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/camera/marveye/left/world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/camera/marveye/nir_left:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/camera/marveye/nir_left/world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/camera/marveye/nir_right:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/camera/marveye/nir_right/world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/camera/marveye/right:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/camera/marveye/right/world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/camera/marveye/rotating_head:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/camera/marveye/rotation_point:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/camera/marveye/tele:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/camera/marveye/tele/mirror:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/camera/marveye/tele/world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/camera/roof/ir:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/camera/roof/ir/world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/camera/surround/back:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/camera/surround/back/world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/camera/surround/front:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/camera/surround/front/world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/camera/surround/left:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/camera/surround/left/world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/camera/surround/right:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/camera/surround/right/world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/camera/windshield/nir:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/camera/windshield/nir/world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/camera/windshield/vis:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/camera/windshield/vis/world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/ins/oxts:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/lidar/hdl64_roof:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/lidar/hdl64_roof/rotating_head:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/lidar/os32_left/os_sensor:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/lidar/os32_right/os_sensor:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/lidar/vls128_roof:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/odometry/base:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        sensor/radar/umrr/21:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/radar/umrr/31:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/radar/umrr/32:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/radar/umrr/33:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/radar/umrr/34:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor/radar/umrr/35:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        vehicle/center_of_gravity:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        vehicle/chassis:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        vehicle/rear_axis:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        vehicle/wheel/front_left:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        vehicle/wheel/front_left/air_suspension:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        vehicle/wheel/front_left/steer:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        vehicle/wheel/front_right:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        vehicle/wheel/front_right/air_suspension:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        vehicle/wheel/front_right/steer:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        vehicle/wheel/rear_left:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        vehicle/wheel/rear_left/air_suspension:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        vehicle/wheel/rear_left/steer:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        vehicle/wheel/rear_right:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        vehicle/wheel/rear_right/air_suspension:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        vehicle/wheel/rear_right/steer:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
       Name: RobotModel
       Robot Description: robot_description
       TF Prefix: ""
       Update Interval: 0
-      Value: false
+      Value: true
       Visual Enabled: true
     - Class: rviz/Camera
       Enabled: true
       Image Rendering: background and overlay
-      Image Topic: /kitti/camera_color/left/image_rect
+      Image Topic: /sensor/camera/surround/front/image_rect_color
       Name: Camera
       Overlay Alpha: 0.5
       Queue Size: 2
@@ -91,10 +341,8 @@ Visualization Manager:
       Unreliable: false
       Value: true
       Visibility:
-        Axes: false
-        Grid: false
+        Grid: true
         LidarLeft:
-          PointCloudFullRevolution: true
           ContinuousInstances: true
           ContinuousPointClouds:
             Firings: true
@@ -106,9 +354,9 @@ Visualization Manager:
             GroundPointSegmentation: true
             InstanceSegmentation: true
             Value: true
+          PointCloudFullRevolution: true
           Value: false
         LidarRight:
-          PointCloudFullRevolution: true
           ContinuousInstances: true
           ContinuousPointClouds:
             Firings: true
@@ -120,9 +368,9 @@ Visualization Manager:
             GroundPointSegmentation: true
             InstanceSegmentation: true
             Value: true
+          PointCloudFullRevolution: true
           Value: false
         LidarRoof:
-          PointCloudFullRevolution: true
           ContinuousInstances: true
           ContinuousPointClouds:
             Firings: true
@@ -134,9 +382,9 @@ Visualization Manager:
             GroundPointSegmentation: true
             InstanceSegmentation: true
             Value: true
+          PointCloudFullRevolution: true
           Value: true
         RobotModel: false
-        TF: false
         Terrain: false
         Value: true
       Zoom Factor: 1.7999999523162842
@@ -146,21 +394,16 @@ Visualization Manager:
       Color: 200; 200; 200
       Color Layer: smoothed_height
       Color Transformer: IntensityLayer
-      Draw Real Cells: false
       Enabled: false
-      Frame Rate (Hz): -1
-      Grid Lines Width Factor: 0.029999999329447746
       Height Layer: smoothed_height
       Height Transformer: Layer
       History Length: 1
-      Interpolate Color in Cells: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 10
       Min Color: 0; 0; 0
       Min Intensity: 0
       Name: Terrain
-      Queue Size: 100
       Show Grid Lines: true
       Topic: /perception/static_environment_model/estimated_terrain/anre
       Unreliable: false
@@ -179,7 +422,6 @@ Visualization Manager:
           Class: rviz/PointCloud2
           Color: 238; 238; 236
           Color Transformer: FlatColor
-          Continuous Transform: false
           Decay Time: 0
           Enabled: false
           Invert Rainbow: false
@@ -210,7 +452,7 @@ Visualization Manager:
                 Min Value: -1.0877271890640259
                 Value: true
               Axis: Z
-              Channel Name: firing_index
+              Channel Name: ground_point_label
               Class: rviz/ContinuousPointCloud2
               Color: 136; 138; 133
               Color Transformer: FlatColor
@@ -250,17 +492,17 @@ Visualization Manager:
                 Min Value: -10
                 Value: true
               Axis: Z
-              Channel Name: debug_ground_point_label
+              Channel Name: ground_point_label
               Class: rviz/ContinuousPointCloud2
               Color: 255; 255; 255
               Color Transformer: Label
               Decay Time: 0
               Enable continuous:
                 Flip: false
-                Maximum Columns: 2200
+                Maximum Columns: 1700
                 Upside Down: false
                 Value: true
-              Enabled: false
+              Enabled: true
               Invert Rainbow: false
               Max Color: 255; 255; 255
               Min Color: 0; 0; 0
@@ -279,7 +521,7 @@ Visualization Manager:
               Unreliable: false
               Use Fixed Frame: true
               Use rainbow: true
-              Value: false
+              Value: true
               Wait for transform: true
             - Alpha: 1
               Autocompute Intensity Bounds: true
@@ -319,7 +561,7 @@ Visualization Manager:
               Use rainbow: true
               Value: false
               Wait for transform: true
-          Enabled: true
+          Enabled: false
           Name: ContinuousPointClouds
         - Class: rviz/Group
           Displays:
@@ -368,7 +610,7 @@ Visualization Manager:
               Enable continuous:
                 Maximum Columns: 1700
                 Value: true
-              Enabled: false
+              Enabled: true
               Flip: false
               Invert Rainbow: false
               Keep Aspect Ratio: true
@@ -386,7 +628,7 @@ Visualization Manager:
               Upside Down: false
               Use Fixed Frame: true
               Use rainbow: true
-              Value: false
+              Value: true
             - Autocompute Intensity Bounds: true
               Autocompute Value Bounds:
                 Max Value: 23.944974899291992
@@ -400,7 +642,7 @@ Visualization Manager:
               Enable continuous:
                 Maximum Columns: 1700
                 Value: true
-              Enabled: true
+              Enabled: false
               Flip: false
               Invert Rainbow: false
               Keep Aspect Ratio: false
@@ -418,8 +660,8 @@ Visualization Manager:
               Upside Down: false
               Use Fixed Frame: true
               Use rainbow: true
-              Value: true
-          Enabled: false
+              Value: false
+          Enabled: true
           Name: ContinuousRangeImages
         - Alpha: 1
           Autocompute Intensity Bounds: true
@@ -474,7 +716,6 @@ Visualization Manager:
           Class: rviz/PointCloud2
           Color: 238; 238; 236
           Color Transformer: FlatColor
-          Continuous Transform: false
           Decay Time: 0
           Enabled: false
           Invert Rainbow: false
@@ -754,7 +995,7 @@ Visualization Manager:
           Use rainbow: true
           Value: true
           Wait for transform: true
-      Enabled: true
+      Enabled: false
       Name: LidarLeft
     - Class: rviz/Group
       Displays:
@@ -769,7 +1010,6 @@ Visualization Manager:
           Class: rviz/PointCloud2
           Color: 238; 238; 236
           Color Transformer: FlatColor
-          Continuous Transform: false
           Decay Time: 0
           Enabled: false
           Invert Rainbow: false
@@ -1049,58 +1289,11 @@ Visualization Manager:
           Use rainbow: true
           Value: true
           Wait for transform: true
-      Enabled: true
-      Name: LidarRight
-    - Alpha: 1
-      Class: rviz/Axes
       Enabled: false
-      Length: 1
-      Name: Axes
-      Radius: 0.10000000149011612
-      Reference Frame: velo_link
-      Show Trail: false
-      Value: false
-    - Class: rviz/TF
-      Enabled: true
-      Filter (blacklist): ""
-      Filter (whitelist): ""
-      Frame Timeout: 15
-      Frames:
-        All Enabled: true
-        camera_color_left:
-          Value: true
-        camera_color_right:
-          Value: true
-        camera_gray_left:
-          Value: true
-        camera_gray_right:
-          Value: true
-        odom:
-          Value: true
-        velo_link:
-          Value: true
-      Marker Alpha: 1
-      Marker Scale: 1
-      Name: TF
-      Show Arrows: true
-      Show Axes: true
-      Show Names: true
-      Tree:
-        odom:
-          camera_gray_left:
-            camera_color_left:
-              {}
-            camera_color_right:
-              {}
-            camera_gray_right:
-              {}
-            velo_link:
-              {}
-      Update Interval: 0
-      Value: true
+      Name: LidarRight
   Enabled: true
   Global Options:
-    Background Color: 255; 255; 255
+    Background Color: 46; 52; 54
     Default Light: true
     Fixed Frame: odom
     Frame Rate: 30
@@ -1126,7 +1319,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 30.98033905029297
+      Distance: 47.219200134277344
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -1134,17 +1327,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.02935992181301117
-        Y: 0.22353845834732056
-        Z: -1.1920928955078125e-06
+        X: 0
+        Y: 0
+        Z: 0
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.4947972893714905
-      Target Frame: velo_link
-      Yaw: 3.5403735637664795
+      Pitch: 0.44039830565452576
+      Target Frame: base_link
+      Yaw: 2.9753975868225098
     Saved: ~
 Window Geometry:
   Camera:
@@ -1160,7 +1353,7 @@ Window Geometry:
   Hide Right Dock: false
   InstanceSegmentation:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd00000004000000000000021100000416fc0200000009fb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb0000000c00430061006d006500720061010000003d0000016d0000001600fffffffb000000100044006900730070006c00610079007301000001b0000001ff000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000160052006f007300620061006700500061006e0065006c01000003b50000009e0000008c00ffffff000000010000010f00000416fc0200000004fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000001200530065006c0065006300740069006f006e010000003d000002eb0000005c00fffffffb0000000a00560069006500770073010000032e00000125000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000738000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000738000000c8fc0100000009fb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e000000000000000738000000ce00fffffffb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e000000000000000738000000ce00fffffffb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e000000000000000738000000eb00fffffffb0000000e0046006900720069006e006700730000000000000007380000006200fffffffc00000000000007380000000000fffffffaffffffff0200000003fb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000001600fffffffb0000000e0046006900720069006e006700730000000000ffffffff0000001600fffffffb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e0000000313000000c80000001600fffffffb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e000000000000000738000000eb00fffffffb0000000e0046006900720069006e006700730000000000000007380000006200fffffffc00000000000007380000000000fffffffa000000000200000004fb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000000000000000fb0000000e0046006900720069006e006700730000000000ffffffff0000000000000000fb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000000000000000fb0000000800540069006d006500000004150000003e0000003900fffffffb0000000800540069006d006501000000000000045000000000000000000000040c0000041600000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000023f00000348fc0200000009fb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb0000000c00430061006d006500720061010000003d000000c30000001600fffffffb000000100044006900730070006c0061007900730100000106000001ed000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000160052006f007300620061006700500061006e0065006c01000002f90000008c0000008c00ffffff000000010000010f00000348fc0200000004fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000001200530065006c0065006300740069006f006e010000003d000002570000005c00fffffffb0000000a00560069006500770073010000029a000000eb000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000738000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000738000000c8fc0100000009fb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e000000000000000738000000ce00fffffffb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e000000000000000738000000ce00fffffffb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e000000000000000738000000eb00fffffffb0000000e0046006900720069006e006700730000000000000007380000006200fffffffc00000000000007380000000000fffffffaffffffff0200000003fb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000001600fffffffb0000000e0046006900720069006e006700730000000000ffffffff0000001600fffffffb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e0000000313000000c80000001600fffffffb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e010000000000000738000000eb00fffffffb0000000e0046006900720069006e006700730000000000000007380000006200fffffffc00000000000007380000000000fffffffa000000000200000004fb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000000000000000fb0000000e0046006900720069006e006700730000000000ffffffff0000000000000000fb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000000000000000fb0000000800540069006d006500000004150000003e0000003900fffffffb0000000800540069006d00650100000000000004500000000000000000000003de0000034800000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   RosbagPanel:
     collapsed: false
   Selection:

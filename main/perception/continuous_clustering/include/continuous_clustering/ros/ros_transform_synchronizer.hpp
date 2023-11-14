@@ -1,5 +1,5 @@
-#ifndef CONTINUOUS_CLUSTERING_ROS_TRANSFORM_SYNCHRONIZER_H
-#define CONTINUOUS_CLUSTERING_ROS_TRANSFORM_SYNCHRONIZER_H
+#ifndef CONTINUOUS_CLUSTERING_ROS_TRANSFORM_SYNCHRONIZER_HPP
+#define CONTINUOUS_CLUSTERING_ROS_TRANSFORM_SYNCHRONIZER_HPP
 
 #include <ros/ros.h>
 #include <tf2_ros/transform_listener.h>
@@ -113,4 +113,4 @@ class RosTransformSynchronizer
     bool frames_are_different_{false};
 };
 
-#endif // CONTINUOUS_CLUSTERING_ROS_TRANSFORM_SYNCHRONIZER_H
+#endif

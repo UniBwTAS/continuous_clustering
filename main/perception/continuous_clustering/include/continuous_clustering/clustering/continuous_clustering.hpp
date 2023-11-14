@@ -1,18 +1,13 @@
-#pragma once
+#ifndef CONTINUOUS_CLUSTERING_CONTINUOUS_CLUSTERING_HPP
+#define CONTINUOUS_CLUSTERING_CONTINUOUS_CLUSTERING_HPP
 
-#include <dynamic_reconfigure/server.h>
-#include <grid_map_msgs/GridMap.h>
-#include <ros/ros.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <sensor_msgs/point_cloud2_iterator.h>
-#include <continuous_clustering/ContinuousClusteringConfig.h>
+#include <set>
+
+#include <Eigen/Geometry>
+
 #include <continuous_clustering/clustering/general.hpp>
-#include <continuous_clustering/ros/ros_transform_synchronizer.hpp>
-#include <continuous_clustering/ros/sensor_input.hpp>
+#include <continuous_clustering/clustering/point_types.hpp>
 #include <continuous_clustering/utils/thread_pool.hpp>
-#include <tf2/LinearMath/Transform.h>
-#include <tf2_ros/transform_listener.h>
-#include <velodyne_pointcloud/calibration.h>
 
 namespace continuous_clustering
 {
@@ -24,6 +19,64 @@ enum
     GP_OBSTACLE = RED,        // ground point: unknown
     GP_EGO_VEHICLE = MAGENTA, // ground point: point on ego vehicle
     GP_FOG = LIGHTGRAY,       // ground point: classified as fog
+};
+
+struct ContinuousRangeImageConfiguration
+{
+    bool sensor_is_clockwise{true};
+    int num_columns{1700};
+    bool supplement_inclination_angle_for_nan_cells{true}; // TODO: maybe ground?
+};
+
+struct ContinuousGroundSegmentationConfiguration
+{
+    // General
+    float max_slope{0.2};
+    float first_ring_as_ground_max_allowed_z_diff{0.4};
+    float first_ring_as_ground_min_allowed_z_diff{-0.4};
+
+    // General Advanced
+    float last_ground_point_slope_higher_than{-0.1};
+    float last_ground_point_distance_smaller_than{5.};
+    float ground_because_close_to_last_certain_ground_max_z_diff{0.4};
+    float ground_because_close_to_last_certain_ground_max_dist_diff{2.0};
+    float obstacle_because_next_certain_obstacle_max_dist_diff{0.3};
+
+    // Segmentation by terrain
+    bool use_terrain{false};
+    float terrain_max_allowed_z_diff{0.4};
+
+    // Detection of points on the ego robot TODO: enable
+    float height_ref_to_maximum_{}, height_ref_to_ground_{};
+    float length_ref_to_front_end_{}, length_ref_to_rear_end_{};
+    float width_ref_to_left_mirror_{}, width_ref_to_right_mirror_{};
+
+    // Filter points originating from fog
+    bool fog_filtering_enabled{false}; // TODO: add "preprocessing" step or add to range_image
+    uint8_t fog_filtering_intensity_below{2};
+    float fog_filtering_distance_below{18};
+    float fog_filtering_inclination_above{-0.06};
+
+    // TODO: ego bounding box + frame!
+};
+
+struct ContinuousClusteringConfiguration
+{
+    float max_distance{0.7};
+    int max_steps_in_row{20};
+    int max_steps_in_column{20};
+    bool stop_after_association_enabled{true};
+    int stop_after_association_min_steps{1};
+    bool ignore_points_in_chessboard_pattern{true};
+    bool ignore_points_with_too_big_inclination_angle_diff{true};
+    bool use_last_point_for_cluster_stamp{false};
+};
+
+struct Configuration
+{
+    ContinuousRangeImageConfiguration range_image{};
+    ContinuousGroundSegmentationConfiguration ground_segmentation{};
+    ContinuousClusteringConfiguration clustering{};
 };
 
 class RangeImageIndex
@@ -70,7 +123,8 @@ struct Point
     int64_t global_column_index{-1};
     int local_column_index{-1};
     int row_index{-1};
-    ros::Time stamp{0, 0};
+    uint64_t stamp{0};
+    uint64_t globally_unique_point_index{static_cast<uint64_t>(-1)};
 
     // ground point segmentation
     uint8_t ground_point_label{0};
@@ -94,51 +148,16 @@ struct Point
     int number_of_visited_neighbors{0};
 };
 
-struct PointCloud2Iterators
-{
-    // range image generation
-    sensor_msgs::PointCloud2Iterator<float> iter_x_out;
-    sensor_msgs::PointCloud2Iterator<float> iter_y_out;
-    sensor_msgs::PointCloud2Iterator<float> iter_z_out;
-    sensor_msgs::PointCloud2Iterator<uint32_t> iter_f_out;
-    sensor_msgs::PointCloud2Iterator<uint8_t> iter_i_out;
-    sensor_msgs::PointCloud2Iterator<uint32_t> iter_time_sec_out;
-    sensor_msgs::PointCloud2Iterator<uint32_t> iter_time_nsec_out;
-    sensor_msgs::PointCloud2Iterator<float> iter_d_out;
-    sensor_msgs::PointCloud2Iterator<float> iter_a_out;
-    sensor_msgs::PointCloud2Iterator<float> iter_ia_out;
-    sensor_msgs::PointCloud2Iterator<double> iter_ca_out;
-    sensor_msgs::PointCloud2Iterator<uint32_t> iter_gc_out;
-    sensor_msgs::PointCloud2Iterator<uint16_t> iter_lc_out;
-    sensor_msgs::PointCloud2Iterator<uint16_t> iter_r_out;
-
-    // ground point segmentation
-    sensor_msgs::PointCloud2Iterator<uint8_t> iter_gp_label_out;
-    sensor_msgs::PointCloud2Iterator<uint8_t> iter_dbg_gp_label_out;
-    sensor_msgs::PointCloud2Iterator<int32_t> iter_dbg_c_n_left_out;
-    sensor_msgs::PointCloud2Iterator<int32_t> iter_dbg_c_n_right_out;
-    sensor_msgs::PointCloud2Iterator<float> iter_height_over_ground_out;
-
-    // continuous clustering
-    sensor_msgs::PointCloud2Iterator<double> iter_finished_at_azimuth_angle;
-    sensor_msgs::PointCloud2Iterator<uint16_t> iter_num_child_points;
-    sensor_msgs::PointCloud2Iterator<uint16_t> iter_tree_root_row_index;
-    sensor_msgs::PointCloud2Iterator<uint32_t> iter_tree_root_column_index;
-    sensor_msgs::PointCloud2Iterator<uint32_t> iter_number_of_visited_neighbors;
-    sensor_msgs::PointCloud2Iterator<uint32_t> iter_tree_id;
-    sensor_msgs::PointCloud2Iterator<uint32_t> iter_id;
-};
-
 struct InsertionJob
 {
     RawPoints::ConstPtr firing;
-    geometry_msgs::TransformStamped odom_frame_from_sensor_frame;
+    Eigen::Isometry3d odom_frame_from_sensor_frame;
 };
 
 struct SegmentationJob
 {
     int64_t ring_buffer_current_global_column_index;
-    tf2::Transform odom_frame_from_sensor_frame;
+    Eigen::Isometry3d odom_frame_from_sensor_frame;
 };
 
 struct AssociationJob
@@ -167,21 +186,34 @@ class ContinuousClustering
 {
 
   public:
-    ContinuousClustering(ros::NodeHandle nh, const ros::NodeHandle& nh_private);
+    ContinuousClustering();
 
-  private:
+  public:
     // general
-    void reset();
+    void reset(int num_rows, bool sequential_execution = false);
+    void setConfiguration(const Configuration& config);
+    bool resetRequired() const;
 
     // range image generation
-    void onNewFiringsCallback(const RawPoints::ConstPtr& firing);
-    void onNewFiringsWithTfCallback(const RawPoints::ConstPtr& firing,
-                                    const geometry_msgs::TransformStamped& odom_from_sensor);
+    void addFiring(const RawPoints::ConstPtr& firing, const Eigen::Isometry3d& odom_from_sensor);
+
+    // ground point segmentation (TODO: terrain)
+    void setTransformRobotFrameFromSensorFrame(const Eigen::Isometry3d& tf);
+    bool hasTransformRobotFrameFromSensorFrame();
+
+    // continuous clustering
+    void setFinishedColumnCallback(std::function<void(int64_t, int64_t, bool)> cb);
+    void setFinishedClusterCallback(std::function<void(const std::vector<Point>&, uint64_t)> cb);
+
+    // debugging
+    void recordJobQueueWorkload(size_t num_jobs_sensor_input); // debugging
+
+  private:
+    // range image generation
     void insertFiringIntoRangeImage(InsertionJob&& job);
 
-    // ground point segmentation
+    // ground point segmentation (TODO: terrain)
     inline void performGroundPointSegmentationForColumn(SegmentationJob&& job);
-    void onNewTerrainCallback(const grid_map_msgs::GridMap::ConstPtr& msg);
     static inline Point2D to2dInAzimuthPlane(const Point3D& p)
     {
         return {p.xy().length(), p.z};
@@ -191,85 +223,42 @@ class ContinuousClustering
     inline void associatePointsInColumn(AssociationJob&& job);
     inline void findFinishedTreesAndAssignSameId(TreeCombinationJob&& job);
     inline void collectPointsForCusterAndPublish(PublishingJob&& job);
-    inline void createPointCloud2ForCluster(sensor_msgs::PointCloud2& msg,
-                                            const std::vector<Point>& cluster_points,
-                                            const ros::Time& min_stamp_for_this_cluster,
-                                            const ros::Time& max_stamp_for_this_cluster);
     inline void clearColumns(int64_t from_global_column_index, int64_t to_global_column_index);
 
-    // ROS-specific
-    static inline PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& msg);
-    inline void addPointToMessage(PointCloud2Iterators& container, int data_index_message, const Point& point) const;
-    static inline void
-    addRawPointToMessage(PointCloud2Iterators& container, int data_index_message, const RawPoint& point);
-    inline void publishColumns(int64_t from_global_column_index, int64_t to_global_column_index, ros::Publisher& pub);
-    inline void publishFiring(const RawPoints::ConstPtr& firing);
-    void callbackReconfigure(ContinuousClusteringConfig& config, uint32_t level);
-
-  private:
-    // reconfigure
-    dynamic_reconfigure::Server<ContinuousClusteringConfig> reconfigure_server_;
-    ContinuousClusteringConfig config_;
-    float max_distance_{};
-    float max_distance_squared_{};
-
-    // init ROS specific stuff
-    ros::Subscriber sub_terrain;
-    ros::Publisher pub_raw_firings;
-    ros::Publisher pub_ground_point_segmentation;
-    ros::Publisher pub_instance_segmentation;
-    ros::Publisher pub_clusters;
-    ros::Time last_update_{0, 0};
-    bool first_firing_after_reset{false};
-    std::string ego_robot_frame{};
-    std::string sensor_frame{};
-    std::string odom_frame{};
-    bool wait_for_tf{true};
-    RosTransformSynchronizer<RawPoints> tf_synchronizer;
-
-    // sensor specific stuff
-    std::string sensor_manufacturer;
-    std::shared_ptr<SensorInput> sensor_input_;
-    bool sensor_is_clockwise_{true};
-
+  public:
     // range image (implemented as ring buffer)
     int ring_buffer_max_columns{0};
+    int num_columns_{};
+    int num_rows_{-1};
     std::vector<Point> range_image_{0};
-    int num_columns{};
-    int num_rows{};
     int64_t ring_buffer_start_global_column_index{};
     int64_t ring_buffer_end_global_column_index{};
+
+  private:
+    Configuration config_;
 
     // continuous range image generation (srig)
     float srig_azimuth_width_per_column{};
     int64_t srig_previous_global_column_index_of_rearmost_laser{0};
     int64_t srig_previous_global_column_index_of_foremost_laser{0};
     int64_t srig_first_unfinished_global_column_index{-1};
-    tf2::Vector3 srig_sensor_position{0, 0, 0};
-    bool srig_reset_because_of_bad_start{false};
-    bool srig_supplement_inclination_angle_for_nan_cells{true}; // allows faster association
+    Eigen::Vector3d srig_sensor_position{0, 0, 0};
+    bool reset_required{false};
 
     // continuous ground point segmentation (sgps)
-    float height_ref_to_maximum_{}, height_ref_to_ground_{};
-    float length_ref_to_front_end_{}, length_ref_to_rear_end_{};
-    float width_ref_to_left_mirror_{}, width_ref_to_right_mirror_{};
-    float height_sensor_to_ground_{};
     Point3D sgps_sensor_position{0, 0, 0};
-    std::unique_ptr<tf2::Transform> sgps_ego_robot_frame_from_sensor_frame_;
-    std::vector<int64_t> sgps_previous_ground_points_;
-    std::vector<std::shared_ptr<int64_t>> sgps_next_ground_points_;
-    ros::Time sgps_previous_column_stamp_;
-    grid_map_msgs::GridMap::ConstPtr last_terrain_msg_;
-    bool sgps_use_terrain_{false};
+    std::unique_ptr<Eigen::Isometry3d> sgps_ego_robot_frame_from_sensor_frame_;
 
     // continuous clustering (sc)
+    float max_distance_squared{0.7 * 0.7};
     int64_t sc_first_unpublished_global_column_index{-1};
     std::mutex sc_first_unfinished_global_column_index_mutex;
     std::list<int64_t> sc_minimum_required_global_column_indices;
     std::list<RangeImageIndex> sc_unfinished_point_trees_;
     uint32_t sc_cluster_counter_{1};
     std::vector<float> sc_inclination_angles_between_lasers_;
-    bool sc_use_last_point_for_cluster_stamp{false};
+    std::function<void(int64_t, int64_t, bool)> finished_column_callback_;
+    std::function<void(const std::vector<Point>&, uint64_t)> finished_cluster_callback_;
 
     // multi-threading
     ThreadPool<InsertionJob> insertion_thread_pool{"I"};
@@ -277,9 +266,12 @@ class ContinuousClustering
     ThreadPool<AssociationJob> association_thread_pool{"A"};
     ThreadPool<TreeCombinationJob> tree_combination_thread_pool{"C"};
     ThreadPool<PublishingJob> publishing_thread_pool{"P"};
+    bool do_sequential_execution{false};
 
     // performance statistics
     bool stop_statistics = false;
     std::list<size_t> num_pending_jobs;
 };
 } // namespace continuous_clustering
+
+#endif

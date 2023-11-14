@@ -8,16 +8,13 @@
     <arg name="sensor_position" default="roof"/>
     <arg name="sensor_frame" default="velo_link"/>
     <arg name="sensor_raw_data_topic" default="/kitti/velo/pointcloud"/>
-    <arg name="sensor_is_clockwise" default="false"/>
-
-    <!-- manufacturer specific: kitti -->
-    <!--<arg name="ouster_metadata_service" default="/bus/$(arg sensor_model)_$(arg sensor_position)/get_metadata"/>-->
+    <arg name="sensor_is_clockwise" default="true"/>
 
     <!-- other ros specific parameters -->
     <arg name="ego_robot_frame" default="velo_link"/>
 
     <!-- range image parameters -->
-    <arg name="columns_per_full_rotation" default="2200"/>
+    <arg name="num_columns" default="2200"/>
 
     <!-- clustering parameters -->
     <arg name="ignore_points_in_chessboard_pattern" default="false"/>
@@ -33,4 +30,10 @@
     <param name="/vehicles/vw_passat_b6/geometric/width_ref_to_right_mirror" value="-1.5"/>
 
     <include file="$(find continuous_clustering)/launch/continuous_clustering.launch" pass_all_args="true"/>
+
+    <!-- start node for evaluation -->
+    <group ns="perception/detections/lidar_$(arg sensor_position)/cluster">
+        <node name="kitti_evaluation" pkg="continuous_clustering" type="kitti_evaluation_node" output="screen"/>
+    </group>
+
 </launch>

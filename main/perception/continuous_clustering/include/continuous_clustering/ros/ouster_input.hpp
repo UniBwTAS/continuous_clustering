@@ -1,20 +1,20 @@
-#ifndef CONTINUOUS_CLUSTERING_OUSTER_INPUT_H
-#define CONTINUOUS_CLUSTERING_OUSTER_INPUT_H
+#ifndef CONTINUOUS_CLUSTERING_OUSTER_INPUT_HPP
+#define CONTINUOUS_CLUSTERING_OUSTER_INPUT_HPP
 
 // prevent clang-format from altering the location of "ouster_ros/ros.h", the
 // header file needs to be the first include due to PCL_NO_PRECOMPILE flag
 // clang-format off
-#include "ouster_ros/os_ros.h"
+#include <ouster_ros/os_ros.h>
 // clang-format on
 
 #include <pcl_conversions/pcl_conversions.h>
 #include <ros/console.h>
 #include <ros/ros.h>
 
-#include "ouster_ros/GetMetadata.h"
-#include "ouster_ros/PacketMsg.h"
+#include <ouster_ros/GetMetadata.h>
+#include <ouster_ros/PacketMsg.h>
 
-#include "ros_sensor_input.hpp"
+#include <continuous_clustering/ros/ros_sensor_input.hpp>
 
 namespace continuous_clustering
 {
@@ -171,6 +171,7 @@ class OusterInput : public RosSensorInput<ouster_ros::PacketMsg>
                 }
                 current_firing->points[p.ring].firing_index = firing_index;
                 current_firing->points[p.ring].stamp = packet_receive_time;
+                keepTrackOfMinAndMaxStamp(packet_receive_time);
             }
 
             if (!interrupt_message)
