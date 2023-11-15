@@ -6,7 +6,7 @@
     <license>BSD</license>
     <maintainer email="andreas.reich@unibw.de">Andreas Reich</maintainer>
     <author email="andreas.reich@unibw.de">Andreas Reich</author>
-    <url type="website">https://github.com/UniBwTAS/continuous-clustering</url>
+    <url type="website">https://github.com/UniBwTAS/continuous_clustering</url>
 
     <buildtool_depend>catkin</buildtool_depend>
 
@@ -14,8 +14,11 @@
     <depend>sensor_msgs</depend>
     <depend>grid_map_msgs</depend>
     <depend>dynamic_reconfigure</depend>
+
+    <!-- sensor inputs -->
     <depend>velodyne_pointcloud</depend>
     <depend>ouster_ros</depend>
+    <depend>ethernet_msgs</depend>
 
     <exec_depend>rviz_range_image</exec_depend>
     <exec_depend>rviz_continuous_point_cloud</exec_depend>

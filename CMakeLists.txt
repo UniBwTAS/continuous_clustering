@@ -18,7 +18,7 @@ if ("$ENV{ROS_VERSION}" STREQUAL "1")
     set(COMPILE_WITH_ROS true)
 
     # ROS/catkin specific setup
-    find_package(catkin REQUIRED roscpp grid_map_msgs sensor_msgs dynamic_reconfigure velodyne_pointcloud ouster_ros pcl_conversions)
+    find_package(catkin REQUIRED roscpp grid_map_msgs sensor_msgs dynamic_reconfigure velodyne_pointcloud ouster_ros pcl_conversions ethernet_msgs)
     generate_dynamic_reconfigure_options(cfg/ContinuousClustering.cfg)
     catkin_package(
             INCLUDE_DIRS include
