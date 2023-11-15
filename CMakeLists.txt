@@ -12,6 +12,9 @@ add_compile_options(-pthread)
 set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+find_package(Eigen3 REQUIRED)
+find_package(PCL REQUIRED COMPONENTS common segmentation)
+
 if ("$ENV{ROS_VERSION}" STREQUAL "1")
     message(STATUS "steaming_clustering ROS 1 wrapper will be compiled")
     add_compile_definitions(WITH_ROS)
@@ -27,9 +30,6 @@ if ("$ENV{ROS_VERSION}" STREQUAL "1")
             DEPENDS PCL EIGEN3
     )
 endif ()
-
-find_package(Eigen3 REQUIRED)
-find_package(PCL REQUIRED COMPONENTS common segmentation)
 
 include_directories(include ${EIGEN3_INCLUDE_DIRS})
 
