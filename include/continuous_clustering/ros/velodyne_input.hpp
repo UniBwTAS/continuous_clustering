@@ -87,7 +87,7 @@ class VelodyneInput : public velodyne_rawdata::DataContainerBase, public RosSens
 
         // only the time diff since packet stamp is calculated and has to added to packet stamp (passed above) later
         interrupt_message = false;
-        parser.unpack(tmp_packet, *this, m->header.stamp, 0);
+        parser.unpack(tmp_packet, *this, m->header.stamp);
     }
 
   private:
