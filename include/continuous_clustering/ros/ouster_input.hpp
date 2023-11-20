@@ -97,7 +97,6 @@ class OusterInput : public RosSensorInput<ouster_ros::PacketMsg>
         }
 
         ls = ouster::LidarScan{1, H, info.format.udp_profile_lidar};
-        cloud = ouster_ros::Cloud{1, H};
 
         pf = std::make_unique<ouster::sensor::packet_format>(info);
 
@@ -141,36 +140,38 @@ class OusterInput : public RosSensorInput<ouster_ros::PacketMsg>
 
             ouster::impl::foreach_field(ls, parse_field_col(), 0 /*m_id*/, *pf, col_buf);
 
-            scan_to_cloud_f(points,
-                            lut_direction.block(m_id * ls.h, 0, ls.h, 3),
-                            lut_offset.block(m_id * ls.h, 0, ls.h, 3),
-                            ts,
-                            ls,
-                            cloud,
-                            0 /*return_id*/);
+            ouster::img_t<uint32_t> range_firing = ls.field<uint32_t>(ouster::sensor::ChanField::RANGE);
+            ouster::PointsF lut_direction_firing = lut_direction.block(m_id * ls.h, 0, ls.h, 3);
+            ouster::PointsF lut_offset_firing = lut_direction.block(m_id * ls.h, 0, ls.h, 3);
+            ouster::cartesianT(points, range_firing, lut_direction_firing, lut_offset_firing);
+            ouster::img_t<uint32_t> signal_img = ls.field<uint32_t>(ouster::sensor::ChanField::SIGNAL);
 
-            for (auto& p : cloud)
+            for (auto ring = 0; ring < ls.h; ring++)
             {
-                if (p.range > 0)
+                uint32_t range = range_firing(ring, 0);
+                auto p = points.row(ring);
+                uint32_t intensity = signal_img(ring, 0);
+                if (range > 0)
                 {
-                    current_firing->points[p.ring].x = p.x;
-                    current_firing->points[p.ring].y = p.y;
-                    current_firing->points[p.ring].z = p.z;
+                    current_firing->points[ring].x = p(0);
+                    current_firing->points[ring].y = p(1);
+                    current_firing->points[ring].z = p(2);
 
                     // according to https://github.com/ouster-lidar/ouster_example/issues/128#issuecomment-558160200 the
                     // typical intensity range is between 0 - 1000 (can be theoretically higher, up to 6000)
-                    current_firing->points[p.ring].intensity =
-                        static_cast<uint8_t>(std::min(1.f, p.intensity / 1000.f) * 255);
+                    // we convert it to a 0 - 255 range
+                    current_firing->points[ring].intensity =
+                        static_cast<uint8_t>(std::min(1.f, static_cast<float>(intensity) / 1000.f) * 255);
                 }
                 else
                 {
-                    current_firing->points[p.ring].x = nanf("");
-                    current_firing->points[p.ring].y = nanf("");
-                    current_firing->points[p.ring].z = nanf("");
-                    current_firing->points[p.ring].intensity = 0;
+                    current_firing->points[ring].x = nanf("");
+                    current_firing->points[ring].y = nanf("");
+                    current_firing->points[ring].z = nanf("");
+                    current_firing->points[ring].intensity = 0;
                 }
-                current_firing->points[p.ring].firing_index = firing_index;
-                current_firing->points[p.ring].stamp = packet_receive_time;
+                current_firing->points[ring].firing_index = firing_index;
+                current_firing->points[ring].stamp = packet_receive_time;
                 keepTrackOfMinAndMaxStamp(packet_receive_time);
             }
 
@@ -197,7 +198,6 @@ class OusterInput : public RosSensorInput<ouster_ros::PacketMsg>
     ouster::PointsF lut_offset;
     ouster::PointsF points;
     ouster::LidarScan ls;
-    ouster_ros::Cloud cloud;
 };
 
 } // namespace continuous_clustering
