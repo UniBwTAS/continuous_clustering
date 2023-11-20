@@ -1,0 +1,13 @@
+<launch>
+    <arg name="path"/>
+    <arg name="delay_between_columns"/>
+
+    <param name="use_sim_time" value="true"/>
+
+    <node name="kitti_demo" pkg="continuous_clustering" type="kitti_demo"
+          args="$(arg path) --delay-between-columns $(arg delay_between_columns)"
+          output="screen"/>
+
+    <node name="rviz" pkg="rviz" type="rviz"
+          args="--display-config $(find continuous_clustering)/rviz/continuous_clustering_kitti_demo.rviz"/>
+</launch>
