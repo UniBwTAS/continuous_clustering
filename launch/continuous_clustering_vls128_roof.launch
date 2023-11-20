@@ -12,7 +12,7 @@
 
     <!-- manufacturer specific: velodyne -->
     <arg name="velodyne_model" default="VLS128"/>
-    <arg name="velodyne_calibration_path" default="$(find io_velodyne)/calibrations/velodyne_vls128_tas.yaml"/>
+    <arg name="velodyne_calibration_path" default="$(find velodyne_pointcloud)/params/VLS128.yaml"/>
     <arg name="velodyne_rpm" default="600.0"/>
 
     <!-- range image parameters -->
