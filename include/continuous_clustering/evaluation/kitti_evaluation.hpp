@@ -51,9 +51,10 @@ struct EvaluationResult
 
 namespace euclidean_clustering
 {
-const float MAX_DISTANCE = 0.5; // TODO: find real value from TRAVEL paper
-const int MIN_CLUSTER_SIZE = 1;
-const int MAX_CLUSTER_SIZE = 99999999;
+// From: https://github.com/url-kaist/TRAVEL/issues/6#issuecomment-1817809650
+const float MAX_DISTANCE = 1.0;
+const int MIN_CLUSTER_SIZE = 10;
+const int MAX_CLUSTER_SIZE = 300000;
 } // namespace euclidean_clustering
 
 class KittiEvaluation
