@@ -1,0 +1,29 @@
+repositories:
+  librosqt:
+    type: git
+    url: https://github.com/1r0b1n0/librosqt.git
+    version: master
+  ethernet_bridge:
+    type: git
+    url: https://github.com/UniBwTAS/ethernet_bridge.git
+    version: master
+  ouster-ros:
+    type: git
+    url: https://github.com/ouster-lidar/ouster-ros.git
+    version: master
+  ogre_helpers:
+    type: git
+    url: https://github.com/UniBwTAS/ogre_helpers.git
+    version: master
+  rviz_range_image:
+    type: git
+    url: https://github.com/UniBwTAS/rviz_range_image.git
+    version: master
+  rviz_continuous_point_cloud:
+    type: git
+    url: https://github.com/UniBwTAS/rviz_continuous_point_cloud.git
+    version: master
+  rviz_colorize_point_cloud_by_label:
+    type: git
+    url: https://github.com/UniBwTAS/rviz_colorize_point_cloud_by_label.git
+    version: master
