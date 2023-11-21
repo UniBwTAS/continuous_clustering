@@ -25,7 +25,7 @@ git clone https://github.com/UniBwTAS/continuous_clustering.git
 
 # install remaining dependencies in package.xml's from apt repository
 sudo apt install -y python3-rosdep
-rosdep init || true
+sudo rosdep init || true
 rosdep update
 rosdep install --from-paths . --ignore-src -r -y
 
