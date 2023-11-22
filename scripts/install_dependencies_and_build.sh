@@ -1,11 +1,8 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
-# source ROS installation
-source /opt/ros/noetic/setup.bash
-source ~/catkin_ws/devel/setup.bash
-
-# clone all dependencies
-sudo apt install -y git
+# install git in order to clone all dependencies
+sudo apt update
+sudo apt install -y -q git
 
 # library to do continuous clustering with ouster sensor
 git clone --recursive https://github.com/ouster-lidar/ouster-ros.git
@@ -21,14 +18,19 @@ git clone https://github.com/UniBwTAS/rviz_continuous_point_cloud.git
 git clone https://github.com/UniBwTAS/rviz_colorize_point_cloud_by_label.git
 
 # actual continuous clustering package
-git clone https://github.com/UniBwTAS/continuous_clustering.git
+if [ "$1" != "--from-source" ]
+then
+  git clone https://github.com/UniBwTAS/continuous_clustering.git
+fi
 
-# install remaining dependencies in package.xml's from apt repository
-sudo apt install -y python3-rosdep
+# source ROS
+. /opt/ros/noetic/setup.sh
+
+# install remaining dependencies in package.xml's from apt & pip repositories
+sudo apt install -y -q python3-rosdep
 sudo rosdep init || true
 rosdep update
 rosdep install --from-paths . --ignore-src -r -y
 
-# build & source directory
+# build directory
 catkin build
-source ~/catkin_ws/devel/setup.bash
