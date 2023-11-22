@@ -1,0 +1,25 @@
+<launch>
+    <!-- flag if rviz should be started -->
+    <arg name="use_rviz" default="true"/>
+
+    <!-- lidar sensor -->
+    <arg name="sensor_manufacturer" default="kitti"/>
+    <arg name="sensor_model" default="kitti"/>
+    <arg name="sensor_position" default="roof"/>
+    <arg name="sensor_frame" default="velo_link"/>
+    <arg name="sensor_raw_data_topic" default="/kitti/velo/pointcloud"/>
+    <arg name="sensor_is_clockwise" default="true"/>
+
+    <!-- other ros specific parameters -->
+    <arg name="ego_robot_frame" default="velo_link"/>
+
+    <!-- range image parameters -->
+    <arg name="num_columns" default="2200"/>
+
+    <!-- clustering parameters -->
+    <arg name="ignore_points_in_chessboard_pattern" default="false"/>
+    <arg name="ignore_points_with_too_big_inclination_angle_diff" default="false"/>
+
+    <!-- clustering -->
+    <include file="$(find continuous_clustering)/launch/sensor_generic.launch" pass_all_args="true"/>
+</launch>

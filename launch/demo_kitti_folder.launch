@@ -1,6 +1,6 @@
 <launch>
-    <arg name="path"/>
-    <arg name="delay_between_columns"/>
+    <arg name="path" default="/mnt/kitti_odometry/dataset/sequences"/>
+    <arg name="delay_between_columns" default="2000"/>
 
     <param name="use_sim_time" value="true"/>
 
@@ -9,5 +9,5 @@
           output="screen"/>
 
     <node name="rviz" pkg="rviz" type="rviz"
-          args="--display-config $(find continuous_clustering)/rviz/continuous_clustering_kitti_demo.rviz"/>
+          args="--display-config $(find continuous_clustering)/rviz/demo_kitti_folder.rviz"/>
 </launch>

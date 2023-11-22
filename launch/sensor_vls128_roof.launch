@@ -19,5 +19,5 @@
     <arg name="num_columns" default="1700"/>
 
     <!-- clustering -->
-    <include file="$(find continuous_clustering)/launch/continuous_clustering.launch" pass_all_args="true"/>
+    <include file="$(find continuous_clustering)/launch/sensor_generic.launch" pass_all_args="true"/>
 </launch>

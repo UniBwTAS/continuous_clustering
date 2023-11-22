@@ -1,7 +1,4 @@
 <launch>
-    <!-- use sim time -->
-    <param name="use_sim_time" value="true"/>
-
     <!-- add vehicle dimensions to parameter server (values below are approximate and relative to lidar) -->
     <param name="/vehicles/ego" value="touareg"/>
     <param name="/vehicles/touareg/geometric/height_ref_to_maximum" value="1.9"/>
@@ -27,7 +24,7 @@
         </include>
     </group>
     <!-- minimal but sufficient version where only the service for metadata is launched. With this
-    our driver already works but there will be no message for the 360 point cloud (os_cloud nodelet missing) -->
+    our driver already works but the 360 PointCloud2 message wouldn't be generated (os_cloud nodelet missing) -->
     <!--<node pkg="nodelet" type="nodelet" name="os_node" args="standalone ouster_ros/OusterReplay" ns="/bus/os32_left/">
         <param name="metadata" value="$(find continuous_clustering)/calibrations/touareg_os32_left.json"/>
     </node>-->
@@ -48,7 +45,7 @@
         </include>
     </group>
     <!-- minimal but sufficient version where only the service for metadata is launched. With this
-    our driver already works but there will be no message for the 360 point cloud (os_cloud nodelet missing) -->
+    our driver already works but the 360 PointCloud2 message wouldn't be generated (os_cloud nodelet missing) -->
     <!--<node pkg="nodelet" type="nodelet" name="os_node" args="standalone ouster_ros/OusterReplay" ns="/bus/os32_right/">
         <param name="metadata" value="$(find continuous_clustering)/calibrations/touareg_os32_right.json"/>
     </node>-->

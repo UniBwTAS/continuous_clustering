@@ -1,0 +1,10 @@
+<launch>
+    <!-- add vehicle dimensions to parameter server (values below are approximate and relative to lidar) -->
+    <param name="/vehicles/ego" value="vw_passat_b6"/>
+    <param name="/vehicles/vw_passat_b6/geometric/height_ref_to_maximum" value="0.5"/>
+    <param name="/vehicles/vw_passat_b6/geometric/height_ref_to_ground" value="-1.7"/>
+    <param name="/vehicles/vw_passat_b6/geometric/length_ref_to_front_end" value="3"/>
+    <param name="/vehicles/vw_passat_b6/geometric/length_ref_to_rear_end" value="-3"/>
+    <param name="/vehicles/vw_passat_b6/geometric/width_ref_to_left_mirror" value="1.5"/>
+    <param name="/vehicles/vw_passat_b6/geometric/width_ref_to_right_mirror" value="-1.5"/>
+</launch>

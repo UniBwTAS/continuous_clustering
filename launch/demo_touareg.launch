@@ -1,0 +1,40 @@
+<launch>
+    <!-- flag if rviz should be started -->
+    <arg name="use_rviz" default="true"/>
+
+    <!-- flag whether to start vehicle specific low level stuff (drivers, parameters, etc.) -->
+    <arg name="launch_vehicle" default="true"/>
+
+    <!-- arguments to play directly a rosbag with this launch file -->
+    <arg name="bag_file" default=""/>
+    <arg name="bag_rate" default="0.1"/>
+
+    <!-- flags for enable/disable individual sensors -->
+    <arg name="use_vls128_roof" default="true"/>
+    <arg name="use_os32_left" default="true"/>
+    <arg name="use_os32_right" default="true"/>
+
+    <!-- start clustering for all 3 sensors -->
+    <include file="$(find continuous_clustering)/launch/sensor_vls128_roof.launch" pass_all_args="true"
+             if="$(arg use_vls128_roof)">
+        <arg name="use_rviz" value="$(arg use_rviz)"/>
+    </include>
+    <include file="$(find continuous_clustering)/launch/sensor_os32_left.launch" pass_all_args="true"
+             if="$(arg use_os32_left)">
+        <arg name="use_rviz" value="false"/>
+    </include>
+    <include file="$(find continuous_clustering)/launch/sensor_os32_right.launch" pass_all_args="true"
+             if="$(arg use_os32_right)">
+        <arg name="use_rviz" value="false"/>
+    </include>
+
+    <!-- start vehicle specific low level stuff (drivers, parameters, etc.) -->
+    <include file="$(find continuous_clustering)/launch/vehicle_touareg.launch" if="$(arg launch_vehicle)"/>
+
+    <!-- play a rosbag if desired -->
+    <param name="use_sim_time" value="true" if="$(eval not (bag_file == ''))"/>
+    <node pkg="rosbag" type="play" name="rosbag_play_recording"
+          required="true"
+          args="--rate $(arg bag_rate) --clock $(arg bag_file)"
+          if="$(eval not (bag_file == ''))"/>
+</launch>
