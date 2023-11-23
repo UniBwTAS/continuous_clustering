@@ -137,11 +137,14 @@ class KittiDemo
         tf2_ros::TransformBroadcaster pub_tf;
         ros::Publisher pub_clock = nh.advertise<rosgraph_msgs::Clock>("/clock", 100);
         ros::Publisher pub_ego_robot_bbox = nh.advertise<visualization_msgs::Marker>("/ego_robot_bounding_box", 1);
-        ros::Publisher pub_firing = nh.advertise<sensor_msgs::PointCloud2>("firing", 1000);
-        ros::Publisher pub_column_ground =
-            nh.advertise<sensor_msgs::PointCloud2>("column_after_ground_segmentation", 1000);
-        ros::Publisher pub_column_cluster = nh.advertise<sensor_msgs::PointCloud2>("column_after_clustering", 1000);
-        ros::Publisher pub_cluster = nh.advertise<sensor_msgs::PointCloud2>("cluster", 1000);
+        ros::Publisher pub_firing =
+            nh.advertise<sensor_msgs::PointCloud2>("/perception/detections/lidar_roof/cluster/raw_firings", 1000);
+        ros::Publisher pub_column_ground = nh.advertise<sensor_msgs::PointCloud2>(
+            "/perception/detections/lidar_roof/cluster/continuous_ground_point_segmentation", 1000);
+        ros::Publisher pub_column_cluster = nh.advertise<sensor_msgs::PointCloud2>(
+            "/perception/detections/lidar_roof/cluster/continuous_instance_segmentation", 1000);
+        ros::Publisher pub_cluster = nh.advertise<sensor_msgs::PointCloud2>(
+            "/perception/detections/lidar_roof/cluster/continuous_clusters", 1000);
         pub_evaluation = nh.advertise<sensor_msgs::PointCloud2>("evaluation", 1000);
 #endif
 
