@@ -350,7 +350,7 @@ Visualization Manager:
               Enabled: false
               Flip: false
               Invert Rainbow: false
-              Keep Aspect Ratio: false
+              Keep Aspect Ratio: true
               Mark NaN Pixels:
                 NaN Pixel Color: 255; 0; 0
                 Value: false

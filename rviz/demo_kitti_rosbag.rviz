@@ -142,7 +142,7 @@ Visualization Manager:
           Size (Pixels): 3
           Size (m): 0.20000000298023224
           Style: Spheres
-          Topic: /sensor/lidar/vls128_roof/velodyne_points_corrected
+          Topic: /kitti/velo
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -349,7 +349,7 @@ Visualization Manager:
               Enabled: false
               Flip: false
               Invert Rainbow: false
-              Keep Aspect Ratio: false
+              Keep Aspect Ratio: true
               Mark NaN Pixels:
                 NaN Pixel Color: 255; 0; 0
                 Value: false
