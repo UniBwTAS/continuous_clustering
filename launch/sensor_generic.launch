@@ -2,6 +2,9 @@
     <!-- flag if rviz should be started -->
     <arg name="use_rviz" default="true"/>
 
+    <!-- flag if we just want to start rviz without continuous clustering -->
+    <arg name="rviz_only" default="false"/>
+
     <!-- lidar sensor -->
     <arg name="sensor_manufacturer"/> <!-- velodyne, ouster, kitti (other manufacturers are currently not supported) -->
     <arg name="sensor_model"/> <!-- arbitrary: e.g. vls128, hdl64, hdl32, os32, kitti ... -->
@@ -28,6 +31,7 @@
     <arg name="ego_robot_frame" default="base_link"/>
     <arg name="odom_frame" default="odom"/>
     <arg name="namespace" default="perception/detections/lidar_$(arg sensor_position)/cluster"/>
+    <arg name="point_cloud_topic" default="/sensor/lidar/$(arg sensor_model)_$(arg sensor_position)/points"/>
 
     <!-- range image parameters -->
     <arg name="num_columns"/>  <!-- number of columns of range image -->
@@ -46,7 +50,7 @@
     <arg name="ignore_points_in_chessboard_pattern" default="true"/>
     <arg name="ignore_points_with_too_big_inclination_angle_diff" default="true"/>
 
-    <group ns="$(arg namespace)">
+    <group ns="$(arg namespace)" unless="$(arg rviz_only)">
 
         <!-- Continuous Clustering Node/Nodelet -->
         <node name="continuous_clustering" pkg="continuous_clustering" type="continuous_clustering_node"
@@ -93,7 +97,15 @@
 
     </group>
 
+    <!-- start rviz: we are using a rviz config template! -->
+    <arg name="rviz_config_in" value="$(find continuous_clustering)/rviz/sensor_generic.rviz.in"/>
+    <arg name="rviz_config_out" value="/tmp/$(anon sensor_generic).rviz"/>
     <node name="rviz" pkg="rviz" type="rviz"
-          args="--display-config $(find continuous_clustering)/rviz/continuous_clustering.rviz"
-          if="$(arg use_rviz)"/>
+          launch-prefix="bash -c 'cat $(arg rviz_config_in) | envsubst > $(arg rviz_config_out); $0 $@'"
+          args="--display-config $(arg rviz_config_out)"
+          if="$(arg use_rviz)">
+        <env name="NAMESPACE" value="$(arg namespace)"/>
+        <env name="FULL_POINT_CLOUD_TOPIC" value="$(arg point_cloud_topic)"/>
+        <env name="RANGE_IMAGE_COLUMNS" value="$(arg num_columns)"/>
+    </node>
 </launch>

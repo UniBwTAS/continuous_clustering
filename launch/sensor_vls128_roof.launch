@@ -15,6 +15,9 @@
     <arg name="velodyne_calibration_path" default="$(find velodyne_pointcloud)/params/VLS128.yaml"/>
     <arg name="velodyne_rpm" default="600.0"/>
 
+    <!-- other ros specific parameters (only used to generate rviz config) -->
+    <arg name="point_cloud_topic" default="/sensor/lidar/$(arg sensor_model)_$(arg sensor_position)/velodyne_points"/>
+
     <!-- range image parameters -->
     <arg name="num_columns" default="1700"/>
 

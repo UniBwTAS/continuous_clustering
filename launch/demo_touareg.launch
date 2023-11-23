@@ -17,7 +17,7 @@
     <!-- start clustering for all 3 sensors -->
     <include file="$(find continuous_clustering)/launch/sensor_vls128_roof.launch" pass_all_args="true"
              if="$(arg use_vls128_roof)">
-        <arg name="use_rviz" value="$(arg use_rviz)"/>
+        <arg name="use_rviz" value="false"/>
     </include>
     <include file="$(find continuous_clustering)/launch/sensor_os32_left.launch" pass_all_args="true"
              if="$(arg use_os32_left)">
@@ -27,6 +27,11 @@
              if="$(arg use_os32_right)">
         <arg name="use_rviz" value="false"/>
     </include>
+
+    <!-- start rviz -->
+    <node name="rviz" pkg="rviz" type="rviz"
+          args="--display-config $(find continuous_clustering)/rviz/demo_touareg.rviz"
+          if="$(arg use_rviz)"/>
 
     <!-- start vehicle specific low level stuff (drivers, parameters, etc.) -->
     <include file="$(find continuous_clustering)/launch/vehicle_touareg.launch" if="$(arg launch_vehicle)"/>
