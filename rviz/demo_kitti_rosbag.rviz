@@ -196,7 +196,7 @@ Visualization Manager:
                 Min Value: -10
                 Value: true
               Axis: Z
-              Channel Name: debug_ground_point_label
+              Channel Name: ground_point_label
               Class: rviz/ContinuousPointCloud2
               Color: 255; 255; 255
               Color Transformer: Label
