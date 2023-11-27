@@ -4,6 +4,8 @@
 
 ![](https://github.com/UniBwTAS/continuous_clustering/blob/master/assets/demo.gif)
 
+### Abstract:
+
 Low-latency instance segmentation of LiDAR point clouds is crucial in real-world applications because it serves as an initial and frequently-used building block in a robot's perception pipeline, where every task adds further delay.
 Particularly in dynamic environments, this total delay can result in significant positional offsets of dynamic objects, as seen in highway scenarios.
 To address this issue, we employ continuous clustering of obstacle points in order to obtain an instance-segmented point cloud.
@@ -14,6 +16,19 @@ An additional advantage is that no problematic discontinuities between the point
 In this work we describe the two-layered data structure and the corresponding algorithm for continuous clustering, which is able to cluster the incoming data in real time.
 We explain the importance of a large perceptive field of view.
 Furthermore, we describe and evaluate important architectural design choices, which could be relevant to design an architecture for deep learning based low-latency instance segmentation.
+
+### If you find our work useful in your research please consider citing our paper:
+```
+@misc{reich2023low,
+      title={Low Latency Instance Segmentation by Continuous Clustering for Rotating LiDAR Sensors}, 
+      author={Andreas Reich and Hans-Joachim Wuensche},
+      year={2023},
+      eprint={2311.13976},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
+```
+Get PDF [here](https://arxiv.org/abs/2311.13976).
 
 ## Run it yourself:
 
