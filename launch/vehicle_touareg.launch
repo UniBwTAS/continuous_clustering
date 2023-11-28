@@ -9,7 +9,7 @@
     <param name="/vehicles/touareg/geometric/width_ref_to_right_mirror" value="-1.1085"/>
 
     <!-- lidar ouster left -->
-    <group>
+    <!--<group>
         <remap from="lidar_packets" to="/bus/os32_left/lidar_packets"/>
         <remap from="imu_packets" to="/bus/os32_left/imu_packets"/>
         <remap from="metadata" to="/bus/os32_left/metadata"/>
@@ -22,15 +22,15 @@
             <arg name="timestamp_mode" default="TIME_FROM_ROS_TIME"/>
             <arg name="tf_prefix" default="sensor/lidar/os32_left"/>
         </include>
-    </group>
+    </group>-->
     <!-- minimal but sufficient version where only the service for metadata is launched. With this
     our driver already works but the 360 PointCloud2 message wouldn't be generated (os_cloud nodelet missing) -->
-    <!--<node pkg="nodelet" type="nodelet" name="os_node" args="standalone ouster_ros/OusterReplay" ns="/bus/os32_left/">
+    <node pkg="nodelet" type="nodelet" name="os_node" args="standalone ouster_ros/OusterReplay" ns="/bus/os32_left/">
         <param name="metadata" value="$(find continuous_clustering)/calibrations/touareg_os32_left.json"/>
-    </node>-->
+    </node>
 
     <!-- lidar ouster right -->
-    <group>
+    <!--<group>
         <remap from="lidar_packets" to="/bus/os32_right/lidar_packets"/>
         <remap from="imu_packets" to="/bus/os32_right/imu_packets"/>
         <remap from="metadata" to="/bus/os32_right/metadata"/>
@@ -43,10 +43,10 @@
             <arg name="timestamp_mode" default="TIME_FROM_ROS_TIME"/>
             <arg name="tf_prefix" default="sensor/lidar/os32_right"/>
         </include>
-    </group>
+    </group>-->
     <!-- minimal but sufficient version where only the service for metadata is launched. With this
     our driver already works but the 360 PointCloud2 message wouldn't be generated (os_cloud nodelet missing) -->
-    <!--<node pkg="nodelet" type="nodelet" name="os_node" args="standalone ouster_ros/OusterReplay" ns="/bus/os32_right/">
+    <node pkg="nodelet" type="nodelet" name="os_node" args="standalone ouster_ros/OusterReplay" ns="/bus/os32_right/">
         <param name="metadata" value="$(find continuous_clustering)/calibrations/touareg_os32_right.json"/>
-    </node>-->
+    </node>
 </launch>

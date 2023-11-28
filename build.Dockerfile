@@ -12,5 +12,5 @@ RUN setup_workspace.sh && rm -rf /var/lib/apt/lists/*
 # install dependencies and build workspace
 WORKDIR ${HOME}/catkin_ws/src
 COPY . ./continuous_clustering
-RUN install_dependencies_and_build.sh --from-source && rm -rf /var/lib/apt/lists/* && rm -rf ${HOME}/.ros
-
+RUN clone_repositories_and_install_dependencies.sh --from-source && rm -rf /var/lib/apt/lists/* && rm -rf ${HOME}/.ros
+RUN catkin build

@@ -31,6 +31,3 @@ sudo apt install -y -q python3-rosdep
 sudo rosdep init || true
 rosdep update
 rosdep install --from-paths . --ignore-src -r -y
-
-# build directory
-catkin build

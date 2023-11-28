@@ -223,7 +223,7 @@ class KittiDemo
 #endif
 
                     // evaluation
-                    if (evaluate_current_sequence && !ground_points_only)
+                    if (evaluate && !ground_points_only)
                         addColumnAndEvaluateFrameIfCompleted(
                             clustering, from_global_column_index, to_global_column_index);
                 });
@@ -244,17 +244,10 @@ class KittiDemo
             // info required for evaluation
             current_sequence_index = sequence_index;
             previous_frame_index = 0;
-            if (std::filesystem::exists(labels_folder))
+            if (evaluate && !std::filesystem::exists(labels_folder))
             {
-                std::cout << "Labels were found -> Evaluate this sequence" << std::endl;
-                evaluate_current_sequence = true;
-            }
-            else
-            {
-                std::cout << "Labels were not found -> Don't evaluate this sequence" << std::endl;
-                evaluate_current_sequence = false;
-                if (skip_sequences_without_label)
-                    continue;
+                std::cout << "SemanticKitti labels were not found -> Don't evaluate this sequence." << std::endl;
+                continue;
             }
 
             // iterate over individual frames (i.e. full LiDAR rotations)
@@ -269,7 +262,7 @@ class KittiDemo
                     kitti_loader.loadPointCloud(velodyne_folder / Path{point_cloud_filename});
 
                 // check weather there is ground truth for this sequence available
-                if (evaluate_current_sequence)
+                if (evaluate)
                 {
                     // also load semantic kitti labels (for ground point segmentation evaluation)
                     std::string label_filename = KittiLoader::padWithZeros(frame_index, 6) + ".label";
@@ -277,11 +270,20 @@ class KittiDemo
 
                     // generate/load euclidean clustering labels for evaluation
                     std::vector<uint16_t> euclidean_clustering_labels;
-                    if (enable_online_ground_truth)
+                    if (!std::filesystem::exists(euclidean_labels_folder))
+                    {
+                        std::cerr << "WARNING: Ground Truth Euclidean Clustering Labels were not found ("
+                                  << euclidean_labels_folder
+                                  << "). Now they will be generated online. Consider to generate them statically by "
+                                     "using the 'gt_label_generator_tool' in order to run evaluation much faster."
+                                  << std::endl;
                         euclidean_clustering_labels = evaluation.generateEuclideanClusteringLabels(points);
+                    }
                     else
+                    {
                         euclidean_clustering_labels = KittiLoader::loadFlattenedPointCloud<uint16_t>(
                             euclidean_labels_folder / Path{label_filename});
+                    }
 
                     // convert it to a point cloud with additional point fields for evaluation and save it
                     // add euclidean clustering labels (for Over-/Under-Segmentation-Entropy evaluation, see "TRAVEL"
@@ -365,7 +367,7 @@ class KittiDemo
             }
 
             // also evaluate final frame
-            if (evaluate_current_sequence)
+            if (evaluate)
                 evaluatePreviousFrame();
         }
 
@@ -384,12 +386,10 @@ class KittiDemo
     // members to detect finished frames (full point clouds)
     int current_sequence_index{0};
     int previous_frame_index{0};
-    bool evaluate_current_sequence{false};
 
   public:
+    bool evaluate{};
     bool disable_ros_publishers{};
-    bool enable_online_ground_truth{};
-    bool skip_sequences_without_label{};
     int delay_between_columns{};
 };
 
@@ -403,10 +403,16 @@ int main(int argc, char** argv)
 
     // parse command line arguments
     utils::CommandLineParser parser(argc, argv);
-    demo.disable_ros_publishers = parser.argumentExists("--disable-ros-publishers");
-    demo.enable_online_ground_truth = parser.argumentExists("--enable-online-ground-truth");
-    demo.skip_sequences_without_label = parser.argumentExists("--skip-sequences-without-labels");
-    demo.delay_between_columns = std::stoi(parser.getValueForArgument("--delay-between-columns", "0"));
+    demo.evaluate = parser.argumentExists("--evaluate");
+    demo.delay_between_columns = std::stoi(parser.getValueForArgument("--delay-between-columns", "2000"));
+
+    bool evaluate_fast = parser.argumentExists("--evaluate-fast");
+    if (evaluate_fast)
+    {
+        demo.evaluate = true;
+        demo.delay_between_columns = 0;
+        demo.disable_ros_publishers = true;
+    }
 
     // check if there are unknown arguments left
     for (const std::string& token : parser.getRemainingArgs())

@@ -15,6 +15,7 @@
 
 ros::Publisher publisher;
 #endif
+bool with_ros = true;
 
 using Path = std::filesystem::path;
 
@@ -69,7 +70,7 @@ void processSingleFrame(Job&& job)
         out.write(reinterpret_cast<const char*>(&euclidean_clustering_labels[i]), sizeof(uint16_t));
 
 #ifdef WITH_ROS
-    if (publisher.getNumSubscribers() > 0)
+    if (with_ros && publisher.getNumSubscribers() > 0)
     {
         pcl::PointCloud<PointWithLabels>::Ptr pcl_debug(new pcl::PointCloud<PointWithLabels>(points.size(), 1));
         for (int i = 0; i < points.size(); i++)
@@ -94,16 +95,19 @@ void processSingleFrame(Job&& job)
 
 int main(int argc, char** argv)
 {
-
-#ifdef WITH_ROS
-    ros::init(argc, argv, "gt_label_generation_tool");
-    ros::NodeHandle nh;
-    publisher = nh.advertise<sensor_msgs::PointCloud2>("gt_label_generator_tool/debug", 5);
-#endif
-
     // parse command line arguments
     utils::CommandLineParser parser(argc, argv);
     int num_threads = std::stoi(parser.getValueForArgument("--num-threads", "1"));
+    with_ros = !parser.argumentExists("--no-ros");
+
+#ifdef WITH_ROS
+    if(with_ros)
+    {
+        ros::init(argc, argv, "gt_label_generator_tool");
+        ros::NodeHandle nh;
+        publisher = nh.advertise<sensor_msgs::PointCloud2>("gt_label_generator_tool/debug", 5);
+    }
+#endif
 
     // check if there are unknown arguments left
     for (const std::string& token : parser.getRemainingArgs())
@@ -198,7 +202,7 @@ int main(int argc, char** argv)
     }
 
 #ifdef WITH_ROS
-    while (thread_pool.getNumberOfUnprocessedJobs() > 0 && ros::ok())
+    while (thread_pool.getNumberOfUnprocessedJobs() > 0 && (!with_ros || ros::ok()))
         std::this_thread::sleep_for(1s);
 #else
     thread_pool.join();

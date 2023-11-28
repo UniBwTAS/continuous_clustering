@@ -41,5 +41,5 @@ RUN cd continuous_clustering \
     && rm -rf build
 
 # run it
-CMD ["kitti_demo", "/mnt/kitti_odometry/dataset/sequences/"]
+CMD ["kitti_demo", "/mnt/kitti_sequences/"]
 

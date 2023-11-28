@@ -1,11 +1,16 @@
 <launch>
-    <arg name="path" default="/mnt/kitti_odometry/dataset/sequences"/>
+    <arg name="path" default="/mnt/kitti_sequences"/>
+    <arg name="evaluate" default="false"/>
+    <arg name="evaluate_fast" default="false"/>
     <arg name="delay_between_columns" default="2000"/>
+
+    <arg name="_evaluate" value="$(eval '--evaluate' if evaluate else '')"/>
+    <arg name="_evaluate_fast" value="$(eval '--evaluate-fast' if evaluate_fast else '')"/>
 
     <param name="use_sim_time" value="true"/>
 
     <node name="kitti_demo" pkg="continuous_clustering" type="kitti_demo"
-          args="$(arg path) --delay-between-columns $(arg delay_between_columns)"
+          args="$(arg path) --delay-between-columns $(arg delay_between_columns) $(arg _evaluate) $(arg _evaluate_fast)"
           output="screen"/>
 
     <node name="rviz" pkg="rviz" type="rviz"
