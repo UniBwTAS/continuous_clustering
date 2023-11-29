@@ -1,4 +1,5 @@
 [![Basic Build Workflow](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/basic-build-ci.yaml/badge.svg?branch=master)](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/basic-build-ci.yaml)
+[![Publish Docker image](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/publish-docker-image.yaml/badge.svg)](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/publish-docker-image.yaml)
 
 ## Low Latency Instance Segmentation by Continuous Clustering for Rotating LiDAR Sensors
 
@@ -86,20 +87,18 @@ export ROSBAG_PATH=/download/folder/of/rosbag/file
 This option is the fastest to set up. However, due to missing hardware acceleration in the VNC Docker container for RVIZ
 the rosbag is played at 1/10 speed.
 
+1. Install [Docker Engine](https://docs.docker.com/engine/install/ubuntu/)
+2. Ensure shell variables `KITTI_SEQUENCES_PATH` and/or `ROSBAG_PATH` are (still) set correctly (see above)
+3. Pull and run docker container:
+
 ```bash
-# IMPORTANT: this option is 
-
-# install docker engine (e.g.: https://docs.docker.com/engine/install/ubuntu/)
-
-# ensure shell variables KITTI_SEQUENCES_PATH and/or ROSBAG_PATH are (still) set correctly (see above)
-
-# pull and run docker container
-docker run -d -p 6080:80 -v /dev/shm:/dev/shm -v ${KITTI_SEQUENCES_PATH}:/mnt/kitti_sequences -v ${ROSBAG_PATH}:/mnt/rosbags -e KITTI_SEQUENCES_PATH=/mnt/kitti_sequences -e ROSBAG_PATH=/mnt/rosbags --name continuous_clustering_demo andreasr30/continuous_clustering_demo:focal-ros1-vnc
-
-# 1. open your browser and enter: http://localhost:6080 (wait a few seconds and retry if it does not load)
-# 2. open terminal in browser window (click 'Start' -> 'System Tools' -> 'LXTerminal')
-# 3. continue with step "Run Continuous Clustering" in the terminal opened 2.
+docker run -d -p 6080:80 -v /dev/shm:/dev/shm -v ${KITTI_SEQUENCES_PATH}:/mnt/kitti_sequences -v ${ROSBAG_PATH}:/mnt/rosbags -e KITTI_SEQUENCES_PATH=/mnt/kitti_sequences -e ROSBAG_PATH=/mnt/rosbags --name continuous_clustering_demo andreasr30/continuous_clustering_demo:master
 ```
+
+4. Open your browser on host and enter: http://localhost:6080 (wait a few seconds and retry if it does not load)
+5. Open terminal in browser window (click 'Start' -> 'System Tools' -> 'LXTerminal')
+6. Continue with step "Run Continuous Clustering" (see below) in the terminal opened in step 2. (There you can use the
+   clipboard feature of noVNC; tiny arrow on the left of the screen)
 
 #### Option 2: Locally on Ubuntu 20.04 (Focal) and ROS Noetic
 
@@ -112,7 +111,7 @@ bash /tmp/install_ros.sh
 wget -P /tmp https://raw.githubusercontent.com/UniBwTAS/continuous_clustering/master/scripts/setup_workspace.sh
 bash /tmp/setup_workspace.sh # created at ~/catkin_ws
 
-# get to your ROS workspace, in our case:
+# switch to your ROS workspace, in our case:
 cd ~/catkin_ws/src
 
 # install dependencies and clone repos to current working directory
@@ -201,8 +200,15 @@ roslaunch continuous_clustering demo_kitti_folder.launch path:=${KITTI_SEQUENCES
 #### Option 2: Evaluate without GUI or ROS within Minimal Docker Container
 
 ```bash
+# build docker image (if not already done)
+cd /path/to/continous_clustering/folder # e.g. cd ~/catkin_ws/src/continuous_clustering
+docker build -f build_no_ros.Dockerfile -t build_no_ros:v1 .
+
 # run evaluation (scores for all sequences are printed at the end)
 docker run --rm -v ${KITTI_SEQUENCES_PATH}:/mnt/kitti_sequences --name build_no_ros build_no_ros:v1 kitti_demo /mnt/kitti_sequences
+
+# if you want to cancel this container call from host
+docker stop build_no_ros
 ```
 
 ## Tips for Rviz Visualization:
