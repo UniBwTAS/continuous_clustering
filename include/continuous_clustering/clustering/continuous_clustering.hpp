@@ -25,7 +25,7 @@ struct ContinuousRangeImageConfiguration
 {
     bool sensor_is_clockwise{true};
     int num_columns{1700};
-    bool supplement_inclination_angle_for_nan_cells{true}; // TODO: maybe ground?
+    bool supplement_inclination_angle_for_nan_cells{true};
 };
 
 struct ContinuousGroundSegmentationConfiguration
@@ -46,13 +46,13 @@ struct ContinuousGroundSegmentationConfiguration
     bool use_terrain{false};
     float terrain_max_allowed_z_diff{0.4};
 
-    // Detection of points on the ego robot TODO: enable
+    // Detection of points on the ego robot
     float height_ref_to_maximum_{}, height_ref_to_ground_{};
     float length_ref_to_front_end_{}, length_ref_to_rear_end_{};
     float width_ref_to_left_mirror_{}, width_ref_to_right_mirror_{};
 
     // Filter points originating from fog
-    bool fog_filtering_enabled{false}; // TODO: add "preprocessing" step or add to range_image
+    bool fog_filtering_enabled{false};
     uint8_t fog_filtering_intensity_below{2};
     float fog_filtering_distance_below{18};
     float fog_filtering_inclination_above{-0.06};
@@ -197,7 +197,7 @@ class ContinuousClustering
     // range image generation
     void addFiring(const RawPoints::ConstPtr& firing, const Eigen::Isometry3d& odom_from_sensor);
 
-    // ground point segmentation (TODO: terrain)
+    // ground point segmentation
     void setTransformRobotFrameFromSensorFrame(const Eigen::Isometry3d& tf);
     bool hasTransformRobotFrameFromSensorFrame();
 
@@ -212,7 +212,7 @@ class ContinuousClustering
     // range image generation
     void insertFiringIntoRangeImage(InsertionJob&& job);
 
-    // ground point segmentation (TODO: terrain)
+    // ground point segmentation
     inline void performGroundPointSegmentationForColumn(SegmentationJob&& job);
     static inline Point2D to2dInAzimuthPlane(const Point3D& p)
     {

@@ -194,9 +194,11 @@ class KittiDemo
             // init some other configs
             Configuration config;
             config.range_image.num_columns = 2200;
-            config.clustering.ignore_points_in_chessboard_pattern = false; // TODO
+            config.clustering.ignore_points_in_chessboard_pattern = false;
             config.clustering.max_distance = 0.5;
-            config.ground_segmentation.height_ref_to_maximum_ = 0.5; // TODO: explain values
+
+            // ego bounding box (ref is here origin of lidar frame)
+            config.ground_segmentation.height_ref_to_maximum_ = 0.5;
             config.ground_segmentation.height_ref_to_ground_ = -1.7;
             config.ground_segmentation.length_ref_to_front_end_ = 3;
             config.ground_segmentation.length_ref_to_rear_end_ = -3;

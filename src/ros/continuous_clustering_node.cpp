@@ -9,7 +9,6 @@
 #include <grid_map_msgs/GridMap.h>
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
-#include <sensor_msgs/point_cloud2_iterator.h>
 #include <tf2/LinearMath/Transform.h>
 #include <tf2_eigen/tf2_eigen.h>
 #include <tf2_ros/transform_listener.h>
@@ -31,14 +30,12 @@ class RosContinuousClustering
         nh_private.param<std::string>("ego_robot_frame", ego_robot_frame, "base_link");
         nh_private.param<bool>("wait_for_tf", wait_for_tf, true);
 
-        // add callbacks to clustering (TODO)
-        clustering_.setFinishedColumnCallback(std::bind(&RosContinuousClustering::onFinishedColumn,
-                                                        this,
-                                                        std::placeholders::_1,
-                                                        std::placeholders::_2,
-                                                        std::placeholders::_3));
-        clustering_.setFinishedClusterCallback(
-            std::bind(&RosContinuousClustering::onFinishedCluster, this, std::placeholders::_1, std::placeholders::_2));
+        // add callbacks to clustering
+        clustering_.setFinishedColumnCallback(
+            [this](int64_t from_global_column_index, int64_t to_global_column_index, bool ground_points_only)
+            { onFinishedColumn(from_global_column_index, to_global_column_index, ground_points_only); });
+        clustering_.setFinishedClusterCallback([this](const std::vector<Point>& cluster_points, uint64_t stamp_cluster)
+                                               { onFinishedCluster(cluster_points, stamp_cluster); });
 
         // use desired sensor input
         if (sensor_manufacturer == "velodyne")

@@ -34,7 +34,7 @@ void ContinuousClustering::reset(int num_rows, bool sequential_execution)
     srig_previous_global_column_index_of_rearmost_laser = 0;
     srig_previous_global_column_index_of_foremost_laser = -1;
     srig_first_unfinished_global_column_index = -1;
-    reset_required = false; // TODO
+    reset_required = false;
 
     // reset members for continuous ground point segmentation (sgps)
     sgps_ego_robot_frame_from_sensor_frame_.reset();
@@ -136,7 +136,7 @@ void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
         // get point relative to sensor origin
         Eigen::Vector3d p_odom_rel = p_odom - srig_sensor_position;
 
-        // calculate azimuth angle (TODO)
+        // calculate azimuth angle
         // float azimuth_angle = std::atan2(static_cast<float>(p_odom_rel.y()), static_cast<float>(p_odom_rel.x()));
         float azimuth_angle = std::atan2(static_cast<float>(p.y()), static_cast<float>(p.x()));
 
@@ -435,7 +435,7 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
         Point2D previous_to_current = current_position_wrt_sensor_2d - previous_position_wrt_sensor_2d;
         float slope_to_prev = previous_to_current.y / previous_to_current.x;
         bool is_flat_wrt_prev = std::abs(slope_to_prev) < c.max_slope && previous_to_current.x > 0;
-        is_flat_wrt_prev = is_flat_wrt_prev && (!c.use_terrain || previous_to_current.x < 5); // TODO
+        is_flat_wrt_prev = is_flat_wrt_prev && (!c.use_terrain || previous_to_current.x < 5); // TODO: Magic number
 
         // calculate slope w.r.t. last seen (quite certain) ground point
         Point2D last_ground_position_wrt_sensor_2d = to2dInAzimuthPlane(last_ground_position_wrt_sensor);

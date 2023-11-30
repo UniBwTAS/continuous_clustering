@@ -225,7 +225,7 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
 void addPointToMessage(PointCloud2Iterators& container, int data_index_message, const Point& point, int num_rows)
 {
     ros::Time stamp;
-    stamp.fromNSec(point.stamp); // TODO: avoid this?
+    stamp.fromNSec(point.stamp);
 
     *(container.iter_x_out + data_index_message) = point.xyz.x;
     *(container.iter_y_out + data_index_message) = point.xyz.y;
@@ -277,8 +277,8 @@ void addRawPointToMessage(PointCloud2Iterators& container, int data_index_messag
 sensor_msgs::PointCloud2Ptr evaluationToPointCloud(const std::vector<KittiSegmentationEvaluationPoint>& point_cloud)
 {
     sensor_msgs::PointCloud2::Ptr msg(new sensor_msgs::PointCloud2());
-    msg->header.stamp = ros::Time(0, 0); // TODO
-    msg->header.frame_id = "velo_link";  // TODO
+    msg->header.stamp = ros::Time(0, 0);
+    msg->header.frame_id = "velo_link";
     msg->width = point_cloud.size();
     msg->height = 1;
     msg->is_bigendian = false;
