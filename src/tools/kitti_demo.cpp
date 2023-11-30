@@ -373,7 +373,13 @@ class KittiDemo
                 evaluatePreviousFrame();
         }
 
-        evaluation.printEvaluationResults();
+        std::string output = evaluation.generateEvaluationResults();
+        std::cout << output << std::endl;
+
+        std::ofstream evaluation_results;
+        evaluation_results.open("evaluation_results.txt");
+        evaluation_results << output;
+        evaluation_results.close();
     }
 
   private:

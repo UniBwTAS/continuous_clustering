@@ -28,21 +28,21 @@ KittiEvaluation::KittiEvaluation()
 
 void KittiEvaluation::evaluate(std::vector<KittiSegmentationEvaluationPoint>& point_cloud, int sequence_index)
 {
-    auto result_it = evaluation_per_sequence.find(sequence_index);
-    if (result_it == evaluation_per_sequence.end())
-        result_it = evaluation_per_sequence.insert({sequence_index, {}}).first;
-    EvaluationResult& result_total = evaluation_per_sequence[-1]; // results for all sequences concatenated
+    auto results_for_sequence_it = evaluation_per_sequence.find(sequence_index);
+    if (results_for_sequence_it == evaluation_per_sequence.end())
+        results_for_sequence_it = evaluation_per_sequence.insert({sequence_index, {}}).first;
+    std::vector<EvaluationResultForFrame>& result_for_all_sequences = evaluation_per_sequence[-1];
 
-    evaluateGroundPoints(point_cloud, result_it->second, result_total);
-    evaluateClusters(point_cloud, result_it->second, result_total);
+    EvaluationResultForFrame result{};
+    evaluateGroundPoints(point_cloud, result);
+    evaluateClusters(point_cloud, result);
 
-    result_it->second.total_num_frames++;
-    result_total.total_num_frames++;
+    results_for_sequence_it->second.push_back(result);
+    result_for_all_sequences.push_back(result);
 }
 
 void KittiEvaluation::evaluateGroundPoints(std::vector<KittiSegmentationEvaluationPoint>& point_cloud,
-                                           EvaluationResult& result_sequence,
-                                           EvaluationResult& result_total) const
+                                           EvaluationResultForFrame& result) const
 {
     for (auto& p : point_cloud)
     {
@@ -59,14 +59,12 @@ void KittiEvaluation::evaluateGroundPoints(std::vector<KittiSegmentationEvaluati
             if (segmentation_says_ground)
             {
                 p.ground_point_true_positive = true;
-                result_sequence.total_number_of_true_positives++;
-                result_total.total_number_of_true_positives++;
+                result.tp++;
             }
             else
             {
                 p.ground_point_false_negative = true;
-                result_sequence.total_number_of_false_negatives++;
-                result_total.total_number_of_false_negatives++;
+                result.fn++;
             }
         }
         else
@@ -74,21 +72,19 @@ void KittiEvaluation::evaluateGroundPoints(std::vector<KittiSegmentationEvaluati
             if (segmentation_says_ground)
             {
                 p.ground_point_false_positive = true;
-                result_sequence.total_number_of_false_positives++;
-                result_total.total_number_of_false_positives++;
+                result.fp++;
             }
             else
             {
                 p.ground_point_true_negative = true;
-                result_sequence.total_number_of_true_negatives++;
-                result_total.total_number_of_true_negatives++;
+                result.tn++;
             }
         }
     }
 }
+
 void KittiEvaluation::evaluateClusters(std::vector<KittiSegmentationEvaluationPoint>& point_cloud,
-                                       EvaluationResult& result_sequence,
-                                       EvaluationResult& result_total)
+                                       EvaluationResultForFrame& result)
 {
     // prepare data
     std::map<uint32_t, std::vector<KittiSegmentationEvaluationPoint>> map_ground_truth_label_to_points;
@@ -112,15 +108,12 @@ void KittiEvaluation::evaluateClusters(std::vector<KittiSegmentationEvaluationPo
         using pair_type = decltype(map)::value_type;
 
         // calculate over-segmentation entropy (OSE)
-        double ose = 0;
         for (const auto& det_label_to_points : map)
         {
             double frac =
                 static_cast<double>(det_label_to_points.second.size()) / static_cast<double>(gt.second.size());
-            ose -= frac * std::log(frac);
+            result.over_segmentation_entropy -= frac * std::log(frac);
         }
-        result_sequence.total_sum_ose += ose;
-        result_total.total_sum_ose += ose;
 
         auto max = std::max_element(map.begin(),
                                     map.end(),
@@ -142,15 +135,12 @@ void KittiEvaluation::evaluateClusters(std::vector<KittiSegmentationEvaluationPo
         if (!map.empty())
         {
             // calculate under-segmentation entropy (USE)
-            double use = 0;
             for (const auto& gt_label_to_points : map)
             {
                 double frac =
                     static_cast<double>(gt_label_to_points.second.size()) / static_cast<double>(det.second.size());
-                use -= frac * std::log(frac);
+                result.under_segmentation_entropy -= frac * std::log(frac);
             }
-            result_sequence.total_sum_use += use;
-            result_total.total_sum_use += use;
         }
     }
 }
@@ -166,51 +156,61 @@ inline void KittiEvaluation::addPointForKey(std::map<uint32_t, std::vector<Kitti
         map.insert(lb, {key, {point}});
 }
 
-void KittiEvaluation::printEvaluationResults()
+void KittiEvaluation::generateEvaluationResultForSingleMetric(
+    std::stringstream& ss,
+    const std::vector<EvaluationResultForFrame>& results_for_sequence,
+    const std::string& metric_name,
+    const std::function<double(const EvaluationResultForFrame&)>& metric_calc_fn)
 {
-    std::cout << "\n" << std::endl;
+    uint32_t number_of_frames = results_for_sequence.size();
+    std::vector<double> data(number_of_frames, 0.);
+    for (uint32_t frame_index = 0; frame_index < number_of_frames; frame_index++)
+        data[frame_index] = metric_calc_fn(results_for_sequence[frame_index]);
+    double mean = 0;
+    double std_dev = 0;
+    calculateMeanAndStdDev(data, mean, std_dev);
+    ss << "| " << metric_name << ": " << mean << " (mean), " << std_dev << " (std_dev)" << std::endl;
+}
+
+std::string KittiEvaluation::generateEvaluationResults()
+{
+    std::stringstream ss;
     for (const auto& entry : evaluation_per_sequence)
     {
-        std::cout << "------------------------------------------------------------------------------" << std::endl;
+        ss << "------------------------------------------------------------------------------" << std::endl;
+
         if (entry.first == -1)
-            std::cout << "| Sequence: All combined" << std::endl;
+            ss << "| Sequence: All combined" << std::endl;
         else
-            std::cout << "| Sequence: " << entry.first << std::endl;
-        std::cout << "----------------------------Ground Point Segmentation-------------------------" << std::endl;
+            ss << "| Sequence: " << entry.first << std::endl;
 
-        const auto& result = entry.second;
+        ss << "----------------------------Ground Point Segmentation-------------------------" << std::endl;
 
-        double recall =
-            static_cast<double>(result.total_number_of_true_positives) /
-            static_cast<double>(result.total_number_of_true_positives + result.total_number_of_false_negatives);
-        std::cout << "| Recall: " << recall << std::endl;
+        auto fn_recall = [](const EvaluationResultForFrame& r) { return r.tp / (r.tp + r.fn); };
+        generateEvaluationResultForSingleMetric(ss, entry.second, "Recall", fn_recall);
 
-        double precision =
-            static_cast<double>(result.total_number_of_true_positives) /
-            static_cast<double>(result.total_number_of_true_positives + result.total_number_of_false_positives);
-        std::cout << "| Precision: " << precision << std::endl;
+        auto fn_precision = [](const EvaluationResultForFrame& r) { return r.tp / (r.tp + r.fp); };
+        generateEvaluationResultForSingleMetric(ss, entry.second, "Precision", fn_precision);
 
-        double accuracy =
-            static_cast<double>(result.total_number_of_true_positives + result.total_number_of_true_negatives) /
-            static_cast<double>(result.total_number_of_true_positives + result.total_number_of_true_negatives +
-                                result.total_number_of_false_positives + result.total_number_of_false_negatives);
-        std::cout << "| Accuracy: " << accuracy << std::endl;
+        auto fn_accuracy = [](const EvaluationResultForFrame& r)
+        { return (r.tp + r.tn) / (r.tp + r.tn + r.fp + r.fn); };
+        generateEvaluationResultForSingleMetric(ss, entry.second, "Accuracy", fn_accuracy);
 
-        double f1_score =
-            static_cast<double>(result.total_number_of_true_positives + result.total_number_of_true_positives) /
-            static_cast<double>(result.total_number_of_true_positives + result.total_number_of_true_positives +
-                                result.total_number_of_false_positives + result.total_number_of_false_negatives);
-        std::cout << "| F1 score: " << f1_score << std::endl;
+        auto fn_f1_score = [](const EvaluationResultForFrame& r)
+        { return (r.tp + r.tp) / (r.tp + r.tp + r.fp + r.fn); };
+        generateEvaluationResultForSingleMetric(ss, entry.second, "F1 Score", fn_f1_score);
 
-        std::cout << "-----------------------------------Clustering---------------------------------" << std::endl;
+        ss << "-----------------------------------Clustering---------------------------------" << std::endl;
 
-        std::cout << "| Over-Segmentation Entropy: " << result.total_sum_ose / result.total_num_frames << ", "
-                  << result.total_sum_ose << ", " << result.total_num_frames << std::endl;
+        auto fn_ose = [](const EvaluationResultForFrame& r) { return r.over_segmentation_entropy; };
+        generateEvaluationResultForSingleMetric(ss, entry.second, "Over-Segmentation Entropy", fn_ose);
 
-        std::cout << "| Under-Segmentation Entropy: " << result.total_sum_use / result.total_num_frames << ", "
-                  << result.total_sum_use << ", " << result.total_num_frames << std::endl;
-        std::cout << "------------------------------------------------------------------------------\n" << std::endl;
+        auto fn_use = [](const EvaluationResultForFrame& r) { return r.under_segmentation_entropy; };
+        generateEvaluationResultForSingleMetric(ss, entry.second, "Under-Segmentation Entropy", fn_use);
+
+        ss << "------------------------------------------------------------------------------\n" << std::endl;
     }
+    return ss.str();
 }
 
 std::vector<KittiSegmentationEvaluationPoint> KittiEvaluation::convertPointCloud(const std::vector<KittiPoint>& in)
@@ -273,6 +273,24 @@ bool KittiEvaluation::isSameCluster(const pcl::PointXYZINormal& p1, const pcl::P
     // intensity: label, curvature: id
     return sqr_dist < euclidean_clustering::MAX_DISTANCE * euclidean_clustering::MAX_DISTANCE &&
            p1.curvature == p2.curvature && p1.intensity == p2.intensity;
+}
+
+void KittiEvaluation::calculateMeanAndStdDev(const std::vector<double>& data, double& mean, double& std_dev)
+{
+    // calculate mean
+    mean = 0;
+    for (double d : data)
+        mean += d;
+    mean /= static_cast<double>(data.size());
+
+    // calculate standard deviation
+    std_dev = 0;
+    for (double d : data)
+    {
+        double diff = d - mean;
+        std_dev += diff * diff;
+    }
+    std_dev = std::sqrt(std_dev / static_cast<double>(data.size()));
 }
 
 } // namespace continuous_clustering

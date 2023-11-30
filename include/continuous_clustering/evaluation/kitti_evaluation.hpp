@@ -35,18 +35,17 @@ struct KittiSegmentationEvaluationPoint
     uint32_t detection_label{0};
 };
 
-struct EvaluationResult
+struct EvaluationResultForFrame
 {
     // ground point segmentation
-    uint64_t total_number_of_true_positives{};
-    uint64_t total_number_of_false_negatives{};
-    uint64_t total_number_of_false_positives{};
-    uint64_t total_number_of_true_negatives{};
+    double tp{0}; // true positive
+    double fn{0}; // false negative
+    double fp{0}; // false positive
+    double tn{0}; // true negative
 
     // clustering
-    double total_sum_ose{0};
-    double total_sum_use{0};
-    int total_num_frames{0};
+    double over_segmentation_entropy{0};
+    double under_segmentation_entropy{0};
 };
 
 namespace euclidean_clustering
@@ -63,20 +62,24 @@ class KittiEvaluation
     KittiEvaluation();
     void evaluate(std::vector<KittiSegmentationEvaluationPoint>& point_cloud, int sequence_index);
     void evaluateGroundPoints(std::vector<KittiSegmentationEvaluationPoint>& point_cloud,
-                              EvaluationResult& result_sequence,
-                              EvaluationResult& result_total) const;
+                              EvaluationResultForFrame& result_for_frame) const;
     static void evaluateClusters(std::vector<KittiSegmentationEvaluationPoint>& point_cloud,
-                                 EvaluationResult& result_sequence,
-                                 EvaluationResult& result_total);
+                                 EvaluationResultForFrame& result_for_frame);
     static inline void addPointForKey(std::map<uint32_t, std::vector<KittiSegmentationEvaluationPoint>>& map,
                                       uint32_t key,
                                       const KittiSegmentationEvaluationPoint& point);
-    void printEvaluationResults();
+    std::string generateEvaluationResults();
     static std::vector<KittiSegmentationEvaluationPoint> convertPointCloud(const std::vector<KittiPoint>& in);
     std::vector<uint16_t> generateEuclideanClusteringLabels(std::vector<KittiPoint>& points) const;
 
   private:
     static inline bool isSameCluster(const pcl::PointXYZINormal& p1, const pcl::PointXYZINormal& p2, float sqr_dist);
+    static void generateEvaluationResultForSingleMetric(
+        std::stringstream& ss,
+        const std::vector<EvaluationResultForFrame>& results_for_sequence,
+        const std::string& metric_name,
+        const std::function<double(const EvaluationResultForFrame&)>& metric_calc_fn);
+    static inline void calculateMeanAndStdDev(const std::vector<double>& data, double& mean, double& std_dev);
 
   private:
     // ground point evaluation
@@ -88,7 +91,7 @@ class KittiEvaluation
     uint16_t label_terrain{};
     uint16_t label_unlabeled{};
 
-    std::map<int, EvaluationResult> evaluation_per_sequence;
+    std::map<int, std::vector<EvaluationResultForFrame>> evaluation_per_sequence;
 };
 
 } // namespace continuous_clustering
