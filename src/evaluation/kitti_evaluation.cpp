@@ -102,7 +102,7 @@ void KittiEvaluation::evaluateClusters(std::vector<KittiSegmentationEvaluationPo
             addPointForKey(map_detection_label_to_points, p.detection_label, p);
     }
 
-    // evaluate over-segmentation/recall
+    // evaluate over-segmentation
     for (const auto& gt : map_ground_truth_label_to_points)
     {
         std::map<uint32_t, std::vector<KittiSegmentationEvaluationPoint>> map;
@@ -128,7 +128,7 @@ void KittiEvaluation::evaluateClusters(std::vector<KittiSegmentationEvaluationPo
                                     { return p1.second.size() < p2.second.size(); });
     }
 
-    // evaluate under-segmentation/precision
+    // evaluate under-segmentation
     for (const auto& det : map_detection_label_to_points)
     {
         std::map<uint32_t, std::vector<KittiSegmentationEvaluationPoint>> map;
