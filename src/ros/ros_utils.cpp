@@ -68,9 +68,9 @@ sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousClustering& clust
 
     if (minimum_point_stamp != std::numeric_limits<uint64_t>::max())
         msg->header.stamp.fromNSec(minimum_point_stamp);
-    else
+    /*else
         ROS_WARN_STREAM("This column had no timestamps. Unable to publish message with timestamp. Local Column Index: "
-                        << from_global_column_index % clustering.num_columns_ << ", " << num_columns_to_publish);
+                        << from_global_column_index % clustering.num_columns_ << ", " << num_columns_to_publish);*/
 
     return msg;
 }
@@ -274,8 +274,7 @@ void addRawPointToMessage(PointCloud2Iterators& container, int data_index_messag
     *(container.iter_time_nsec_out + data_index_message) = t.nsec;
 }
 
-sensor_msgs::PointCloud2Ptr
-evaluationToPointCloud(const std::vector<KittiSegmentationEvaluationPoint>& point_cloud)
+sensor_msgs::PointCloud2Ptr evaluationToPointCloud(const std::vector<KittiSegmentationEvaluationPoint>& point_cloud)
 {
     sensor_msgs::PointCloud2::Ptr msg(new sensor_msgs::PointCloud2());
     msg->header.stamp = ros::Time(0, 0); // TODO
