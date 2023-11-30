@@ -151,7 +151,7 @@ int main(int argc, char** argv)
         std::cout << "You didn't pass the required command line arguments. Please pass the following command line "
                      "arguments:\n\n\t"
                      "To generate labels for all sequences in a provided data directory:\n\t\t"
-                     "./gt_label_generator_tool [--num-threads N] <DATA_DIR>\n\n\t"
+                     "./gt_label_generator_tool [--no-ros] [--num-threads N] <DATA_DIR>\n\n\t"
                      "To generate labels for specific sequences:\n\t\t"
                      "./gt_label_generator_tool <DATA_DIR> [--num-threads N] <SEQUENCE_1> <SEQUENCE_2> <SEQUENCE_N>"
                   << std::endl;
