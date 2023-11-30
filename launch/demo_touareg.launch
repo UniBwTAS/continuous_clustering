@@ -1,13 +1,13 @@
 <launch>
     <!-- flag if rviz should be started -->
-    <arg name="use_rviz" default="true"/>
+    <arg name="use_rviz" default="true" doc="whether to start rviz"/>
 
     <!-- flag whether to start vehicle specific low level stuff (drivers, parameters, etc.) -->
-    <arg name="launch_vehicle" default="true"/>
+    <arg name="launch_vehicle" default="true" doc="whether to launch low level vehicle sensor inputs and parameters"/>
 
     <!-- arguments to play directly a rosbag with this launch file -->
-    <arg name="bag_file" default=""/>
-    <arg name="bag_rate" default="0.1"/>
+    <arg name="bag_file" default="" doc="path to bag file; if empty no bag file is replayed"/>
+    <arg name="bag_rate" default="0.1" doc="replay speed"/>
 
     <!-- flags for enable/disable individual sensors -->
     <arg name="use_vls128_roof" default="true"/>

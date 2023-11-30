@@ -1,8 +1,8 @@
 <launch>
-    <arg name="path" default="/mnt/kitti_sequences"/>
-    <arg name="evaluate" default="false"/>
-    <arg name="evaluate_fast" default="false"/>
-    <arg name="delay_between_columns" default="2000"/>
+    <arg name="path" default="/mnt/kitti_sequences" doc="path to kitti sequences, i.e. parent of '00', '01', ..."/>
+    <arg name="evaluate" default="false" doc="whether to evaluate sequences based on metrics from TRAVEL paper"/>
+    <arg name="evaluate_fast" default="false" doc="same as 'evaluate' but without ROS publishers and with no delays"/>
+    <arg name="delay_between_columns" default="2000" doc="artificial delay in microseconds between image columns"/>
 
     <arg name="_evaluate" value="$(eval '--evaluate' if evaluate else '')"/>
     <arg name="_evaluate_fast" value="$(eval '--evaluate-fast' if evaluate_fast else '')"/>

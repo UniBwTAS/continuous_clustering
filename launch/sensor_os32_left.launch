@@ -1,6 +1,6 @@
 <launch>
     <!-- flag if rviz should be started -->
-    <arg name="use_rviz" default="true"/>
+    <arg name="use_rviz" default="true" doc="whether to start rviz"/>
 
     <!-- lidar sensor -->
     <arg name="sensor_manufacturer" default="ouster"/>

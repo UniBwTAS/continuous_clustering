@@ -1,54 +1,53 @@
 <launch>
     <!-- flag if rviz should be started -->
-    <arg name="use_rviz" default="true"/>
+    <arg name="use_rviz" default="true" doc="whether to start rviz"/>
 
     <!-- flag if we just want to start rviz without continuous clustering -->
-    <arg name="rviz_only" default="false"/>
+    <arg name="rviz_only" default="false" doc="whether to start only rviz but nothing else"/>
 
     <!-- lidar sensor -->
-    <arg name="sensor_manufacturer"/> <!-- velodyne, ouster, kitti (other manufacturers are currently not supported) -->
-    <arg name="sensor_model"/> <!-- arbitrary: e.g. vls128, hdl64, hdl32, os32, kitti ... -->
-    <arg name="sensor_position"/> <!-- arbitrary: e.g. roof, left, right -->
-    <arg name="sensor_frame"/>  <!-- the ROS frame id of the velodyne sensor -->
-    <arg name="sensor_raw_data_topic"/> <!-- input topic for raw data -->
-    <arg name="sensor_is_clockwise"/> <!-- whether the lidar sensor rotates clockwise -->
+    <arg name="sensor_manufacturer" doc="available options: velodyne, ouster, kitti"/>
+    <arg name="sensor_model" doc="arbitrary: e.g. vls128, hdl64, hdl32, os32, kitti ..."/>
+    <arg name="sensor_position" doc="arbitrary: e.g. roof, left, right"/>
+    <arg name="sensor_frame"  doc="the ROS frame id of the velodyne sensor"/>
+    <arg name="sensor_raw_data_topic" doc="input topic for raw data"/>
+    <arg name="sensor_is_clockwise" doc="whether the lidar sensor rotates clockwise"/>
 
     <!-- manufacturer specific: velodyne -->
     <arg name="is_velodyne" value="$(eval sensor_manufacturer == 'velodyne')"/>
     <group if="$(arg is_velodyne)">
-        <arg name="velodyne_model"/> <!-- e.g. VLS128, VLP16, 32C, 32E, VLS128, 64E (see: raw_data.cc) -->
-        <arg name="velodyne_calibration_path"/> <!-- path to calibration YAML file -->
-        <arg name="velodyne_rpm"/>  <!-- rotations per minute: e.g. 600 -->
+        <arg name="velodyne_model" doc="e.g. VLS128, VLP16, 32C, 32E, VLS128, 64E (see: raw_data.cc)"/>
+        <arg name="velodyne_calibration_path" doc="path to calibration YAML file"/>
+        <arg name="velodyne_rpm" doc="rotations per minute: e.g. 600"/>
     </group>
 
     <!-- manufacturer specific: ouster -->
     <arg name="is_ouster" value="$(eval sensor_manufacturer == 'ouster')"/>
     <group if="$(arg is_ouster)">
-        <arg name="ouster_metadata_service"/>  <!-- full service name to get metadata -->
+        <arg name="ouster_metadata_service" doc="full ROS service name to get metadata"/>
     </group>
 
     <!-- other ros specific parameters -->
-    <arg name="ego_robot_frame" default="base_link"/>
-    <arg name="odom_frame" default="odom"/>
-    <arg name="namespace" default="perception/detections/lidar_$(arg sensor_position)/cluster"/>
-    <arg name="point_cloud_topic" default="/sensor/lidar/$(arg sensor_model)_$(arg sensor_position)/points"/>
+    <arg name="ego_robot_frame" default="base_link" doc="ego robot frame is used to calculate ego bounding box"/>
+    <arg name="odom_frame" default="odom" doc="world fixed frame approx. aligned with ground plane"/>
+    <arg name="namespace" default="perception/detections/lidar_$(arg sensor_position)/cluster" doc="namespace"/>
 
     <!-- range image parameters -->
-    <arg name="num_columns"/>  <!-- number of columns of range image -->
-    <arg name="wait_for_tf" default="true"/>
-    <arg name="supplement_inclination_angle_for_nan_cells" default="true"/>
+    <arg name="num_columns" doc="number of columns of range image; should be the number of firings per rotations"/>
+    <arg name="wait_for_tf" default="true" doc="whether to wait for appropriate TF or just use the latest available"/>
+    <arg name="supplement_inclination_angle_for_nan_cells" default="true" doc="use artificial inclination angles"/>
 
     <!-- ground point segmentation parameters -->
-    <arg name="use_terrain" default="False"/>
-    <arg name="fog_filtering_enabled" default="False"/>
-    <arg name="fog_filtering_intensity_below" default="2"/>
-    <arg name="fog_filtering_distance_below" default="18"/>
-    <arg name="fog_filtering_inclination_above" default="-0.06"/>
+    <arg name="use_terrain" default="False" doc="whether to use terrain (currently not supported!)"/>
+    <arg name="fog_filtering_enabled" default="False" doc="whether to try to filter points originating from fog"/>
+    <arg name="fog_filtering_intensity_below" default="2" doc="this cond. + others to consider as fog point"/>
+    <arg name="fog_filtering_distance_below" default="18" doc="this cond. + others to consider as fog point"/>
+    <arg name="fog_filtering_inclination_above" default="-0.06" doc="this cond. + others to consider as fog point"/>
 
     <!-- clustering parameters -->
-    <arg name="use_last_point_for_cluster_stamp" default="false"/>
-    <arg name="ignore_points_in_chessboard_pattern" default="true"/>
-    <arg name="ignore_points_with_too_big_inclination_angle_diff" default="true"/>
+    <arg name="use_last_point_for_cluster_stamp" default="false" doc="use middle or last point for cluster stamp"/>
+    <arg name="ignore_points_in_chessboard_pattern" default="true" doc="use this if clustering is too slow"/>
+    <arg name="ignore_points_with_too_big_inclination_angle_diff" default="true" doc="avoids small distant clusters"/>
 
     <group ns="$(arg namespace)" unless="$(arg rviz_only)">
 
@@ -100,6 +99,7 @@
     <!-- start rviz: we are using a rviz config template! -->
     <arg name="rviz_config_in" value="$(find continuous_clustering)/rviz/sensor_generic.rviz.in"/>
     <arg name="rviz_config_out" value="/tmp/$(anon sensor_generic).rviz"/>
+    <arg name="point_cloud_topic" default="/sensor/lidar/$(arg sensor_model)_$(arg sensor_position)/points"/>
     <node name="rviz" pkg="rviz" type="rviz"
           launch-prefix="bash -c 'cat $(arg rviz_config_in) | envsubst > $(arg rviz_config_out); $0 $@'"
           args="--display-config $(arg rviz_config_out)"
