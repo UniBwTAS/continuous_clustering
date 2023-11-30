@@ -338,7 +338,9 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
                 "is some other issue with clearing (not cleared at all or written after clearing): " +
                 std::to_string(point_global_column_index_copy) + ", " +
                 std::to_string(job.ring_buffer_current_global_column_index) + ", " +
-                std::to_string(ring_buffer_max_columns));
+                std::to_string(ring_buffer_max_columns) +
+                "; This typically happens when the clustering is not fast enough to handle all the firings. Consider "
+                "to play the sensor data more slowly or to adjust the parameters to make the clustering faster.");
         }
 
         // refill local/global column index because it was not filled for omitted cells
