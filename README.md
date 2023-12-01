@@ -190,13 +190,13 @@ and [src/evaluation/kitti_evaluation.cpp](src/evaluation/kitti_evaluation.cpp) f
 
 ```bash
 cd /tmp
-pip3 install gdown && gdown 1lA-OHRg6yM8z7INF_7_03hB0yJ4RswaV
+pip3 install gdown && gdown 1MOfLbUQcwRMLhRca0bxJMLVriU3G8Tg3
 cd ${KITTI_SEQUENCES_PATH}/../..
 unzip /tmp/data_odometry_labels_euclidean_clustering.zip
 ```
 
 Alternatively download it manually from
-our [Google Drive](https://drive.google.com/file/d/1lA-OHRg6yM8z7INF_7_03hB0yJ4RswaV/view?usp=sharing) and unzip it to
+our [Google Drive](https://drive.google.com/file/d/1MOfLbUQcwRMLhRca0bxJMLVriU3G8Tg3/view?usp=sharing) and unzip it to
 the correct location (in parent directory of `dataset` folder).
 
 #### Option 2: Generate with GUI & ROS setup (assumes prepared ROS setup, see above, useful for debugging etc.)
