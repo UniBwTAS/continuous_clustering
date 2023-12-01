@@ -156,59 +156,54 @@ inline void KittiEvaluation::addPointForKey(std::map<uint32_t, std::vector<Kitti
         map.insert(lb, {key, {point}});
 }
 
-void KittiEvaluation::generateEvaluationResultForSingleMetric(
-    std::stringstream& ss,
-    const std::vector<EvaluationResultForFrame>& results_for_sequence,
-    const std::string& metric_name,
-    const std::function<double(const EvaluationResultForFrame&)>& metric_calc_fn)
-{
-    uint32_t number_of_frames = results_for_sequence.size();
-    std::vector<double> data(number_of_frames, 0.);
-    for (uint32_t frame_index = 0; frame_index < number_of_frames; frame_index++)
-        data[frame_index] = metric_calc_fn(results_for_sequence[frame_index]);
-    double mean = 0;
-    double std_dev = 0;
-    calculateMeanAndStdDev(data, mean, std_dev);
-    ss << "| " << metric_name << ": " << mean << " (mean), " << std_dev << " (std_dev)" << std::endl;
-}
-
 std::string KittiEvaluation::generateEvaluationResults()
 {
+    // create string for Markdown table
+
     std::stringstream ss;
+    ss << std::fixed;
+    ss << std::setprecision(2);
+
+    // header line
+    ss << "| Sequence | Recall &mu; &uarr; / &sigma; &darr; | Precision &mu; &uarr; / &sigma; &darr; | F1-Score "
+          "&mu; &uarr; / &sigma; &darr; | Accuracy &mu; &uarr; / &sigma; &darr; | USE &mu; &darr; / &sigma; &darr; | "
+          "OSE &mu; &darr; / &sigma; &darr; |"
+       << std::endl;
+
+    // separator
+    ss << "| :---: | :---: | :---: | :---: | :---: | :---: | :---: |" << std::endl;
+
+    // print line for each sequence
     for (const auto& entry : evaluation_per_sequence)
     {
-        ss << "------------------------------------------------------------------------------" << std::endl;
-
         if (entry.first == -1)
-            ss << "| Sequence: All combined" << std::endl;
+            ss << "| All ";
         else
-            ss << "| Sequence: " << entry.first << std::endl;
-
-        ss << "----------------------------Ground Point Segmentation-------------------------" << std::endl;
+            ss << "| " << entry.first << " ";
 
         auto fn_recall = [](const EvaluationResultForFrame& r) { return r.tp / (r.tp + r.fn); };
-        generateEvaluationResultForSingleMetric(ss, entry.second, "Recall", fn_recall);
-
         auto fn_precision = [](const EvaluationResultForFrame& r) { return r.tp / (r.tp + r.fp); };
-        generateEvaluationResultForSingleMetric(ss, entry.second, "Precision", fn_precision);
-
-        auto fn_accuracy = [](const EvaluationResultForFrame& r)
-        { return (r.tp + r.tn) / (r.tp + r.tn + r.fp + r.fn); };
-        generateEvaluationResultForSingleMetric(ss, entry.second, "Accuracy", fn_accuracy);
-
         auto fn_f1_score = [](const EvaluationResultForFrame& r)
         { return (r.tp + r.tp) / (r.tp + r.tp + r.fp + r.fn); };
-        generateEvaluationResultForSingleMetric(ss, entry.second, "F1 Score", fn_f1_score);
-
-        ss << "-----------------------------------Clustering---------------------------------" << std::endl;
-
-        auto fn_ose = [](const EvaluationResultForFrame& r) { return r.over_segmentation_entropy; };
-        generateEvaluationResultForSingleMetric(ss, entry.second, "Over-Segmentation Entropy", fn_ose);
-
+        auto fn_accuracy = [](const EvaluationResultForFrame& r)
+        { return (r.tp + r.tn) / (r.tp + r.tn + r.fp + r.fn); };
         auto fn_use = [](const EvaluationResultForFrame& r) { return r.under_segmentation_entropy; };
-        generateEvaluationResultForSingleMetric(ss, entry.second, "Under-Segmentation Entropy", fn_use);
+        auto fn_ose = [](const EvaluationResultForFrame& r) { return r.over_segmentation_entropy; };
 
-        ss << "------------------------------------------------------------------------------\n" << std::endl;
+        std::array<std::function<double(const EvaluationResultForFrame&)>, 6> fn_metric_all = {
+            fn_recall, fn_precision, fn_f1_score, fn_accuracy, fn_use, fn_ose};
+        for (int i = 0; i < fn_metric_all.size(); i++)
+        {
+            double mean, std_dev;
+            std::vector<double> data(entry.second.size());
+            std::transform(entry.second.begin(), entry.second.end(), data.begin(), fn_metric_all[i]);
+            calculateMeanAndStdDev(data, mean, std_dev);
+            if (i < 4)
+                ss << "| " << (mean * 100) << " / " << (std_dev * 100) << " ";
+            else
+                ss << "| " << mean << " / " << std_dev << " ";
+        }
+        ss << "|" << std::endl;
     }
     return ss.str();
 }

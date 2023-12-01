@@ -74,11 +74,6 @@ class KittiEvaluation
 
   private:
     static inline bool isSameCluster(const pcl::PointXYZINormal& p1, const pcl::PointXYZINormal& p2, float sqr_dist);
-    static void generateEvaluationResultForSingleMetric(
-        std::stringstream& ss,
-        const std::vector<EvaluationResultForFrame>& results_for_sequence,
-        const std::string& metric_name,
-        const std::function<double(const EvaluationResultForFrame&)>& metric_calc_fn);
     static inline void calculateMeanAndStdDev(const std::vector<double>& data, double& mean, double& std_dev);
 
   private:
