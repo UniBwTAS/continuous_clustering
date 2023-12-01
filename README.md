@@ -257,13 +257,52 @@ TODO
 
 ## Info about our LiDAR Drivers
 
+Our clustering algorithm is able to process the UDP packets from the LiDAR sensor. So the firings can be processed
+immediately. We directly process the raw UDP packets from the corresponding sensor, which makes the input
+manufacturer/sensor specific. Luckily, we can use external libraries, so it is not necessary reimplement the decoding
+part (UDP Packet -> Euclidean Point Positions). Currently, we support following sensor manufacturers:
+
 ### Velodyne
 
-TODO
+- Tested Sensors: VLS 128
+- All other rotating Velodyne LiDARs should work, too
+- We use this project: [ros-drivers/velodyne](https://github.com/ros-drivers/velodyne)
+- Unfortunately, this projects always records full rotations (ROS message type `velodyne_msgs/VelodyneScan`)
+    - Therefore, we use this project [UniBwTAS/ethernet_bridge](https://github.com/UniBwTAS/ethernet_bridge) to read and
+      record the raw UDP packets from the sensor (ROS message type: `ethernet_msgs/Packet`)
+    - Example launch file to start ethernet_bridge on real robot (e.g.: PORT 2370):
+
+```xml
+
+<launch>
+    <!-- flag if in real robot or playing a rosbag -->
+    <arg name="rosbag" default="false"/>
+
+    <arg name="port" default="2370"/>
+    <arg name="ns_ethernet_bridge" value="bus/vls128_roof/eth_scan"/>
+
+    <node pkg="ethernet_bridge" type="udp" name="ethernet_bridge" unless="$(arg rosbag)" ns="$(arg ns_ethernet_bridge)">
+        <param name="ethernet_bindAddress" value="0.0.0.0"/>
+        <param name="ethernet_bindPort" value="$(arg port)"/>
+    </node>
+</launch>
+```
+
+- Our clustering subscribes to these UDP packets and can use the middleware-agnostic library
+  from [ros-drivers/velodyne](https://github.com/ros-drivers/velodyne) to decode packets to euclidean points
+    - See source code at: [velodyne_input.hpp](include/continuous_clustering/ros/velodyne_input.hpp)
 
 ### Ouster
 
-TODO
+- Tested Sensors: OS 32
+- All other rotating Ouster LiDARs should work, too
+- We use this project: [ouster-lidar/ouster-ros](https://github.com/ouster-lidar/ouster-ros)
+- This project reads and records individual UDP packets
+- Therefore, the sensors can be launched regularly with the launch files
+  from [ouster-lidar/ouster-ros](https://github.com/ouster-lidar/ouster-ros)
+- Our clustering subscribes to Ouster's UDP packets (ROS Message type: `ouster_ros/PacketMsg`) and can use the library
+  from [ouster-lidar/ouster-ros](https://github.com/ouster-lidar/ouster-ros) to decode packets to euclidean points
+    - See source code at: [ouster_input.hpp](include/continuous_clustering/ros/ouster_input.hpp)
 
 ## TODOs
 
