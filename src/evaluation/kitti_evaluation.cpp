@@ -173,11 +173,15 @@ std::string KittiEvaluation::generateEvaluationResults()
     // separator
     ss << "| :---: | :---: | :---: | :---: | :---: | :---: | :---: |" << std::endl;
 
+    // insert results of TRAVEL paper
+    ss << "| All (**TRAVEL**) | 90.0 / - | 96.7 / - | 93.1 / 4.3 | 93.9 / 3.7 | 24.07 / 11.8 | 70.40 / 34.44 |"
+       << std::endl;
+
     // print line for each sequence
     for (const auto& entry : evaluation_per_sequence)
     {
         if (entry.first == -1)
-            ss << "| All ";
+            ss << "| All (**Ours**) ";
         else
             ss << "| " << entry.first << " ";
 
