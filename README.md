@@ -139,6 +139,46 @@ Scans_ ([arXiv](https://arxiv.org/abs/2206.03190), [GitHub](https://github.com/u
 Under-Segmentation Entropy (USE) for clustering performance and precision / recall / accuracy / F1-Score for ground
 point segmentation.
 
+### Results
+
+The following results were obtained at Commit SHA [fa3c53b](https://github.com/UniBwTAS/continuous_clustering/commit/fa3c53bab51975b06ae5ec3a9e56567729149e4f)
+
+#### Clustering
+
+| Sequence | USE &mu; &darr; / &sigma; &darr; | OSE &mu; &darr; / &sigma; &darr; |
+| :---: | :---: | :---: |
+| All (**TRAVEL**)| 24.07 / 11.8 | 70.40 / 34.44 |
+| All (**Ours**)| **18.75** / 7.82 | **40.22** / 14.56 |
+| 0 | 15.30 / 4.57 | 39.80 / 10.84 |
+| 1 | 17.88 / 9.66 | 35.81 / 13.92 |
+| 2 | 16.13 / 5.63 | 27.67 / 11.54 |
+| 3 | 16.30 / 7.12 | 33.08 / 18.37 |
+| 4 | 17.50 / 13.80 | 39.61 / 17.83 |
+| 5 | 22.44 / 4.82 | 49.58 / 8.82 |
+| 6 | 36.90 / 5.35 | 57.27 / 8.35 |
+| 7 | 17.17 / 5.02 | 40.78 / 12.58 |
+| 8 | 19.11 / 7.12 | 48.58 / 12.47 |
+| 9 | 18.45 / 6.25 | 39.62 / 11.86 |
+| 10 | 20.10 / 8.70 | 34.33 / 12.37 |
+
+#### Ground Point Segmentation:
+
+| Sequence | Recall &mu; &uarr; / &sigma; &darr; | Precision &mu; &uarr; / &sigma; &darr; | F1-Score &mu; &uarr; / &sigma; &darr; | Accuracy &mu; &uarr; / &sigma; &darr; |
+| :---: | :---: | :---: | :---: | :---: |
+| All (**TRAVEL**) | 90.0 / - | 96.7 / - | 93.1 / 4.3 | 93.9 / 3.7 |
+| All (**Ours**) | 95.95 / 3.60 | 89.25 / 7.04 | 92.32 / 4.70 | 93.44 / 3.83 |
+| 0 | 97.19 / 1.53 | 89.65 / 4.99 | 93.20 / 3.10 | 94.86 / 1.79 |
+| 1 | 92.31 / 5.93 | 87.40 / 7.59 | 89.62 / 5.73 | 88.32 / 4.94 |
+| 2 | 95.61 / 3.76 | 91.82 / 4.27 | 93.57 / 2.79 | 93.96 / 3.20 |
+| 3 | 96.94 / 1.77 | 77.21 / 13.79 | 85.24 / 9.23 | 85.12 / 8.46 |
+| 4 | 98.55 / 0.92 | 89.39 / 4.37 | 93.68 / 2.21 | 93.36 / 1.87 |
+| 5 | 95.84 / 2.54 | 87.11 / 6.71 | 91.18 / 4.67 | 93.33 / 2.30 |
+| 6 | 97.71 / 1.28 | 95.83 / 1.50 | 96.75 / 1.13 | 95.87 / 1.19 |
+| 7 | 96.97 / 1.93 | 90.55 / 4.31 | 93.60 / 2.73 | 95.20 / 1.35 |
+| 8 | 96.44 / 2.43 | 89.46 / 7.64 | 92.66 / 4.85 | 94.38 / 2.56 |
+| 9 | 95.31 / 4.03 | 88.22 / 5.70 | 91.45 / 3.37 | 91.74 / 3.20 |
+| 10 | 91.62 / 6.79 | 85.76 / 7.22 | 88.33 / 5.45 | 91.83 / 3.63 |
+
 ### Download/Generate Ground Truth Data
 
 In order to evaluate OSE and USE for clustering performance additional labels are required, which are generated from the
