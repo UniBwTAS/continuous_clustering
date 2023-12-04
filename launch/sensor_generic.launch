@@ -24,7 +24,7 @@
     <!-- manufacturer specific: ouster -->
     <arg name="is_ouster" value="$(eval sensor_manufacturer == 'ouster')"/>
     <group if="$(arg is_ouster)">
-        <arg name="ouster_metadata_service" doc="full ROS service name to get metadata"/>
+        <arg name="ouster_metadata_path" doc="path to sensor metadata YAML file"/>
     </group>
 
     <!-- other ros specific parameters -->
@@ -61,7 +61,7 @@
             <param name="calibration" value="$(arg velodyne_calibration_path)" if="$(arg is_velodyne)"/>
 
             <!-- ouster specific parameters/re-mappings -->
-            <remap from="get_metadata" to="$(arg ouster_metadata_service)" if="$(arg is_ouster)"/>
+            <param name="ouster_metadata_path" value="$(arg ouster_metadata_path)" if="$(arg is_ouster)"/>
 
             <!-- lidar sensor -->
             <remap from="raw_data" to="$(arg sensor_raw_data_topic)"/>

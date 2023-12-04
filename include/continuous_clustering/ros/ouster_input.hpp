@@ -11,7 +11,6 @@
 #include <ros/console.h>
 #include <ros/ros.h>
 
-#include <ouster_ros/GetMetadata.h>
 #include <ouster_ros/PacketMsg.h>
 
 #include <continuous_clustering/ros/ros_sensor_input.hpp>
@@ -51,19 +50,11 @@ class OusterInput : public RosSensorInput<ouster_ros::PacketMsg>
   public:
     OusterInput(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private) : RosSensorInput(nh, nh_private)
     {
-        ouster_ros::GetMetadata metadata{};
-        auto client = nh_.serviceClient<ouster_ros::GetMetadata>("get_metadata");
-        client.waitForExistence();
-        if (!client.call(metadata))
-        {
-            auto error_msg = "OusterCloud: Calling get_metadata service failed";
-            ROS_ERROR_STREAM(error_msg);
-            throw std::runtime_error(error_msg);
-        }
+        std::string ouster_metadata_path;
+        if(!nh_private.getParam("ouster_metadata_path", ouster_metadata_path))
+            throw std::runtime_error("Please provide: ouster_metadata_path parameter!");
 
-        ROS_INFO("OusterCloud: retrieved sensor metadata!");
-
-        info = ouster::sensor::parse_metadata(metadata.response.metadata);
+        info = ouster::sensor::metadata_from_json(ouster_metadata_path);
         uint32_t H = info.format.pixels_per_column;
         uint32_t W = info.format.columns_per_frame;
 

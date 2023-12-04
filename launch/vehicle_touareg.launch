@@ -8,6 +8,8 @@
     <param name="/vehicles/touareg/geometric/width_ref_to_left_mirror" value="1.1085"/>
     <param name="/vehicles/touareg/geometric/width_ref_to_right_mirror" value="-1.1085"/>
 
+    <!-- uncomment the following if you want to have the regular 360° PointCloud2 for the Ouster sensor -->
+
     <!-- lidar ouster left -->
     <!--<group>
         <remap from="lidar_packets" to="/bus/os32_left/lidar_packets"/>
@@ -23,11 +25,6 @@
             <arg name="tf_prefix" default="sensor/lidar/os32_left"/>
         </include>
     </group>-->
-    <!-- minimal but sufficient version where only the service for metadata is launched. With this
-    our driver already works but the 360 PointCloud2 message wouldn't be generated (os_cloud nodelet missing) -->
-    <node pkg="nodelet" type="nodelet" name="os_node" args="standalone ouster_ros/OusterReplay" ns="/bus/os32_left/">
-        <param name="metadata" value="$(find continuous_clustering)/calibrations/touareg_os32_left.json"/>
-    </node>
 
     <!-- lidar ouster right -->
     <!--<group>
@@ -44,9 +41,4 @@
             <arg name="tf_prefix" default="sensor/lidar/os32_right"/>
         </include>
     </group>-->
-    <!-- minimal but sufficient version where only the service for metadata is launched. With this
-    our driver already works but the 360 PointCloud2 message wouldn't be generated (os_cloud nodelet missing) -->
-    <node pkg="nodelet" type="nodelet" name="os_node" args="standalone ouster_ros/OusterReplay" ns="/bus/os32_right/">
-        <param name="metadata" value="$(find continuous_clustering)/calibrations/touareg_os32_right.json"/>
-    </node>
 </launch>
