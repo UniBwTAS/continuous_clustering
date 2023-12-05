@@ -44,8 +44,6 @@ struct PointCloud2Iterators
     // ground point segmentation
     std::optional<sensor_msgs::PointCloud2Iterator<uint8_t>> iter_gp_label_out;
     std::optional<sensor_msgs::PointCloud2Iterator<uint8_t>> iter_dbg_gp_label_out;
-    std::optional<sensor_msgs::PointCloud2Iterator<int32_t>> iter_dbg_c_n_left_out;
-    std::optional<sensor_msgs::PointCloud2Iterator<int32_t>> iter_dbg_c_n_right_out;
     std::optional<sensor_msgs::PointCloud2Iterator<float>> iter_height_over_ground_out;
 
     // continuous clustering

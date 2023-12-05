@@ -111,15 +111,15 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
     msg.is_bigendian = false;
     msg.is_dense = false;
 
-    int up_to_field = 27;
+    int up_to_field = 25;
     if (fill_fields_up_to_stage == RAW_POINT)
         up_to_field = 8;
     else if (fill_fields_up_to_stage == RANGE_IMAGE_GENERATION)
         up_to_field = 15;
     else if (fill_fields_up_to_stage == GROUND_POINT_SEGMENTATION)
-        up_to_field = 20;
+        up_to_field = 18;
     else if (fill_fields_up_to_stage == CONTINUOUS_CLUSTERING)
-        up_to_field = 27;
+        up_to_field = 25;
 
     sensor_msgs::PointCloud2Modifier output_modifier(msg);
     output_modifier.setPointCloud2Fields(up_to_field,
@@ -174,12 +174,6 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
                                          "debug_ground_point_label",
                                          1,
                                          sensor_msgs::PointField::UINT8,
-                                         "debug_local_column_index_of_left_ground_neighbor",
-                                         1,
-                                         sensor_msgs::PointField::INT32,
-                                         "debug_local_column_index_of_right_ground_neighbor",
-                                         1,
-                                         sensor_msgs::PointField::INT32,
                                          "height_over_ground",
                                          1,
                                          sensor_msgs::PointField::FLOAT32,
@@ -227,8 +221,6 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
         return iterators;
     iterators.iter_gp_label_out = {msg, "ground_point_label"};
     iterators.iter_dbg_gp_label_out = {msg, "debug_ground_point_label"};
-    iterators.iter_dbg_c_n_left_out = {msg, "debug_local_column_index_of_left_ground_neighbor"};
-    iterators.iter_dbg_c_n_right_out = {msg, "debug_local_column_index_of_right_ground_neighbor"};
     iterators.iter_height_over_ground_out = {msg, "height_over_ground"};
     if (fill_fields_up_to_stage == GROUND_POINT_SEGMENTATION)
         return iterators;
@@ -278,8 +270,6 @@ void addPointToMessage(PointCloud2Iterators& container,
     // ground point segmentation
     *(*container.iter_gp_label_out + data_index_message) = point.ground_point_label;
     *(*container.iter_dbg_gp_label_out + data_index_message) = point.debug_ground_point_label;
-    *(*container.iter_dbg_c_n_left_out + data_index_message) = point.local_column_index_of_left_ground_neighbor;
-    *(*container.iter_dbg_c_n_right_out + data_index_message) = point.local_column_index_of_right_ground_neighbor;
     *(*container.iter_height_over_ground_out + data_index_message) = point.height_over_ground;
     if (fill_fields_up_to_stage == GROUND_POINT_SEGMENTATION)
         return;
