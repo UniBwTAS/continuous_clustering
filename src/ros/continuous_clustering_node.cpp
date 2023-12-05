@@ -159,7 +159,8 @@ class RosContinuousClustering
 
     void onFinishedColumn(int64_t from_global_column_index, int64_t to_global_column_index, bool ground_points_only)
     {
-        auto msg = columnToPointCloud(clustering_, from_global_column_index, to_global_column_index, odom_frame);
+        ProcessingStage stage = ground_points_only ? GROUND_POINT_SEGMENTATION : CONTINUOUS_CLUSTERING;
+        auto msg = columnToPointCloud(clustering_, from_global_column_index, to_global_column_index, odom_frame, stage);
         ros::Publisher* pub = ground_points_only ? &pub_ground_point_segmentation : &pub_instance_segmentation;
         if (msg && pub->getNumSubscribers() > 0)
             pub->publish(msg);

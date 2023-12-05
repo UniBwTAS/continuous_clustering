@@ -19,12 +19,12 @@ sensor_msgs::PointCloud2Ptr clusterToPointCloud(const std::vector<Point>& cluste
     msg->width = cluster_points.size();
     msg->height = 1;
 
-    PointCloud2Iterators container = prepareMessageAndCreateIterators(*msg);
+    PointCloud2Iterators container = prepareMessageAndCreateIterators(*msg, CONTINUOUS_CLUSTERING);
 
     int data_index_message = 0;
     for (const Point& point : cluster_points)
     {
-        addPointToMessage(container, data_index_message, point, num_rows_in_range_image);
+        addPointToMessage(container, data_index_message, point, num_rows_in_range_image, CONTINUOUS_CLUSTERING);
         data_index_message++;
     }
 
@@ -34,7 +34,8 @@ sensor_msgs::PointCloud2Ptr clusterToPointCloud(const std::vector<Point>& cluste
 sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousClustering& clustering,
                                                int64_t from_global_column_index,
                                                int64_t to_global_column_index,
-                                               const std::string& frame_id)
+                                               const std::string& frame_id,
+                                               ProcessingStage fill_fields_up_to_stage)
 {
     int num_columns_to_publish = static_cast<int>(to_global_column_index - from_global_column_index) + 1;
     if (num_columns_to_publish <= 0)
@@ -45,7 +46,7 @@ sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousClustering& clust
     msg->width = num_columns_to_publish;
     msg->height = clustering.num_rows_;
 
-    PointCloud2Iterators container = prepareMessageAndCreateIterators(*msg);
+    PointCloud2Iterators container = prepareMessageAndCreateIterators(*msg, fill_fields_up_to_stage);
 
     // keep track of minimum point stamp in this message
     uint64_t minimum_point_stamp = std::numeric_limits<uint64_t>::max();
@@ -59,7 +60,7 @@ sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousClustering& clust
             const Point& point =
                 clustering.range_image_[ring_buffer_local_column_index * clustering.num_rows_ + row_index];
             int data_index_message = row_index * static_cast<int>(msg->width) + message_column_index;
-            addPointToMessage(container, data_index_message, point, clustering.num_rows_);
+            addPointToMessage(container, data_index_message, point, clustering.num_rows_, fill_fields_up_to_stage);
 
             if (point.stamp != 0 && point.stamp < minimum_point_stamp)
                 minimum_point_stamp = point.stamp;
@@ -82,7 +83,7 @@ sensor_msgs::PointCloud2Ptr firingToPointCloud(const RawPoints::ConstPtr& firing
     msg->width = 1;
     msg->height = firing->points.size();
 
-    PointCloud2Iterators container = prepareMessageAndCreateIterators(*msg);
+    PointCloud2Iterators container = prepareMessageAndCreateIterators(*msg, RAW_POINT);
 
     // keep track of minimum point stamp in this message
     uint64_t minimum_point_stamp = std::numeric_limits<uint64_t>::max();
@@ -104,13 +105,24 @@ sensor_msgs::PointCloud2Ptr firingToPointCloud(const RawPoints::ConstPtr& firing
     return msg;
 }
 
-PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& msg)
+PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& msg,
+                                                      ProcessingStage fill_fields_up_to_stage)
 {
     msg.is_bigendian = false;
     msg.is_dense = false;
 
+    int up_to_field = 27;
+    if (fill_fields_up_to_stage == RAW_POINT)
+        up_to_field = 8;
+    else if (fill_fields_up_to_stage == RANGE_IMAGE_GENERATION)
+        up_to_field = 15;
+    else if (fill_fields_up_to_stage == GROUND_POINT_SEGMENTATION)
+        up_to_field = 20;
+    else if (fill_fields_up_to_stage == CONTINUOUS_CLUSTERING)
+        up_to_field = 27;
+
     sensor_msgs::PointCloud2Modifier output_modifier(msg);
-    output_modifier.setPointCloud2Fields(27,
+    output_modifier.setPointCloud2Fields(up_to_field,
                                          "x",
                                          1,
                                          sensor_msgs::PointField::FLOAT32,
@@ -126,6 +138,9 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
                                          "intensity",
                                          1,
                                          sensor_msgs::PointField::UINT8,
+                                         "globally_unique_point_index",
+                                         1,
+                                         sensor_msgs::PointField::FLOAT64,
                                          "time_sec",
                                          1,
                                          sensor_msgs::PointField::UINT32,
@@ -153,9 +168,6 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
                                          "row_index",
                                          1,
                                          sensor_msgs::PointField::UINT16,
-                                         "globally_unique_point_index",
-                                         1,
-                                         sensor_msgs::PointField::FLOAT64,
                                          "ground_point_label",
                                          1,
                                          sensor_msgs::PointField::UINT8,
@@ -193,85 +205,110 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
                                          1,
                                          sensor_msgs::PointField::UINT32);
 
-    return {{msg, "x"},
-            {msg, "y"},
-            {msg, "z"},
-            {msg, "firing_index"},
-            {msg, "intensity"},
-            {msg, "time_sec"},
-            {msg, "time_nsec"},
-            {msg, "distance"},
-            {msg, "azimuth_angle"},
-            {msg, "inclination_angle"},
-            {msg, "continuous_azimuth_angle"},
-            {msg, "global_column_index"},
-            {msg, "local_column_index"},
-            {msg, "row_index"},
-            {msg, "globally_unique_point_index"},
-            {msg, "ground_point_label"},
-            {msg, "debug_ground_point_label"},
-            {msg, "debug_local_column_index_of_left_ground_neighbor"},
-            {msg, "debug_local_column_index_of_right_ground_neighbor"},
-            {msg, "height_over_ground"},
-            {msg, "finished_at_continuous_azimuth_angle"},
-            {msg, "num_child_points"},
-            {msg, "tree_root_row_index"},
-            {msg, "tree_root_column_index"},
-            {msg, "number_of_visited_neighbors"},
-            {msg, "tree_id"},
-            {msg, "id"}};
+    PointCloud2Iterators iterators;
+    iterators.iter_x_out = {msg, "x"};
+    iterators.iter_y_out = {msg, "y"};
+    iterators.iter_z_out = {msg, "z"};
+    iterators.iter_f_out = {msg, "firing_index"};
+    iterators.iter_i_out = {msg, "intensity"};
+    iterators.iter_gpi_out = {msg, "globally_unique_point_index"};
+    iterators.iter_time_sec_out = {msg, "time_sec"};
+    iterators.iter_time_nsec_out = {msg, "time_nsec"};
+    if (fill_fields_up_to_stage == RAW_POINT)
+        return iterators;
+    iterators.iter_d_out = {msg, "distance"};
+    iterators.iter_a_out = {msg, "azimuth_angle"};
+    iterators.iter_ia_out = {msg, "inclination_angle"};
+    iterators.iter_ca_out = {msg, "continuous_azimuth_angle"};
+    iterators.iter_gc_out = {msg, "global_column_index"};
+    iterators.iter_lc_out = {msg, "local_column_index"};
+    iterators.iter_r_out = {msg, "row_index"};
+    if (fill_fields_up_to_stage == RANGE_IMAGE_GENERATION)
+        return iterators;
+    iterators.iter_gp_label_out = {msg, "ground_point_label"};
+    iterators.iter_dbg_gp_label_out = {msg, "debug_ground_point_label"};
+    iterators.iter_dbg_c_n_left_out = {msg, "debug_local_column_index_of_left_ground_neighbor"};
+    iterators.iter_dbg_c_n_right_out = {msg, "debug_local_column_index_of_right_ground_neighbor"};
+    iterators.iter_height_over_ground_out = {msg, "height_over_ground"};
+    if (fill_fields_up_to_stage == GROUND_POINT_SEGMENTATION)
+        return iterators;
+    iterators.iter_finished_at_azimuth_angle = {msg, "finished_at_continuous_azimuth_angle"};
+    iterators.iter_num_child_points = {msg, "num_child_points"};
+    iterators.iter_tree_root_row_index = {msg, "tree_root_row_index"};
+    iterators.iter_tree_root_column_index = {msg, "tree_root_column_index"};
+    iterators.iter_number_of_visited_neighbors = {msg, "number_of_visited_neighbors"};
+    iterators.iter_tree_id = {msg, "tree_id"};
+    iterators.iter_id = {msg, "id"};
+    return iterators;
 }
 
-void addPointToMessage(PointCloud2Iterators& container, int data_index_message, const Point& point, int num_rows)
+void addPointToMessage(PointCloud2Iterators& container,
+                       int data_index_message,
+                       const Point& point,
+                       int num_rows,
+                       ProcessingStage fill_fields_up_to_stage)
 {
     ros::Time stamp;
     stamp.fromNSec(point.stamp);
 
-    *(container.iter_x_out + data_index_message) = point.xyz.x;
-    *(container.iter_y_out + data_index_message) = point.xyz.y;
-    *(container.iter_z_out + data_index_message) = point.xyz.z;
-    *(container.iter_f_out + data_index_message) = static_cast<uint32_t>(point.firing_index);
-    *(container.iter_i_out + data_index_message) = point.intensity;
-    *(container.iter_time_sec_out + data_index_message) = stamp.sec;
-    *(container.iter_time_nsec_out + data_index_message) = stamp.nsec;
-    *(container.iter_d_out + data_index_message) = point.distance;
-    *(container.iter_a_out + data_index_message) = point.azimuth_angle;
-    *(container.iter_ia_out + data_index_message) = point.inclination_angle;
-    *(container.iter_ca_out + data_index_message) = point.continuous_azimuth_angle;
-    *(container.iter_gc_out + data_index_message) = point.global_column_index;
-    *(container.iter_lc_out + data_index_message) = point.local_column_index;
-    *(container.iter_r_out + data_index_message) = point.row_index;
-    *(container.iter_gpi_out + data_index_message) =
+    // raw point
+    *(*container.iter_x_out + data_index_message) = point.xyz.x;
+    *(*container.iter_y_out + data_index_message) = point.xyz.y;
+    *(*container.iter_z_out + data_index_message) = point.xyz.z;
+    *(*container.iter_f_out + data_index_message) = static_cast<uint32_t>(point.firing_index);
+    *(*container.iter_i_out + data_index_message) = point.intensity;
+    *(*container.iter_gpi_out + data_index_message) =
         *reinterpret_cast<const double*>(&point.globally_unique_point_index); // PointCloud2 does not support UINT64
-    *(container.iter_gp_label_out + data_index_message) = point.ground_point_label;
-    *(container.iter_dbg_gp_label_out + data_index_message) = point.debug_ground_point_label;
-    *(container.iter_dbg_c_n_left_out + data_index_message) = point.local_column_index_of_left_ground_neighbor;
-    *(container.iter_dbg_c_n_right_out + data_index_message) = point.local_column_index_of_right_ground_neighbor;
-    *(container.iter_height_over_ground_out + data_index_message) = point.height_over_ground;
-    *(container.iter_finished_at_azimuth_angle + data_index_message) = point.finished_at_continuous_azimuth_angle;
-    *(container.iter_num_child_points + data_index_message) = point.child_points.size();
-    *(container.iter_tree_root_row_index + data_index_message) = point.tree_root_.row_index;
-    *(container.iter_tree_root_column_index + data_index_message) = point.tree_root_.column_index;
-    *(container.iter_number_of_visited_neighbors + data_index_message) = point.number_of_visited_neighbors;
-    *(container.iter_tree_id + data_index_message) =
+    *(*container.iter_time_sec_out + data_index_message) = stamp.sec;
+    *(*container.iter_time_nsec_out + data_index_message) = stamp.nsec;
+    if (fill_fields_up_to_stage == RAW_POINT)
+        return;
+
+    // range image generation
+    *(*container.iter_d_out + data_index_message) = point.distance;
+    *(*container.iter_a_out + data_index_message) = point.azimuth_angle;
+    *(*container.iter_ia_out + data_index_message) = point.inclination_angle;
+    *(*container.iter_ca_out + data_index_message) = point.continuous_azimuth_angle;
+    *(*container.iter_gc_out + data_index_message) = point.global_column_index;
+    *(*container.iter_lc_out + data_index_message) = point.local_column_index;
+    *(*container.iter_r_out + data_index_message) = point.row_index;
+    if (fill_fields_up_to_stage == RANGE_IMAGE_GENERATION)
+        return;
+
+    // ground point segmentation
+    *(*container.iter_gp_label_out + data_index_message) = point.ground_point_label;
+    *(*container.iter_dbg_gp_label_out + data_index_message) = point.debug_ground_point_label;
+    *(*container.iter_dbg_c_n_left_out + data_index_message) = point.local_column_index_of_left_ground_neighbor;
+    *(*container.iter_dbg_c_n_right_out + data_index_message) = point.local_column_index_of_right_ground_neighbor;
+    *(*container.iter_height_over_ground_out + data_index_message) = point.height_over_ground;
+    if (fill_fields_up_to_stage == GROUND_POINT_SEGMENTATION)
+        return;
+
+    // continuous clustering
+    *(*container.iter_finished_at_azimuth_angle + data_index_message) = point.finished_at_continuous_azimuth_angle;
+    *(*container.iter_num_child_points + data_index_message) = point.child_points.size();
+    *(*container.iter_tree_root_row_index + data_index_message) = point.tree_root_.row_index;
+    *(*container.iter_tree_root_column_index + data_index_message) = point.tree_root_.column_index;
+    *(*container.iter_number_of_visited_neighbors + data_index_message) = point.number_of_visited_neighbors;
+    *(*container.iter_tree_id + data_index_message) =
         static_cast<uint32_t>(point.tree_root_.column_index * num_rows + point.tree_root_.row_index);
-    *(container.iter_id + data_index_message) = point.id;
+    *(*container.iter_id + data_index_message) = point.id;
 }
 
 void addRawPointToMessage(PointCloud2Iterators& container, int data_index_message, const RawPoint& point)
 {
-    *(container.iter_x_out + data_index_message) = point.x;
-    *(container.iter_y_out + data_index_message) = point.y;
-    *(container.iter_z_out + data_index_message) = point.z;
-    *(container.iter_f_out + data_index_message) = static_cast<uint32_t>(point.firing_index);
-    *(container.iter_i_out + data_index_message) = point.intensity;
-    *(container.iter_gpi_out + data_index_message) =
+    *(*container.iter_x_out + data_index_message) = point.x;
+    *(*container.iter_y_out + data_index_message) = point.y;
+    *(*container.iter_z_out + data_index_message) = point.z;
+    *(*container.iter_f_out + data_index_message) = static_cast<uint32_t>(point.firing_index);
+    *(*container.iter_i_out + data_index_message) = point.intensity;
+    *(*container.iter_gpi_out + data_index_message) =
         *reinterpret_cast<const double*>(&point.globally_unique_point_index); // PointCloud2 does not support UINT64
 
     ros::Time t;
     t.fromNSec(point.stamp);
-    *(container.iter_time_sec_out + data_index_message) = t.sec;
-    *(container.iter_time_nsec_out + data_index_message) = t.nsec;
+    *(*container.iter_time_sec_out + data_index_message) = t.sec;
+    *(*container.iter_time_nsec_out + data_index_message) = t.nsec;
 }
 
 sensor_msgs::PointCloud2Ptr evaluationToPointCloud(const std::vector<KittiSegmentationEvaluationPoint>& point_cloud)

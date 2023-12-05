@@ -215,10 +215,11 @@ class KittiDemo
 #ifdef WITH_ROS
                     // publish column in odom frame
                     ros::Publisher* pub = ground_points_only ? &pub_column_ground : &pub_column_cluster;
+                    ProcessingStage stage = ground_points_only ? GROUND_POINT_SEGMENTATION : CONTINUOUS_CLUSTERING;
                     if (!disable_ros_publishers && pub->getNumSubscribers() > 0)
                     {
-                        auto msg =
-                            columnToPointCloud(clustering, from_global_column_index, to_global_column_index, "odom");
+                        auto msg = columnToPointCloud(
+                            clustering, from_global_column_index, to_global_column_index, "odom", stage);
                         if (msg)
                             pub->publish(msg);
                     }
