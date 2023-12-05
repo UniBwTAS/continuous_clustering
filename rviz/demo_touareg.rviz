@@ -12,7 +12,7 @@ Panels:
         - /LidarLeft1/ContinuousRangeImages1/InstanceSegmentation1/Enable continuous1
         - /LidarRight1
       Splitter Ratio: 0.6441441178321838
-    Tree Height: 373
+    Tree Height: 268
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -31,6 +31,12 @@ Panels:
     Name: Time
     SyncMode: 0
     SyncSource: ContinuousInstances
+  - Class: rosbag_panel/RosbagPanel
+    LastOpenedDirectory: ""
+    Name: RosbagPanel
+  - Class: rosbag_panel/RosbagPanel
+    LastOpenedDirectory: ""
+    Name: RosbagPanel
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -70,257 +76,7 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        base_link_ground:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/camera/marveye/left:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/camera/marveye/left/world:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
           Value: true
-        sensor/camera/marveye/nir_left:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/camera/marveye/nir_left/world:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/camera/marveye/nir_right:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/camera/marveye/nir_right/world:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/camera/marveye/right:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/camera/marveye/right/world:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/camera/marveye/rotating_head:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/camera/marveye/rotation_point:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/camera/marveye/tele:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/camera/marveye/tele/mirror:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/camera/marveye/tele/world:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/camera/roof/ir:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/camera/roof/ir/world:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/camera/surround/back:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/camera/surround/back/world:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/camera/surround/front:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/camera/surround/front/world:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/camera/surround/left:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/camera/surround/left/world:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/camera/surround/right:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/camera/surround/right/world:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/camera/windshield/nir:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/camera/windshield/nir/world:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/camera/windshield/vis:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/camera/windshield/vis/world:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/ins/oxts:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/lidar/hdl64_roof:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/lidar/hdl64_roof/rotating_head:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/lidar/os32_left/os_sensor:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/lidar/os32_right/os_sensor:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/lidar/vls128_roof:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/odometry/base:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        sensor/radar/umrr/21:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/radar/umrr/31:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/radar/umrr/32:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/radar/umrr/33:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/radar/umrr/34:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        sensor/radar/umrr/35:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        vehicle/center_of_gravity:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        vehicle/chassis:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        vehicle/rear_axis:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        vehicle/wheel/front_left:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        vehicle/wheel/front_left/air_suspension:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        vehicle/wheel/front_left/steer:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        vehicle/wheel/front_right:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        vehicle/wheel/front_right/air_suspension:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        vehicle/wheel/front_right/steer:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        vehicle/wheel/rear_left:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        vehicle/wheel/rear_left/air_suspension:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        vehicle/wheel/rear_left/steer:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        vehicle/wheel/rear_right:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        vehicle/wheel/rear_right/air_suspension:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        vehicle/wheel/rear_right/steer:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
       Name: RobotModel
       Robot Description: robot_description
       TF Prefix: ""
@@ -1328,7 +1084,9 @@ Window Geometry:
   Hide Right Dock: false
   InstanceSegmentation:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd00000004000000000000023f000002d0fc0200000009fb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb0000000c00430061006d006500720061010000003d000000ca0000001600fffffffb000000100044006900730070006c006100790073010000010d00000200000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000160052006f007300620061006700500061006e0065006c00000002f90000008c0000000000000000000000010000010f000002d0fc0200000004fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000001200530065006c0065006300740069006f006e010000003d000002010000005c00fffffffb0000000a005600690065007700730100000244000000c9000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000738000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000738000000c8fc0100000009fb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e000000000000000738000000ce00fffffffb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e000000000000000738000000ce00fffffffb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e000000000000000738000000eb00fffffffb0000000e0046006900720069006e006700730000000000000007380000006200fffffffc00000000000007380000000000fffffffaffffffff0200000003fb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000001600fffffffb0000000e0046006900720069006e006700730000000000ffffffff0000001600fffffffb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e0000000313000000c80000001600fffffffb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e010000000000000738000000eb00fffffffb0000000e0046006900720069006e006700730000000000000007380000006200fffffffc00000000000007380000000000fffffffa000000000200000004fb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000000000000000fb0000000e0046006900720069006e006700730000000000ffffffff0000000000000000fb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000000000000000fb0000000800540069006d006500000004150000003e0000003900fffffffb0000000800540069006d00650100000000000004500000000000000000000003de000002d000000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000023f000002d0fc020000000dfb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb0000000c00430061006d006500720061010000003d000000a10000001600fffffffb000000100044006900730070006c00610079007301000000e400000197000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000160052006f007300620061006700500061006e0065006c00000002f90000008c0000007700fffffffb000000160052006f007300620061006700500061006e0065006c01000002810000008c0000008c00fffffffb000000160052006f007300620061006700500061006e0065006c01000002810000008c0000000000000000fb000000160052006f007300620061006700500061006e0065006c01000002810000008c0000000000000000fb000000160052006f007300620061006700500061006e0065006c01000002810000008c0000000000000000000000010000010f000002d0fc0200000004fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000001200530065006c0065006300740069006f006e010000003d000002010000005c00fffffffb0000000a005600690065007700730100000244000000c9000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000738000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e1000001970000000300000738000000c8fc0100000009fb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e000000000000000738000000ce00fffffffb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e000000000000000738000000ce00fffffffb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e000000000000000738000000eb00fffffffb0000000e0046006900720069006e006700730000000000000007380000006200fffffffc00000000000007380000000000fffffffaffffffff0200000003fb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000001600fffffffb0000000e0046006900720069006e006700730000000000ffffffff0000001600fffffffb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e0000000313000000c80000001600fffffffb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e010000000000000738000000eb00fffffffb0000000e0046006900720069006e006700730000000000000007380000006200fffffffc00000000000007380000000000fffffffa000000000200000004fb000000280049006e007300740061006e00630065005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000000000000000fb0000000e0046006900720069006e006700730000000000ffffffff0000000000000000fb0000002e00470072006f0075006e00640050006f0069006e0074005300650067006d0065006e0074006100740069006f006e0000000000ffffffff0000000000000000fb0000000800540069006d006500000004150000003e0000003900fffffffb0000000800540069006d00650100000000000004500000000000000000000003de000002d000000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  RosbagPanel:
+    collapsed: false
   Selection:
     collapsed: false
   Time:

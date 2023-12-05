@@ -7,7 +7,6 @@
 
     <!-- arguments to play directly a rosbag with this launch file -->
     <arg name="bag_file" default="" doc="path to bag file; if empty no bag file is replayed"/>
-    <arg name="bag_rate" default="0.1" doc="replay speed"/>
 
     <!-- flags for enable/disable individual sensors -->
     <arg name="use_vls128_roof" default="true"/>
@@ -38,8 +37,8 @@
 
     <!-- play a rosbag if desired -->
     <param name="use_sim_time" value="true" if="$(eval not (bag_file == ''))"/>
-    <node pkg="rosbag" type="play" name="rosbag_play_recording"
+    <node pkg="rosbag" type="play" name="rosbag_play"
           required="true"
-          args="--rate $(arg bag_rate) --clock $(arg bag_file)"
+          args="--server $(arg bag_file)"
           if="$(eval not (bag_file == ''))"/>
 </launch>

@@ -27,3 +27,11 @@ repositories:
     type: git
     url: https://github.com/UniBwTAS/rviz_colorize_point_cloud_by_label.git
     version: master
+  rosbag_panel:
+    type: git
+    url: https://github.com/UniBwTAS/rosbag_panel.git
+    version: master
+  ros_comm:
+    type: git
+    url: https://github.com/UniBwTAS/ros_comm.git
+    version: dev-ctrl-by-srv-minimal

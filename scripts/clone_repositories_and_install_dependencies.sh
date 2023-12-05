@@ -17,6 +17,11 @@ git clone https://github.com/UniBwTAS/rviz_range_image.git
 git clone https://github.com/UniBwTAS/rviz_continuous_point_cloud.git
 git clone https://github.com/UniBwTAS/rviz_colorize_point_cloud_by_label.git
 
+# another very useful Rviz plugin, which shows a panel to control the playback of rosbag
+git clone https://github.com/UniBwTAS/rosbag_panel.git
+# rosbag_panel requires a fork of ros_comm as it adds a ROS service to the rosbag player to control it remotely
+git clone https://github.com/UniBwTAS/ros_comm.git --branch dev-ctrl-by-srv-minimal
+
 # actual continuous clustering package
 if [ "$1" != "--from-source" ]
 then

@@ -20,8 +20,10 @@
     <depend>ouster_ros</depend>
     <depend>ethernet_msgs</depend>
 
+    <exec_depend>xacro</exec_depend>
     <exec_depend>rviz_range_image</exec_depend>
     <exec_depend>rviz_continuous_point_cloud</exec_depend>
     <exec_depend>rviz_colorize_point_cloud_by_label</exec_depend>
+    <exec_depend>rosbag_panel</exec_depend>
 
 </package>

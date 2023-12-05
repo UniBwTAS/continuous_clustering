@@ -126,7 +126,8 @@ catkin build
 # run on kitti odometry dataset
 roslaunch continuous_clustering demo_kitti_folder.launch path:=${KITTI_SEQUENCES_PATH}
 
-# run on VW Touareg rosbag
+# run on VW Touareg rosbag (set the playback speed lower in Rviz (RosbagPanel) if you run in docker due to missing 
+# hardware acceleration for graphical output)
 roslaunch continuous_clustering demo_touareg.launch bag_file:=${ROSBAG_PATH}/vw_touareg_example1.bag
 ```
 
