@@ -7,4 +7,7 @@
     <param name="/vehicles/vw_passat_b6/geometric/length_ref_to_rear_end" value="-3"/>
     <param name="/vehicles/vw_passat_b6/geometric/width_ref_to_left_mirror" value="1.5"/>
     <param name="/vehicles/vw_passat_b6/geometric/width_ref_to_right_mirror" value="-1.5"/>
+
+    <!-- visualize dummy car in Rviz (has not the correct dimensions!) -->
+    <param name="robot_description" command="$(find xacro)/xacro $(find continuous_clustering)/urdf/dummy_car.urdf"/>
 </launch>

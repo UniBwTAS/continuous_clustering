@@ -15,4 +15,9 @@
 
     <node name="rviz" pkg="rviz" type="rviz"
           args="--display-config $(find continuous_clustering)/rviz/demo_kitti_folder.rviz"/>
+
+    <!-- below is just for visualization of a dummy car in Rviz (has not the correct dimensions) -->
+    <param name="robot_description" command="$(find xacro)/xacro $(find continuous_clustering)/urdf/dummy_car.urdf"/>
+    <node pkg="tf2_ros" type="static_transform_publisher" name="publish_base_link"
+          args="0 0 -1.3 0 0 0 velo_link base_link"/>
 </launch>

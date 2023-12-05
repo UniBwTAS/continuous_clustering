@@ -313,13 +313,6 @@ class KittiDemo
                 // generate (flattened) range image from point cloud (height corresponds to number of lasers)
                 std::vector<KittiPoint> range_image = kitti_loader.generateRangeImage(points);
 
-#ifdef WITH_ROS
-                // publish ego robot as marker
-                if (!disable_ros_publishers)
-                    publish_ego_robot_bounding_box(
-                        timestamps_velodyne_start[frame_index], pub_ego_robot_bbox, config.ground_segmentation);
-#endif
-
                 // publish individual firings (here column and firing is the same as we pretend that the lasers
                 // of one firing have the same azimuth angle, this is not the case for real velodyne sensors)
                 for (int column_index = 0; column_index < KittiLoader::RANGE_IMAGE_WIDTH; column_index++)

@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<robot name="touareg">
+
+    <!-- add colors -->
+    <material name="gray">
+        <color rgba="0.8 0.8 0.8 0.5"/>
+    </material>
+    <material name="black">
+        <color rgba="0 0 0 1"/>
+    </material>
+
+    <link name="base_link">
+
+        <!-- chassis -->
+        <visual>
+            <geometry>
+                <box size="4.754 2.217 1.5"/>
+            </geometry>
+            <origin xyz="-0.0235 0 0.338" rpy="0 0 0"/>
+            <material name="gray"/>
+        </visual>
+
+        <!-- front left wheel -->
+        <visual>
+            <geometry>
+                <cylinder length="0.2" radius="0.37"/>
+            </geometry>
+            <origin xyz="1.4275 1.1085 -0.2715" rpy="${pi / 2} 0 0"/>
+            <material name="black"/>
+        </visual>
+
+        <!-- front right wheel -->
+        <visual>
+            <geometry>
+                <cylinder length="0.2" radius="0.37"/>
+            </geometry>
+            <origin xyz="1.4275 -1.1085 -0.2715" rpy="${pi / 2} 0 0"/>
+            <material name="black"/>
+        </visual>
+
+        <!-- rear left wheel -->
+        <visual>
+            <geometry>
+                <cylinder length="0.2" radius="0.37"/>
+            </geometry>
+            <origin xyz="-1.4275 1.1085 -0.2715" rpy="${pi / 2} 0 0"/>
+            <material name="black"/>
+        </visual>
+
+        <!-- rear right wheel -->
+        <visual>
+            <geometry>
+                <cylinder length="0.2" radius="0.37"/>
+            </geometry>
+            <origin xyz="-1.4275 -1.1085 -0.2715" rpy="${pi / 2} 0 0"/>
+            <material name="black"/>
+        </visual>
+    </link>
+
+
+</robot>

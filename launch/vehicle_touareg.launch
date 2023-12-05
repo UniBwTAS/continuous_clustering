@@ -8,6 +8,9 @@
     <param name="/vehicles/touareg/geometric/width_ref_to_left_mirror" value="1.1085"/>
     <param name="/vehicles/touareg/geometric/width_ref_to_right_mirror" value="-1.1085"/>
 
+    <!-- visualize dummy car in Rviz (has not the correct dimensions!) -->
+    <param name="robot_description" command="$(find xacro)/xacro $(find continuous_clustering)/urdf/dummy_car.urdf"/>
+
     <!-- uncomment the following if you want to have the regular 360° PointCloud2 for the Ouster sensor -->
 
     <!-- lidar ouster left -->
