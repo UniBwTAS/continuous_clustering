@@ -1,6 +1,5 @@
 #include <continuous_clustering/clustering/continuous_clustering.hpp>
 
-#include <fstream>
 #include <iostream>
 #include <utility>
 
@@ -813,7 +812,7 @@ void ContinuousClustering::findFinishedTreesAndAssignSameId(TreeCombinationJob&&
     sc_unfinished_point_trees_.splice(sc_unfinished_point_trees_.end(), std::move(job.new_unfinished_point_trees));
 
     std::list<std::list<RangeImageIndex>> trees_per_finished_cluster;
-    std::list<int64_t> finished_cluster_ids;
+    std::list<uint64_t> finished_cluster_ids;
 
     std::list<RangeImageIndex> trees_collected_for_current_cluster;
     std::list<RangeImageIndex> trees_to_visit_for_current_cluster;
@@ -914,7 +913,7 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PublishingJob&& job)
     std::vector<Point> cluster_points;
 
     auto it_trees_per_finished_cluster = job.trees_per_finished_cluster.begin();
-    for (int64_t cluster_id : job.cluster_ids)
+    for (uint64_t cluster_id : job.cluster_ids)
     {
         // clear buffer
         cluster_points.clear();

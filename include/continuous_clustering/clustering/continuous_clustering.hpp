@@ -142,7 +142,7 @@ struct Point
     std::set<RangeImageIndex> associated_trees{};
     RangeImageIndex tree_root_{0, -1};
     uint32_t tree_num_points{0};
-    uint32_t id{0};
+    uint64_t id{0};
     double visited_at_continuous_azimuth_angle{-1.};
     bool belongs_to_finished_cluster{false};
     int number_of_visited_neighbors{0};
@@ -178,7 +178,7 @@ struct PublishingJob
     int64_t ring_buffer_current_global_column_index;
     int64_t ring_buffer_min_required_global_column_index;
 
-    std::list<int64_t> cluster_ids;
+    std::list<uint64_t> cluster_ids;
     std::list<std::list<RangeImageIndex>> trees_per_finished_cluster;
 };
 
@@ -255,7 +255,7 @@ class ContinuousClustering
     std::mutex sc_first_unfinished_global_column_index_mutex;
     std::list<int64_t> sc_minimum_required_global_column_indices;
     std::list<RangeImageIndex> sc_unfinished_point_trees_;
-    uint32_t sc_cluster_counter_{1};
+    uint64_t sc_cluster_counter_{1};
     std::vector<float> sc_inclination_angles_between_lasers_;
     std::function<void(int64_t, int64_t, bool)> finished_column_callback_;
     std::function<void(const std::vector<Point>&, uint64_t)> finished_cluster_callback_;
