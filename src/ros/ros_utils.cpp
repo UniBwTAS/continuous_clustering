@@ -121,6 +121,10 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
     else if (fill_fields_up_to_stage == CONTINUOUS_CLUSTERING)
         up_to_field = 25;
 
+    // Some point fields below should be actually UINT64. Unfortunately, this type is not available for a PointCloud2
+    // message: http://docs.ros.org/en/melodic/api/sensor_msgs/html/msg/PointField.html. Therefore, we use FLOAT64 which
+    // is able to store higher integers than UINT32 (2^52 vs 2^32); these fields are marked with (*)
+
     sensor_msgs::PointCloud2Modifier output_modifier(msg);
     output_modifier.setPointCloud2Fields(up_to_field,
                                          "x",
@@ -134,13 +138,13 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
                                          sensor_msgs::PointField::FLOAT32,
                                          "firing_index",
                                          1,
-                                         sensor_msgs::PointField::UINT32,
+                                         sensor_msgs::PointField::FLOAT64, // (*)
                                          "intensity",
                                          1,
                                          sensor_msgs::PointField::UINT8,
                                          "globally_unique_point_index",
                                          1,
-                                         sensor_msgs::PointField::FLOAT64,
+                                         sensor_msgs::PointField::FLOAT64, // (*)
                                          "time_sec",
                                          1,
                                          sensor_msgs::PointField::UINT32,
@@ -161,7 +165,7 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
                                          sensor_msgs::PointField::FLOAT64,
                                          "global_column_index",
                                          1,
-                                         sensor_msgs::PointField::UINT32,
+                                         sensor_msgs::PointField::FLOAT64, // (*)
                                          "local_column_index",
                                          1,
                                          sensor_msgs::PointField::UINT16,
@@ -188,16 +192,16 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
                                          sensor_msgs::PointField::UINT16,
                                          "tree_root_column_index",
                                          1,
-                                         sensor_msgs::PointField::UINT8,
+                                         sensor_msgs::PointField::FLOAT64, // (*)
                                          "number_of_visited_neighbors",
                                          1,
                                          sensor_msgs::PointField::UINT32,
                                          "tree_id",
                                          1,
-                                         sensor_msgs::PointField::UINT32,
+                                         sensor_msgs::PointField::FLOAT64, // (*)
                                          "id",
                                          1,
-                                         sensor_msgs::PointField::UINT32);
+                                         sensor_msgs::PointField::FLOAT64); // (*)
 
     PointCloud2Iterators iterators;
     iterators.iter_x_out = {msg, "x"};
@@ -243,14 +247,17 @@ void addPointToMessage(PointCloud2Iterators& container,
     ros::Time stamp;
     stamp.fromNSec(point.stamp);
 
+    // Some point fields below should be actually UINT64. Unfortunately, this type is not available for a PointCloud2
+    // message: http://docs.ros.org/en/melodic/api/sensor_msgs/html/msg/PointField.html. Therefore, we use FLOAT64 which
+    // is able to store higher integers than UINT32 (2^52 vs 2^32); these fields are marked with (*)
+
     // raw point
     *(*container.iter_x_out + data_index_message) = point.xyz.x;
     *(*container.iter_y_out + data_index_message) = point.xyz.y;
     *(*container.iter_z_out + data_index_message) = point.xyz.z;
-    *(*container.iter_f_out + data_index_message) = static_cast<uint32_t>(point.firing_index);
+    *(*container.iter_f_out + data_index_message) = static_cast<double>(point.firing_index); // (*)
     *(*container.iter_i_out + data_index_message) = point.intensity;
-    *(*container.iter_gpi_out + data_index_message) =
-        *reinterpret_cast<const double*>(&point.globally_unique_point_index); // PointCloud2 does not support UINT64
+    *(*container.iter_gpi_out + data_index_message) = static_cast<double>(point.globally_unique_point_index); // (*)
     *(*container.iter_time_sec_out + data_index_message) = stamp.sec;
     *(*container.iter_time_nsec_out + data_index_message) = stamp.nsec;
     if (fill_fields_up_to_stage == RAW_POINT)
@@ -261,7 +268,7 @@ void addPointToMessage(PointCloud2Iterators& container,
     *(*container.iter_a_out + data_index_message) = point.azimuth_angle;
     *(*container.iter_ia_out + data_index_message) = point.inclination_angle;
     *(*container.iter_ca_out + data_index_message) = point.continuous_azimuth_angle;
-    *(*container.iter_gc_out + data_index_message) = point.global_column_index;
+    *(*container.iter_gc_out + data_index_message) = static_cast<double>(point.global_column_index); // (*)
     *(*container.iter_lc_out + data_index_message) = point.local_column_index;
     *(*container.iter_r_out + data_index_message) = point.row_index;
     if (fill_fields_up_to_stage == RANGE_IMAGE_GENERATION)
@@ -278,22 +285,26 @@ void addPointToMessage(PointCloud2Iterators& container,
     *(*container.iter_finished_at_azimuth_angle + data_index_message) = point.finished_at_continuous_azimuth_angle;
     *(*container.iter_num_child_points + data_index_message) = point.child_points.size();
     *(*container.iter_tree_root_row_index + data_index_message) = point.tree_root_.row_index;
-    *(*container.iter_tree_root_column_index + data_index_message) = point.tree_root_.column_index;
+    *(*container.iter_tree_root_column_index + data_index_message) =
+        static_cast<double>(point.tree_root_.column_index); // (*)
     *(*container.iter_number_of_visited_neighbors + data_index_message) = point.number_of_visited_neighbors;
     *(*container.iter_tree_id + data_index_message) =
-        static_cast<uint32_t>(point.tree_root_.column_index * num_rows + point.tree_root_.row_index);
-    *(*container.iter_id + data_index_message) = point.id;
+        static_cast<double>(point.tree_root_.column_index * num_rows + point.tree_root_.row_index); // (*)
+    *(*container.iter_id + data_index_message) = static_cast<double>(point.id);                     // (*)
 }
 
 void addRawPointToMessage(PointCloud2Iterators& container, int data_index_message, const RawPoint& point)
 {
+    // Some point fields below should be actually UINT64. Unfortunately, this type is not available for a PointCloud2
+    // message: http://docs.ros.org/en/melodic/api/sensor_msgs/html/msg/PointField.html. Therefore, we use FLOAT64 which
+    // is able to store higher integers than UINT32 (2^52 vs 2^32); these fields are marked with (*)
+
     *(*container.iter_x_out + data_index_message) = point.x;
     *(*container.iter_y_out + data_index_message) = point.y;
     *(*container.iter_z_out + data_index_message) = point.z;
-    *(*container.iter_f_out + data_index_message) = static_cast<uint32_t>(point.firing_index);
+    *(*container.iter_f_out + data_index_message) = static_cast<double>(point.firing_index); // (*)
     *(*container.iter_i_out + data_index_message) = point.intensity;
-    *(*container.iter_gpi_out + data_index_message) =
-        *reinterpret_cast<const double*>(&point.globally_unique_point_index); // PointCloud2 does not support UINT64
+    *(*container.iter_gpi_out + data_index_message) = static_cast<double>(point.globally_unique_point_index); // (*)
 
     ros::Time t;
     t.fromNSec(point.stamp);

@@ -22,11 +22,15 @@ enum ProcessingStage
 
 struct PointCloud2Iterators
 {
+    // Some point fields below should be actually UINT64. Unfortunately, this type is not available for a PointCloud2
+    // message: http://docs.ros.org/en/melodic/api/sensor_msgs/html/msg/PointField.html. Therefore, we use FLOAT64 which
+    // is able to store higher integers than UINT32 (2^52 vs 2^32); these fields are marked with (*)
+
     // raw points (from sensor)
     std::optional<sensor_msgs::PointCloud2Iterator<float>> iter_x_out;
     std::optional<sensor_msgs::PointCloud2Iterator<float>> iter_y_out;
     std::optional<sensor_msgs::PointCloud2Iterator<float>> iter_z_out;
-    std::optional<sensor_msgs::PointCloud2Iterator<uint32_t>> iter_f_out;
+    std::optional<sensor_msgs::PointCloud2Iterator<double>> iter_f_out;
     std::optional<sensor_msgs::PointCloud2Iterator<uint8_t>> iter_i_out;
     std::optional<sensor_msgs::PointCloud2Iterator<double>> iter_gpi_out;
     std::optional<sensor_msgs::PointCloud2Iterator<uint32_t>> iter_time_sec_out;
@@ -37,7 +41,7 @@ struct PointCloud2Iterators
     std::optional<sensor_msgs::PointCloud2Iterator<float>> iter_a_out;
     std::optional<sensor_msgs::PointCloud2Iterator<float>> iter_ia_out;
     std::optional<sensor_msgs::PointCloud2Iterator<double>> iter_ca_out;
-    std::optional<sensor_msgs::PointCloud2Iterator<uint32_t>> iter_gc_out;
+    std::optional<sensor_msgs::PointCloud2Iterator<double>> iter_gc_out;
     std::optional<sensor_msgs::PointCloud2Iterator<uint16_t>> iter_lc_out;
     std::optional<sensor_msgs::PointCloud2Iterator<uint16_t>> iter_r_out;
 
@@ -50,10 +54,10 @@ struct PointCloud2Iterators
     std::optional<sensor_msgs::PointCloud2Iterator<double>> iter_finished_at_azimuth_angle;
     std::optional<sensor_msgs::PointCloud2Iterator<uint16_t>> iter_num_child_points;
     std::optional<sensor_msgs::PointCloud2Iterator<uint16_t>> iter_tree_root_row_index;
-    std::optional<sensor_msgs::PointCloud2Iterator<uint32_t>> iter_tree_root_column_index;
+    std::optional<sensor_msgs::PointCloud2Iterator<double>> iter_tree_root_column_index; // no uin64_t available
     std::optional<sensor_msgs::PointCloud2Iterator<uint32_t>> iter_number_of_visited_neighbors;
-    std::optional<sensor_msgs::PointCloud2Iterator<uint32_t>> iter_tree_id;
-    std::optional<sensor_msgs::PointCloud2Iterator<uint32_t>> iter_id;
+    std::optional<sensor_msgs::PointCloud2Iterator<double>> iter_tree_id;
+    std::optional<sensor_msgs::PointCloud2Iterator<double>> iter_id;
 };
 
 sensor_msgs::PointCloud2Ptr clusterToPointCloud(const std::vector<Point>& cluster_points,
