@@ -8,18 +8,114 @@
 #include <continuous_clustering/evaluation/kitti_loader.hpp>
 #include <continuous_clustering/utils/command_line_parser.hpp>
 
-#ifdef WITH_ROS
-#include <ros/ros.h>
-#include <rosgraph_msgs/Clock.h>
-#include <visualization_msgs/Marker.h>
-
-#include <continuous_clustering/ros/ros_utils.hpp>
-#endif
-
 using Path = std::filesystem::path;
 
 using namespace continuous_clustering;
 using namespace std::chrono_literals;
+
+#ifdef WITH_ROS
+#include <ros/ros.h>
+#include <rosgraph_msgs/Clock.h>
+
+#include <continuous_clustering/ros/ros_utils.hpp>
+
+class ROSInterface
+{
+  public:
+    void init()
+    {
+        pub_clock = nh.advertise<rosgraph_msgs::Clock>("/clock", 100);
+        pub_firing =
+            nh.advertise<sensor_msgs::PointCloud2>("/perception/detections/lidar_roof/cluster/raw_firings", 1000);
+        pub_column_ground = nh.advertise<sensor_msgs::PointCloud2>(
+            "/perception/detections/lidar_roof/cluster/continuous_ground_point_segmentation", 1000);
+        pub_column_cluster = nh.advertise<sensor_msgs::PointCloud2>(
+            "/perception/detections/lidar_roof/cluster/continuous_instance_segmentation", 1000);
+        pub_cluster = nh.advertise<sensor_msgs::PointCloud2>(
+            "/perception/detections/lidar_roof/cluster/continuous_clusters", 1000);
+        pub_evaluation = nh.advertise<sensor_msgs::PointCloud2>("evaluation", 1000);
+    }
+
+    void publishEvaluationPointCloud(const std::vector<KittiSegmentationEvaluationPoint>& point_cloud)
+    {
+        if (pub_evaluation.getNumSubscribers() > 0)
+            pub_evaluation.publish(evaluationToPointCloud(point_cloud));
+    }
+
+    void publishColumn(int64_t from_global_column_index,
+                       int64_t to_global_column_index,
+                       bool ground_points_only,
+                       const ContinuousClustering& clustering)
+    {
+        // publish column in odom frame
+        ros::Publisher* pub = ground_points_only ? &pub_column_ground : &pub_column_cluster;
+        ProcessingStage stage = ground_points_only ? GROUND_POINT_SEGMENTATION : CONTINUOUS_CLUSTERING;
+        if (pub->getNumSubscribers() > 0)
+        {
+            auto msg = columnToPointCloud(clustering, from_global_column_index, to_global_column_index, "odom", stage);
+            if (msg)
+                pub->publish(msg);
+        }
+    };
+
+    void publishCluster(const std::vector<Point>& cluster_points, int num_rows_in_range_image, uint64_t stamp_cluster)
+    {
+        if (pub_cluster.getNumSubscribers() == 0)
+            return;
+        pub_cluster.publish(clusterToPointCloud(cluster_points, num_rows_in_range_image, stamp_cluster, "odom"));
+    };
+
+    void publishFiringAndClockAndTF(const RawPoints::Ptr& firing,
+                                    const Eigen::Isometry3d& odom_from_velodyne,
+                                    bool publish_firing)
+    {
+        if (pub_firing.getNumSubscribers() > 0)
+            pub_firing.publish(firingToPointCloud(firing, "velo_link"));
+
+        // publish clock
+        publish_clock(pub_clock, firing->stamp);
+
+        // publish this pose every X-th column (not too often)
+        if (publish_firing)
+            publish_tf(pub_tf, odom_from_velodyne, firing->stamp);
+    }
+
+    bool ok()
+    {
+        return nh.ok();
+    }
+
+  private:
+    ros::NodeHandle nh;
+    tf2_ros::TransformBroadcaster pub_tf;
+    ros::Publisher pub_clock;
+    ros::Publisher pub_firing;
+    ros::Publisher pub_column_ground;
+    ros::Publisher pub_column_cluster;
+    ros::Publisher pub_cluster;
+    ros::Publisher pub_evaluation;
+};
+#else
+class DummyInterface
+{
+  public:
+    void init(){};
+    void publishEvaluationPointCloud(const std::vector<KittiSegmentationEvaluationPoint>& point_cloud){};
+    void publishColumn(int64_t from_global_column_index,
+                       int64_t to_global_column_index,
+                       bool ground_points_only,
+                       const ContinuousClustering& clustering){};
+    void
+    publishCluster(const std::vector<Point>& cluster_points, int num_rows_in_range_image, uint64_t stamp_cluster){};
+    void publishFiringAndClockAndTF(const RawPoints::Ptr& firing,
+                                    const Eigen::Isometry3d& odom_from_velodyne,
+                                    bool publish_firing){};
+    static bool ok()
+    {
+        return true;
+    };
+};
+#endif
 
 class KittiDemo
 {
@@ -68,10 +164,8 @@ class KittiDemo
 
         auto it = map_frame_to_point_cloud.find({current_sequence_index, previous_frame_index});
         evaluation.evaluate(it->second, current_sequence_index);
-#ifdef WITH_ROS
-        if (!disable_ros_publishers && pub_evaluation.getNumSubscribers() > 0)
-            pub_evaluation.publish(evaluationToPointCloud(it->second));
-#endif
+        if (enable_publishers)
+            middleware.publishEvaluationPointCloud(it->second);
         map_frame_to_point_cloud.erase(it);
         previous_frame_index++;
     }
@@ -132,21 +226,7 @@ class KittiDemo
   public:
     void run(const Path& root_folder, const std::vector<std::string>& sequences)
     {
-#ifdef WITH_ROS
-        ros::NodeHandle nh;
-        tf2_ros::TransformBroadcaster pub_tf;
-        ros::Publisher pub_clock = nh.advertise<rosgraph_msgs::Clock>("/clock", 100);
-        ros::Publisher pub_ego_robot_bbox = nh.advertise<visualization_msgs::Marker>("/ego_robot_bounding_box", 1);
-        ros::Publisher pub_firing =
-            nh.advertise<sensor_msgs::PointCloud2>("/perception/detections/lidar_roof/cluster/raw_firings", 1000);
-        ros::Publisher pub_column_ground = nh.advertise<sensor_msgs::PointCloud2>(
-            "/perception/detections/lidar_roof/cluster/continuous_ground_point_segmentation", 1000);
-        ros::Publisher pub_column_cluster = nh.advertise<sensor_msgs::PointCloud2>(
-            "/perception/detections/lidar_roof/cluster/continuous_instance_segmentation", 1000);
-        ros::Publisher pub_cluster = nh.advertise<sensor_msgs::PointCloud2>(
-            "/perception/detections/lidar_roof/cluster/continuous_clusters", 1000);
-        pub_evaluation = nh.advertise<sensor_msgs::PointCloud2>("evaluation", 1000);
-#endif
+        middleware.init();
 
         // iterate over all frames in specified sequences
         KittiLoader kitti_loader;
@@ -212,37 +292,20 @@ class KittiDemo
             clustering.setFinishedColumnCallback(
                 [&](int64_t from_global_column_index, int64_t to_global_column_index, bool ground_points_only)
                 {
-#ifdef WITH_ROS
-                    // publish column in odom frame
-                    ros::Publisher* pub = ground_points_only ? &pub_column_ground : &pub_column_cluster;
-                    ProcessingStage stage = ground_points_only ? GROUND_POINT_SEGMENTATION : CONTINUOUS_CLUSTERING;
-                    if (!disable_ros_publishers && pub->getNumSubscribers() > 0)
-                    {
-                        auto msg = columnToPointCloud(
-                            clustering, from_global_column_index, to_global_column_index, "odom", stage);
-                        if (msg)
-                            pub->publish(msg);
-                    }
-#endif
-
-                    // evaluation
+                    if (enable_publishers)
+                        middleware.publishColumn(
+                            from_global_column_index, to_global_column_index, ground_points_only, clustering);
                     if (evaluate && !ground_points_only)
                         addColumnAndEvaluateFrameIfCompleted(
                             clustering, from_global_column_index, to_global_column_index);
                 });
 
-#ifdef WITH_ROS
             clustering.setFinishedClusterCallback(
                 [&](const std::vector<Point>& cluster_points, uint64_t stamp_cluster)
                 {
-                    if (disable_ros_publishers || pub_cluster.getNumSubscribers() == 0)
-                        return;
-
-                    // publish cluster in odom frame
-                    pub_cluster.publish(
-                        clusterToPointCloud(cluster_points, clustering.num_rows_, stamp_cluster, "odom"));
+                    if (enable_publishers)
+                        middleware.publishCluster(cluster_points, clustering.num_rows_, stamp_cluster);
                 });
-#endif
 
             // info required for evaluation
             current_sequence_index = sequence_index;
@@ -325,41 +388,25 @@ class KittiDemo
                                                                        sequence_index,
                                                                        frame_index);
 
-#ifdef WITH_ROS
-                    if (!disable_ros_publishers && pub_firing.getNumSubscribers() > 0)
-                        pub_firing.publish(firingToPointCloud(firing, "velo_link"));
-#endif
-
                     // get pose of sensor in odometry frame at this firing
                     Eigen::Isometry3d odom_from_velodyne =
                         kitti_loader.interpolate(transforms_odom_from_velodyne, firing->stamp).pose;
 
-#ifdef WITH_ROS
-                    // publish clock
-                    if (!disable_ros_publishers)
-                        publish_clock(pub_clock, firing->stamp);
-
-                    // publish this pose every X-th column (not too often)
-                    if (!disable_ros_publishers && column_index % 200 == 0)
-                        publish_tf(pub_tf, odom_from_velodyne, firing->stamp);
-#endif
+                    if (enable_publishers)
+                        middleware.publishFiringAndClockAndTF(firing, odom_from_velodyne, column_index % 200 == 0);
 
                     clustering.addFiring(firing, odom_from_velodyne);
 
                     if (delay_between_columns > 0)
                     {
-#ifdef WITH_ROS
-                        if (!nh.ok())
+                        if (!middleware.ok())
                             return;
-#endif
                         std::this_thread::sleep_for(std::chrono::microseconds(delay_between_columns));
                     }
                 }
 
-#ifdef WITH_ROS
-                if (!nh.ok())
+                if (!middleware.ok())
                     return;
-#endif
             }
 
             // also evaluate final frame
@@ -378,9 +425,6 @@ class KittiDemo
 
   private:
     KittiEvaluation evaluation;
-#ifdef WITH_ROS
-    ros::Publisher pub_evaluation;
-#endif
 
     // store point cloud (+ ground truth labels)
     std::map<std::pair<uint16_t, uint16_t>, std::vector<KittiSegmentationEvaluationPoint>> map_frame_to_point_cloud;
@@ -391,8 +435,13 @@ class KittiDemo
 
   public:
     bool evaluate{};
-    bool disable_ros_publishers{};
+    bool enable_publishers{true};
     int delay_between_columns{};
+#ifdef WITH_ROS
+    ROSInterface middleware;
+#else
+    DummyInterface middleware;
+#endif
 };
 
 int main(int argc, char** argv)
@@ -409,11 +458,13 @@ int main(int argc, char** argv)
     demo.delay_between_columns = std::stoi(parser.getValueForArgument("--delay-between-columns", "2000"));
 
     bool evaluate_fast = parser.argumentExists("--evaluate-fast");
+#ifdef WITH_ROS
     if (evaluate_fast)
+#endif
     {
         demo.evaluate = true;
         demo.delay_between_columns = 0;
-        demo.disable_ros_publishers = true;
+        demo.enable_publishers = false;
     }
 
     // check if there are unknown arguments left
