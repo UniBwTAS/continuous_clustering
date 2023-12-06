@@ -131,6 +131,14 @@ roslaunch continuous_clustering demo_kitti_folder.launch path:=${KITTI_SEQUENCES
 roslaunch continuous_clustering demo_touareg.launch bag_file:=${ROSBAG_PATH}/vw_touareg_example1.bag
 ```
 
+**Note:** For the latter launch file, you can use `--wait_for_tf:=false` (default: `true`) argument. It controls whether
+to wait for the transform from velodyne to fixed frame (e.g. odometry frame) with a timestamp larger than the one of the
+firing or whether to use the latest available (probably incorrect) transform. The former is the accurate approach 
+(that's why it is the default) but the columns are published in larger batches/slices because they are accumulated
+between two transforms. The size of a slice depends on the update rate of the transform (i.e. transforms with 50Hz lead
+to batches/slices of 1/5 rotation for a LiDAR rotating with 10Hz). So for a nice visualization where the columns are
+published one by one like it the GIF at the top of the page you should disable this flag.
+
 ## Evaluation on SemanticKITTI Dataset
 
 We evaluate our clustering algorithm with the same metrics as described in the paper _TRAVEL: Traversable Ground and
@@ -142,7 +150,8 @@ point segmentation.
 
 ### Results
 
-The following results were obtained at Commit SHA [fa3c53b](https://github.com/UniBwTAS/continuous_clustering/commit/fa3c53bab51975b06ae5ec3a9e56567729149e4f)
+The following results were obtained at Commit
+SHA [fa3c53b](https://github.com/UniBwTAS/continuous_clustering/commit/fa3c53bab51975b06ae5ec3a9e56567729149e4f)
 
 #### Clustering
 
