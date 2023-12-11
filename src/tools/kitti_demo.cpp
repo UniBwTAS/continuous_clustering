@@ -230,8 +230,12 @@ class KittiDemo
 
         // iterate over all frames in specified sequences
         KittiLoader kitti_loader;
+        std::vector<double> execution_durations(0);
         for (const std::string& sequence : sequences)
         {
+            // store start timestamp in order to measure time
+            auto timing_start = std::chrono::steady_clock::now();
+
             // sequence path
             uint16_t sequence_index = std::stoi(sequence);
             Path sequence_folder{root_folder / Path(KittiLoader::padWithZeros(sequence_index, 2))};
@@ -412,6 +416,11 @@ class KittiDemo
             // also evaluate final frame
             if (evaluate)
                 evaluatePreviousFrame();
+
+            std::chrono::duration<double> execution_duration = std::chrono::steady_clock::now() - timing_start;
+            execution_durations.push_back(execution_duration.count());
+            std::cout << "Execution time: " << std::fixed << std::setprecision(5) << execution_duration.count()
+                      << std::endl;
         }
 
         std::string output = evaluation.generateEvaluationResults();
@@ -420,6 +429,10 @@ class KittiDemo
         std::ofstream evaluation_results;
         evaluation_results.open("evaluation_results.txt");
         evaluation_results << output;
+        evaluation_results << std::endl << std::endl << "Execution Duration per Sequence:" << std::endl;
+        for (int i = 0; i < execution_durations.size(); i++)
+            evaluation_results << "Sequence " << sequences[i] << ": " << std::fixed << std::setprecision(5)
+                               << execution_durations[i] << std::endl;
         evaluation_results.close();
     }
 
