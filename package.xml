@@ -25,5 +25,6 @@
     <exec_depend>rviz_continuous_point_cloud</exec_depend>
     <exec_depend>rviz_colorize_point_cloud_by_label</exec_depend>
     <exec_depend>rosbag_panel</exec_depend>
+    <exec_depend>cv_bridge</exec_depend>
 
 </package>
