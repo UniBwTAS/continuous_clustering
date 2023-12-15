@@ -1,3 +1,5 @@
+[![forthebadge](https://forthebadge.com/images/badges/made-with-c-plus-plus.svg)](https://forthebadge.com)
+
 [![Basic Build Workflow](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/basic-build-ci.yaml/badge.svg?branch=master)](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/basic-build-ci.yaml)
 [![Publish Docker image](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/publish-docker-image.yaml/badge.svg)](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/publish-docker-image.yaml)
 
@@ -47,12 +49,14 @@ The authors gratefully acknowledge funding by the Federal Office of Bundeswehr E
 We mounted two Ouster OS 32 at a tilted angle in order to get rid of the blind spots of our main LiDAR sensor. Our
 clustering also works with these mounting positions. The main challenge here is the ground point segmentation not the
 clustering. It works ok, but we hope to improve it in the future.
+
 ![](https://github.com/UniBwTAS/continuous_clustering/blob/master/assets/demo_ouster.gif)
 
 ### Works with Fog
 
 There are many clutter points and the camera image is almost useless. But the clustering still works quite well after
 filtering potential fog points.
+
 ![](https://github.com/UniBwTAS/continuous_clustering/blob/master/assets/demo_fog.gif)
 
 ### Works on German Highway
@@ -61,7 +65,7 @@ There are often no speed limits on the German Highway. So it is not uncommon to 
 much higher. A latency of e.g. 200ms leads to positional errors of `(180 / 3.6) m/s * 0.2s = 10m`. This shows the need 
 to keep latencies at a minimum.
 
-[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/DZKuAQBngNE/0.jpg)](https://www.youtube.com/watch?v=DZKuAQBngNE&t=98s)
+[![IMAGE ALT TEXT HERE](https://user-images.githubusercontent.com/74038190/235294007-de441046-823e-4eff-89bf-d4df52858b65.gif)](https://www.youtube.com/watch?v=DZKuAQBngNE&t=98s)
 
 ## Run it yourself:
 
