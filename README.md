@@ -1,9 +1,9 @@
-[![forthebadge](https://forthebadge.com/images/badges/made-with-c-plus-plus.svg)](https://forthebadge.com)
+## Low Latency Instance Segmentation by Continuous Clustering for Rotating LiDAR Sensors
 
 [![Basic Build Workflow](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/basic-build-ci.yaml/badge.svg?branch=master)](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/basic-build-ci.yaml)
 [![Publish Docker image](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/publish-docker-image.yaml/badge.svg)](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/publish-docker-image.yaml)
 
-## Low Latency Instance Segmentation by Continuous Clustering for Rotating LiDAR Sensors
+[![forthebadge](https://forthebadge.com/images/badges/made-with-c-plus-plus.svg)](https://forthebadge.com)
 
 ![](https://github.com/UniBwTAS/continuous_clustering/blob/master/assets/demo.gif)
 
@@ -112,7 +112,7 @@ export ROSBAG_PATH=/download/folder/of/rosbag/file
 ```
 Available bags:
 - `gdown 1zM4xPRahgxdJXJGHNXYUpM_g4-9UrcwC` (3.9GB, [Manual Download](https://drive.google.com/file/d/1zM4xPRahgxdJXJGHNXYUpM_g4-9UrcwC/view?usp=sharing))
-  - Long recording in urban scenario (no for small file size, no Ouster sensors)
+  - Long recording in urban scenario (no camera to reduce file size, no Ouster sensors)
 - `gdown 1qjCG6-nWBZ_2wJwoP80jj0gGopBT2c23` (2.4GB, [Manual Download](https://drive.google.com/file/d/1qjCG6-nWBZ_2wJwoP80jj0gGopBT2c23/view?usp=sharing))
   - Recording including Ouster 32 sensor data (blurred camera for privacy reasons)
 - `gdown 146IaBdEmkfBWdIgGV5HzrEYDTol84a1H` (0.7GB, [Manual Download](https://drive.google.com/file/d/146IaBdEmkfBWdIgGV5HzrEYDTol84a1H/view?usp=sharing))
