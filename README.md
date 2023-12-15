@@ -68,9 +68,9 @@ to keep latencies at a minimum.
 
 # Run it yourself:
 
-## Download Sensor Data
+## 1. Download Sensor Data
 
-### SemanticKitti
+### 1.1. SemanticKitti
 
 We use the same folder structure as the SemanticKitti dataset:
 
@@ -92,7 +92,7 @@ curl -s https://raw.githubusercontent.com/UniBwTAS/continuous_clustering/master/
 export KITTI_SEQUENCES_PATH="$(pwd)/kitti_odometry/dataset/sequences"
 ```
 
-### Rosbag of our test vehicle VW Touareg
+### 1.2. Rosbag of our test vehicle VW Touareg
 
 Download the rosbag:
 
@@ -114,9 +114,9 @@ Available bags:
 - `gdown 146IaBdEmkfBWdIgGV5HzrEYDTol84a1H` (0.7GB, [Manual Download](https://drive.google.com/file/d/146IaBdEmkfBWdIgGV5HzrEYDTol84a1H/view?usp=sharing))
   - Short recording of German Highway (blurred camera for privacy reasons)
 
-## Setup Environment
+## 2. Setup Environment
 
-### Option 1: Docker + GUI (VNC):
+### 2.1. Option: Docker + GUI (VNC):
 
 This option is the fastest to set up. However, due to missing hardware acceleration in the VNC Docker container for RVIZ
 the rosbag is played at 1/10 speed.
@@ -134,7 +134,7 @@ docker run -d -p 6080:80 -v /dev/shm:/dev/shm -v ${KITTI_SEQUENCES_PATH}:/mnt/ki
 6. Continue with step "Run Continuous Clustering" (see below) in the terminal opened in step 2. (There you can use the
    clipboard feature of noVNC; tiny arrow on the left of the screen)
 
-### Option 2: Locally on Ubuntu 20.04 (Focal) and ROS Noetic
+### 2.2. Option: Locally on Ubuntu 20.04 (Focal) and ROS Noetic
 
 ```bash
 # install ROS (if not already installed)
@@ -154,7 +154,7 @@ bash /tmp/clone_repositories_and_install_dependencies.sh
 catkin build
 ```
 
-## Run Continuous Clustering
+## 3. Run Continuous Clustering
 
 ```bash
 # run on kitti odometry dataset
@@ -183,12 +183,12 @@ Scans_ ([arXiv](https://arxiv.org/abs/2206.03190), [GitHub](https://github.com/u
 Under-Segmentation Entropy (USE) for clustering performance and precision / recall / accuracy / F1-Score for ground
 point segmentation.
 
-## Results
+## 1. Evaluation Results
 
-The following results were obtained at Commit
-SHA [fa3c53b](https://github.com/UniBwTAS/continuous_clustering/commit/fa3c53bab51975b06ae5ec3a9e56567729149e4f)
+> [!NOTE]
+> The following results were obtained at Commit SHA [fa3c53b](https://github.com/UniBwTAS/continuous_clustering/commit/fa3c53bab51975b06ae5ec3a9e56567729149e4f)
 
-### Clustering
+### 1.1. Clustering
 
 | Sequence | USE &mu; &darr; / &sigma; &darr; | OSE &mu; &darr; / &sigma; &darr; |
 | :---: | :---: | :---: |
@@ -206,7 +206,7 @@ SHA [fa3c53b](https://github.com/UniBwTAS/continuous_clustering/commit/fa3c53bab
 | 9 | 18.45 / 6.25 | 39.62 / 11.86 |
 | 10 | 20.10 / 8.70 | 34.33 / 12.37 |
 
-### Ground Point Segmentation:
+### 1.2. Ground Point Segmentation:
 
 | Sequence | Recall &mu; &uarr; / &sigma; &darr; | Precision &mu; &uarr; / &sigma; &darr; | F1-Score &mu; &uarr; / &sigma; &darr; | Accuracy &mu; &uarr; / &sigma; &darr; |
 | :---: | :---: | :---: | :---: | :---: |
@@ -224,14 +224,14 @@ SHA [fa3c53b](https://github.com/UniBwTAS/continuous_clustering/commit/fa3c53bab
 | 9 | 95.31 / 4.03 | 88.22 / 5.70 | 91.45 / 3.37 | 91.74 / 3.20 |
 | 10 | 91.62 / 6.79 | 85.76 / 7.22 | 88.33 / 5.45 | 91.83 / 3.63 |
 
-## Download/Generate Ground Truth Data
+## 2. Get Ground Truth Labels
 
 In order to evaluate OSE and USE for clustering performance additional labels are required, which are generated from the
 Semantic Kitti Labels and using a euclidean distance-based clustering.
 See [Issue](https://github.com/url-kaist/TRAVEL/issues/6) in TRAVEL GitHub repository
 and [src/evaluation/kitti_evaluation.cpp](src/evaluation/kitti_evaluation.cpp) for more details.
 
-### Option 1: Download pre-generated labels (fastest)
+### 2.1. Option: Download pre-generated labels (fastest)
 
 ```bash
 cd /tmp
@@ -244,7 +244,7 @@ Alternatively download it manually from
 our [Google Drive](https://drive.google.com/file/d/1MOfLbUQcwRMLhRca0bxJMLVriU3G8Tg3/view?usp=sharing) and unzip it to
 the correct location (in parent directory of `dataset` folder).
 
-### Option 2: Generate with GUI & ROS setup (assumes prepared ROS setup, see above, useful for debugging etc.)
+### 2.2. Option: Generate with GUI & ROS setup (assumes prepared ROS setup, see above, useful for debugging etc.)
 
 Generate labels, which are saved to `${KITTI_SEQUENCES_PATH}/<sequence>/labels_euclidean_clustering/`
 
@@ -253,10 +253,11 @@ rosrun continuous_clustering gt_label_generator_tool ${KITTI_SEQUENCES_PATH} --n
 ```
 
 > [!TIP]
-> If you want to visualize the generated ground truth labels in ROS then remove the `--no-ros` flag and use just one
-thread (default).
+> If you want to visualize the generated ground truth labels in an online fashion then remove the `--no-ros` flag and 
+> use just one thread (default). You can then subscribe to the corresponding topic in Rviz and visualize the point 
+> labels.
 
-### Option 3: Generate without GUI or ROS within Minimal Docker Container
+### 2.3. Option: Generate without GUI or ROS within Minimal Docker Container
 
 ```bash
 # build docker image
@@ -271,9 +272,9 @@ docker run --rm -v ${KITTI_SEQUENCES_PATH}:/mnt/kitti_sequences --name build_no_
 docker stop build_no_ros
 ```
 
-## Run Evaluation
+## 3. Run Evaluation
 
-### Option 1: Evaluate with GUI & ROS setup (assumes prepared ROS setup, see above, useful for debugging)
+### 3.1. Option: Evaluate with GUI & ROS setup (assumes prepared ROS setup; useful for debugging)
 
 ```bash
 # run evaluation slowly with visual output
@@ -284,7 +285,7 @@ roslaunch continuous_clustering demo_kitti_folder.launch path:=${KITTI_SEQUENCES
 roslaunch continuous_clustering demo_kitti_folder.launch path:=${KITTI_SEQUENCES_PATH} evaluate-fast:=true
 ```
 
-### Option 2: Evaluate without GUI or ROS within Minimal Docker Container
+### 3.2. Option: Evaluate without GUI or ROS within Minimal Docker Container
 
 ```bash
 # build docker image (if not already done)
