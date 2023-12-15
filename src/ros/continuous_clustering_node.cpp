@@ -1,5 +1,5 @@
 #include <continuous_clustering/ContinuousClusteringConfig.h>
-#include <continuous_clustering/ros/kitti_input.hpp>
+#include <continuous_clustering/ros/generic_points_input.hpp>
 #include <continuous_clustering/ros/ouster_input.hpp>
 #include <continuous_clustering/ros/ros_transform_synchronizer.hpp>
 #include <continuous_clustering/ros/ros_utils.hpp>
@@ -42,8 +42,8 @@ class RosContinuousClustering
             sensor_input_.reset(new VelodyneInput(nh, nh_private));
         else if (sensor_manufacturer == "ouster")
             sensor_input_.reset(new OusterInput(nh, nh_private));
-        else if (sensor_manufacturer == "kitti")
-            sensor_input_.reset(new KittiInput(nh, nh_private));
+        else if (sensor_manufacturer == "generic_points")
+            sensor_input_.reset(new GenericPointsInput(nh, nh_private));
         else
             throw std::runtime_error("Unknown manufacturer: " + sensor_manufacturer);
         sensor_input_->subscribe();

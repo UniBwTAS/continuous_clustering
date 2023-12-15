@@ -39,33 +39,35 @@ Get PDF [here](https://arxiv.org/abs/2311.13976).
 
 ## Acknowledgement
 
-The authors gratefully acknowledge funding by the Federal Office of Bundeswehr Equipment, Information Technology and In-Service Support (BAAINBw).
+The authors gratefully acknowledge funding by the Federal Office of Bundeswehr Equipment, Information Technology and
+In-Service Support (BAAINBw).
 
 ## Overview
+
 - [Examples](#examples)
 - [Run it yourself](#run-it-yourself)
     - [1. Download Sensor Data](#1-download-sensor-data)
-      - [1.1. SemanticKitti](#11-semantickitti)
-      - [1.2. Rosbag of our test vehicle VW Touareg](#12-rosbag-of-our-test-vehicle-vw-touareg)
+        - [1.1. SemanticKitti](#11-semantickitti)
+        - [1.2. Rosbag of our test vehicle VW Touareg](#12-rosbag-of-our-test-vehicle-vw-touareg)
     - [2. Setup Environment](#2-setup-environment)
-      - [2.1. Option: Docker + GUI (VNC)](#21-option-docker--gui-vnc)
-      - [2.2. Option: Locally on Ubuntu 20.04 (Focal) and ROS Noetic](#22-option-locally-on-ubuntu-2004-focal-and-ros-noetic)
+        - [2.1. Option: Docker + GUI (VNC)](#21-option-docker--gui-vnc)
+        - [2.2. Option: Locally on Ubuntu 20.04 (Focal) and ROS Noetic](#22-option-locally-on-ubuntu-2004-focal-and-ros-noetic)
     - [3. Run Continuous Clustering](#3-run-continuous-clustering)
 - [Evaluation on SemanticKITTI Dataset](#evaluation-on-semantickitti-dataset)
-  - [1. Evaluation Results](#1-evaluation-results)
-    - [1.1. Clustering](#11-clustering)
-    - [1.2. Ground Point Segmentation](#12-ground-point-segmentation)
-  - [2. Get Ground Truth Labels](#2-get-ground-truth-labels)
-    - [2.1. Option: Download pre-generated labels](#21-option-download-pre-generated-labels-fastest)
-    - [2.2. Option: Generate with GUI & ROS setup](#22-option-generate-with-gui--ros-setup-assumes-prepared-ros-setup-see-above-useful-for-debugging-etc)
-    - [2.3. Option: Generate without GUI or ROS within Minimal Docker Container](#23-option-generate-without-gui-or-ros-within-minimal-docker-container)
-  - [3. Run Evaluation](#3-run-evaluation)
-    - [3.1. Option: Evaluate with GUI & ROS setup](#31-option-evaluate-with-gui--ros-setup-assumes-prepared-ros-setup-useful-for-debugging)
-    - [3.2. Option: Evaluate without GUI or ROS within Minimal Docker Container](#32-option-evaluate-without-gui-or-ros-within-minimal-docker-container)
+    - [1. Evaluation Results](#1-evaluation-results)
+        - [1.1. Clustering](#11-clustering)
+        - [1.2. Ground Point Segmentation](#12-ground-point-segmentation)
+    - [2. Get Ground Truth Labels](#2-get-ground-truth-labels)
+        - [2.1. Option: Download pre-generated labels](#21-option-download-pre-generated-labels-fastest)
+        - [2.2. Option: Generate with GUI & ROS setup](#22-option-generate-with-gui--ros-setup-assumes-prepared-ros-setup-see-above-useful-for-debugging-etc)
+        - [2.3. Option: Generate without GUI or ROS within Minimal Docker Container](#23-option-generate-without-gui-or-ros-within-minimal-docker-container)
+    - [3. Run Evaluation](#3-run-evaluation)
+        - [3.1. Option: Evaluate with GUI & ROS setup](#31-option-evaluate-with-gui--ros-setup-assumes-prepared-ros-setup-useful-for-debugging)
+        - [3.2. Option: Evaluate without GUI or ROS within Minimal Docker Container](#32-option-evaluate-without-gui-or-ros-within-minimal-docker-container)
 - [Info about our LiDAR Drivers](#info-about-our-lidar-drivers)
-  - [Velodyne](#velodyne)
-  - [Ouster](#ouster)
-- [Tips for Rviz Visualization](#tips-for-rviz-visualization)
+    - [1. Velodyne](#1-velodyne)
+    - [2. Ouster](#2-ouster)
+    - [3. Generic Points](#3-generic-points)
 - [TODOs](#todos)
 
 # Examples:
@@ -88,7 +90,7 @@ filtering potential fog points.
 ## Works on German Highway
 
 There are often no speed limits on the German Highway. So it is not uncommon to see cars with velocities of 180 km/h or
-much higher. A latency of e.g. 200ms leads to positional errors of `(180 / 3.6) m/s * 0.2s = 10m`. This shows the need 
+much higher. A latency of e.g. 200ms leads to positional errors of `(180 / 3.6) m/s * 0.2s = 10m`. This shows the need
 to keep latencies at a minimum.
 
 [![Video GIF](https://user-images.githubusercontent.com/74038190/235294007-de441046-823e-4eff-89bf-d4df52858b65.gif)](https://www.youtube.com/watch?v=DZKuAQBngNE&t=98s)
@@ -134,12 +136,16 @@ our [Google Drive](https://drive.google.com/file/d/1zM4xPRahgxdJXJGHNXYUpM_g4-9U
 environment variable `ROSBAG_PATH` accordingly: `export ROSBAG_PATH=/parent/folder/of/rosbag`
 
 Available bags:
-- `gdown 1zM4xPRahgxdJXJGHNXYUpM_g4-9UrcwC` (3.9GB, [Manual Download](https://drive.google.com/file/d/1zM4xPRahgxdJXJGHNXYUpM_g4-9UrcwC/view?usp=sharing))
-  - Long recording in urban scenario (no camera to reduce file size, no Ouster sensors)
-- `gdown 1qjCG6-nWBZ_2wJwoP80jj0gGopBT2c23` (2.4GB, [Manual Download](https://drive.google.com/file/d/1qjCG6-nWBZ_2wJwoP80jj0gGopBT2c23/view?usp=sharing))
-  - Recording including Ouster 32 sensor data (blurred camera for privacy reasons)
-- `gdown 146IaBdEmkfBWdIgGV5HzrEYDTol84a1H` (0.7GB, [Manual Download](https://drive.google.com/file/d/146IaBdEmkfBWdIgGV5HzrEYDTol84a1H/view?usp=sharing))
-  - Short recording of German Highway (blurred camera for privacy reasons)
+
+- `gdown 1zM4xPRahgxdJXJGHNXYUpM_g4-9UrcwC` (
+  3.9GB, [Manual Download](https://drive.google.com/file/d/1zM4xPRahgxdJXJGHNXYUpM_g4-9UrcwC/view?usp=sharing))
+    - Long recording in urban scenario (no camera to reduce file size, no Ouster sensors)
+- `gdown 1qjCG6-nWBZ_2wJwoP80jj0gGopBT2c23` (
+  2.4GB, [Manual Download](https://drive.google.com/file/d/1qjCG6-nWBZ_2wJwoP80jj0gGopBT2c23/view?usp=sharing))
+    - Recording including Ouster 32 sensor data (blurred camera for privacy reasons)
+- `gdown 146IaBdEmkfBWdIgGV5HzrEYDTol84a1H` (
+  0.7GB, [Manual Download](https://drive.google.com/file/d/146IaBdEmkfBWdIgGV5HzrEYDTol84a1H/view?usp=sharing))
+    - Short recording of German Highway (blurred camera for privacy reasons)
 
 ## 2. Setup Environment
 
@@ -193,12 +199,12 @@ roslaunch continuous_clustering demo_touareg.launch bag_file:=${ROSBAG_PATH}/vw_
 ```
 
 > [!Tip]
-> For the latter launch file, you can use `--wait_for_tf:=false` (default: `true`) argument. It controls whether to wait 
-> for the transform from velodyne to fixed frame (e.g. odometry frame) with a timestamp larger than the one of the 
-> firing or whether to use the latest available (probably incorrect) transform. The former is the accurate approach 
-> (that's why it is the default) but the columns are published in larger batches/slices because they are accumulated 
-> between two transforms. The size of a slice depends on the update rate of the transform (i.e. transforms with 50Hz 
-> lead to batches/slices of 1/5 rotation for a LiDAR rotating with 10Hz). So for a nice visualization where the columns 
+> For the latter launch file, you can use `--wait_for_tf:=false` (default: `true`) argument. It controls whether to wait
+> for the transform from velodyne to fixed frame (e.g. odometry frame) with a timestamp larger than the one of the
+> firing or whether to use the latest available (probably incorrect) transform. The former is the accurate approach
+> (that's why it is the default) but the columns are published in larger batches/slices because they are accumulated
+> between two transforms. The size of a slice depends on the update rate of the transform (i.e. transforms with 50Hz
+> lead to batches/slices of 1/5 rotation for a LiDAR rotating with 10Hz). So for a nice visualization where the columns
 > are published one by one like it the GIF at the top of the page you should disable this flag.
 
 # Evaluation on SemanticKITTI Dataset
@@ -280,8 +286,8 @@ rosrun continuous_clustering gt_label_generator_tool ${KITTI_SEQUENCES_PATH} --n
 ```
 
 > [!TIP]
-> If you want to visualize the generated ground truth labels in an online fashion then remove the `--no-ros` flag and 
-> use just one thread (default). You can then subscribe to the corresponding topic in Rviz and visualize the point 
+> If you want to visualize the generated ground truth labels in an online fashion then remove the `--no-ros` flag and
+> use just one thread (default). You can then subscribe to the corresponding topic in Rviz and visualize the point
 > labels.
 
 ### 2.3. Option: Generate without GUI or ROS within Minimal Docker Container
@@ -326,10 +332,6 @@ docker run --rm -v ${KITTI_SEQUENCES_PATH}:/mnt/kitti_sequences --name build_no_
 docker stop build_no_ros
 ```
 
-# Tips for Rviz Visualization
-
-TODO
-
 # Info about our LiDAR Drivers
 
 Our clustering algorithm is able to process the UDP packets from the LiDAR sensor. So the firings can be processed
@@ -337,7 +339,7 @@ immediately. We directly process the raw UDP packets from the corresponding sens
 manufacturer/sensor specific. Luckily, we can use external libraries, so it is not necessary reimplement the decoding
 part (UDP Packet -> Euclidean Point Positions). Currently, we support following sensor manufacturers:
 
-## Velodyne
+## 1. Velodyne
 
 - Tested Sensors: VLS 128
 - All other rotating Velodyne LiDARs should work, too
@@ -367,7 +369,7 @@ part (UDP Packet -> Euclidean Point Positions). Currently, we support following 
   from [ros-drivers/velodyne](https://github.com/ros-drivers/velodyne) to decode packets to euclidean points
     - See source code at: [velodyne_input.hpp](include/continuous_clustering/ros/velodyne_input.hpp)
 
-## Ouster
+## 2. Ouster
 
 - Tested Sensors: OS 32
 - All other rotating Ouster LiDARs should work, too
@@ -379,7 +381,15 @@ part (UDP Packet -> Euclidean Point Positions). Currently, we support following 
   from [ouster-lidar/ouster-ros](https://github.com/ouster-lidar/ouster-ros) to decode packets to euclidean points
     - See source code at: [ouster_input.hpp](include/continuous_clustering/ros/ouster_input.hpp)
 
-## TODOs
+## 3. Generic Points
+
+Alternatively, you can also launch the clustering with parameter `sensor_manufacturer:="generic_points"`. Then it
+subscribes to `<namespace>/raw_data` topic and expects `sensor_msgs::PointCloud2` messages, which should represent one
+firing. It has to be an organized point cloud with `width=1` and `height=<number-of-lasers>`. Required point fields are
+`x`, `y`, `z` (w.r.t. sensor origin), and `intensity`. Missing returns should be represented by `NaN`.
+See [launch/sensor_kitti.launch](launch/sensor_kitti.launch) for such an example.
+
+# TODOs
 
 - Port it to ROS2: planned soon
 - Add features:
