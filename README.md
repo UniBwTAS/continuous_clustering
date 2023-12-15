@@ -165,13 +165,14 @@ roslaunch continuous_clustering demo_kitti_folder.launch path:=${KITTI_SEQUENCES
 roslaunch continuous_clustering demo_touareg.launch bag_file:=${ROSBAG_PATH}/vw_touareg_example1.bag
 ```
 
-**Note:** For the latter launch file, you can use `--wait_for_tf:=false` (default: `true`) argument. It controls whether
-to wait for the transform from velodyne to fixed frame (e.g. odometry frame) with a timestamp larger than the one of the
-firing or whether to use the latest available (probably incorrect) transform. The former is the accurate approach
-(that's why it is the default) but the columns are published in larger batches/slices because they are accumulated
-between two transforms. The size of a slice depends on the update rate of the transform (i.e. transforms with 50Hz lead
-to batches/slices of 1/5 rotation for a LiDAR rotating with 10Hz). So for a nice visualization where the columns are
-published one by one like it the GIF at the top of the page you should disable this flag.
+> [!Tip]
+> For the latter launch file, you can use `--wait_for_tf:=false` (default: `true`) argument. It controls whether to wait 
+> for the transform from velodyne to fixed frame (e.g. odometry frame) with a timestamp larger than the one of the 
+> firing or whether to use the latest available (probably incorrect) transform. The former is the accurate approach 
+> (that's why it is the default) but the columns are published in larger batches/slices because they are accumulated 
+> between two transforms. The size of a slice depends on the update rate of the transform (i.e. transforms with 50Hz 
+> lead to batches/slices of 1/5 rotation for a LiDAR rotating with 10Hz). So for a nice visualization where the columns 
+> are published one by one like it the GIF at the top of the page you should disable this flag.
 
 # Evaluation on SemanticKITTI Dataset
 
@@ -230,7 +231,7 @@ Semantic Kitti Labels and using a euclidean distance-based clustering.
 See [Issue](https://github.com/url-kaist/TRAVEL/issues/6) in TRAVEL GitHub repository
 and [src/evaluation/kitti_evaluation.cpp](src/evaluation/kitti_evaluation.cpp) for more details.
 
-### Option 1: Download pre-generated labels
+### Option 1: Download pre-generated labels (fastest)
 
 ```bash
 cd /tmp
@@ -246,12 +247,14 @@ the correct location (in parent directory of `dataset` folder).
 ### Option 2: Generate with GUI & ROS setup (assumes prepared ROS setup, see above, useful for debugging etc.)
 
 Generate labels, which are saved to `${KITTI_SEQUENCES_PATH}/<sequence>/labels_euclidean_clustering/`
-If you want to visualize the generated ground truth labels in ROS then remove the `--no-ros` flag and use just one
-thread (default).
 
 ```bash
 rosrun continuous_clustering gt_label_generator_tool ${KITTI_SEQUENCES_PATH} --no-ros --num-threads 8
 ```
+
+> [!TIP]
+> If you want to visualize the generated ground truth labels in ROS then remove the `--no-ros` flag and use just one
+thread (default).
 
 ### Option 3: Generate without GUI or ROS within Minimal Docker Container
 
