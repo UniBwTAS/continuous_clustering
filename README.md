@@ -1,13 +1,12 @@
-## Low Latency Instance Segmentation by Continuous Clustering for Rotating LiDAR Sensors
+# Low Latency Instance Segmentation by Continuous Clustering for Rotating LiDAR Sensors
 
 [![Basic Build Workflow](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/basic-build-ci.yaml/badge.svg?branch=master)](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/basic-build-ci.yaml)
 [![Publish Docker image](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/publish-docker-image.yaml/badge.svg)](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/publish-docker-image.yaml)
+[![arXiv](https://img.shields.io/badge/arXiv-2311.13976-b31b1b.svg)](https://arxiv.org/abs/2311.13976)
 
-[![forthebadge](https://forthebadge.com/images/badges/made-with-c-plus-plus.svg)](https://forthebadge.com)
+![Continuous Clustering Demo](https://github.com/UniBwTAS/continuous_clustering/blob/master/assets/demo.gif)
 
-![](https://github.com/UniBwTAS/continuous_clustering/blob/master/assets/demo.gif)
-
-### Abstract:
+## Abstract:
 
 Low-latency instance segmentation of LiDAR point clouds is crucial in real-world applications because it serves as an
 initial and frequently-used building block in a robot's perception pipeline, where every task adds further delay.
@@ -23,7 +22,7 @@ incoming data in real time. We explain the importance of a large perceptive fiel
 evaluate important architectural design choices, which could be relevant to design an architecture for deep learning
 based low-latency instance segmentation.
 
-### If you find our work useful in your research please consider citing our paper:
+## If you find our work useful in your research please consider citing our paper:
 
 ```
 @misc{reich2023low,
@@ -38,40 +37,40 @@ based low-latency instance segmentation.
 
 Get PDF [here](https://arxiv.org/abs/2311.13976).
 
-### Acknowledgement
+## Acknowledgement
 
 The authors gratefully acknowledge funding by the Federal Office of Bundeswehr Equipment, Information Technology and In-Service Support (BAAINBw).
 
-## Examples:
+# Examples:
 
-### Works with uncommon mounting positions
+## Works with uncommon mounting positions
 
 We mounted two Ouster OS 32 at a tilted angle in order to get rid of the blind spots of our main LiDAR sensor. Our
 clustering also works with these mounting positions. The main challenge here is the ground point segmentation not the
 clustering. It works ok, but we hope to improve it in the future.
 
-![](https://github.com/UniBwTAS/continuous_clustering/blob/master/assets/demo_ouster.gif)
+![Clustering with Ouster sensor](https://github.com/UniBwTAS/continuous_clustering/blob/master/assets/demo_ouster.gif)
 
-### Works with Fog
+## Works with Fog
 
 There are many clutter points and the camera image is almost useless. But the clustering still works quite well after
 filtering potential fog points.
 
-![](https://github.com/UniBwTAS/continuous_clustering/blob/master/assets/demo_fog.gif)
+![Clustering with clutter points from fog](https://github.com/UniBwTAS/continuous_clustering/blob/master/assets/demo_fog.gif)
 
-### Works on German Highway
+## Works on German Highway
 
 There are often no speed limits on the German Highway. So it is not uncommon to see cars with velocities of 180 km/h or
 much higher. A latency of e.g. 200ms leads to positional errors of `(180 / 3.6) m/s * 0.2s = 10m`. This shows the need 
 to keep latencies at a minimum.
 
-[![IMAGE ALT TEXT HERE](https://user-images.githubusercontent.com/74038190/235294007-de441046-823e-4eff-89bf-d4df52858b65.gif)](https://www.youtube.com/watch?v=DZKuAQBngNE&t=98s)
+[![Video GIF](https://user-images.githubusercontent.com/74038190/235294007-de441046-823e-4eff-89bf-d4df52858b65.gif)](https://www.youtube.com/watch?v=DZKuAQBngNE&t=98s)
 
-## Run it yourself:
+# Run it yourself:
 
-### Download Sensor Data
+## Download Sensor Data
 
-#### SemanticKitti
+### SemanticKitti
 
 We use the same folder structure as the SemanticKitti dataset:
 
@@ -93,7 +92,7 @@ curl -s https://raw.githubusercontent.com/UniBwTAS/continuous_clustering/master/
 export KITTI_SEQUENCES_PATH="$(pwd)/kitti_odometry/dataset/sequences"
 ```
 
-#### Rosbag of our test vehicle VW Touareg
+### Rosbag of our test vehicle VW Touareg
 
 Download the rosbag:
 
@@ -105,11 +104,8 @@ export ROSBAG_PATH=$(pwd)
 
 Alternatively download it manually from
 our [Google Drive](https://drive.google.com/file/d/1zM4xPRahgxdJXJGHNXYUpM_g4-9UrcwC/view?usp=sharing) and set the
-environment variable `ROSBAG_PATH` to download folder:
+environment variable `ROSBAG_PATH` accordingly: `export ROSBAG_PATH=/parent/folder/of/rosbag`
 
-```bash
-export ROSBAG_PATH=/download/folder/of/rosbag/file
-```
 Available bags:
 - `gdown 1zM4xPRahgxdJXJGHNXYUpM_g4-9UrcwC` (3.9GB, [Manual Download](https://drive.google.com/file/d/1zM4xPRahgxdJXJGHNXYUpM_g4-9UrcwC/view?usp=sharing))
   - Long recording in urban scenario (no camera to reduce file size, no Ouster sensors)
@@ -118,9 +114,9 @@ Available bags:
 - `gdown 146IaBdEmkfBWdIgGV5HzrEYDTol84a1H` (0.7GB, [Manual Download](https://drive.google.com/file/d/146IaBdEmkfBWdIgGV5HzrEYDTol84a1H/view?usp=sharing))
   - Short recording of German Highway (blurred camera for privacy reasons)
 
-### Setup Environment
+## Setup Environment
 
-#### Option 1: Docker + GUI (VNC):
+### Option 1: Docker + GUI (VNC):
 
 This option is the fastest to set up. However, due to missing hardware acceleration in the VNC Docker container for RVIZ
 the rosbag is played at 1/10 speed.
@@ -138,7 +134,7 @@ docker run -d -p 6080:80 -v /dev/shm:/dev/shm -v ${KITTI_SEQUENCES_PATH}:/mnt/ki
 6. Continue with step "Run Continuous Clustering" (see below) in the terminal opened in step 2. (There you can use the
    clipboard feature of noVNC; tiny arrow on the left of the screen)
 
-#### Option 2: Locally on Ubuntu 20.04 (Focal) and ROS Noetic
+### Option 2: Locally on Ubuntu 20.04 (Focal) and ROS Noetic
 
 ```bash
 # install ROS (if not already installed)
@@ -158,7 +154,7 @@ bash /tmp/clone_repositories_and_install_dependencies.sh
 catkin build
 ```
 
-### Run Continuous Clustering
+## Run Continuous Clustering
 
 ```bash
 # run on kitti odometry dataset
@@ -177,7 +173,7 @@ between two transforms. The size of a slice depends on the update rate of the tr
 to batches/slices of 1/5 rotation for a LiDAR rotating with 10Hz). So for a nice visualization where the columns are
 published one by one like it the GIF at the top of the page you should disable this flag.
 
-## Evaluation on SemanticKITTI Dataset
+# Evaluation on SemanticKITTI Dataset
 
 We evaluate our clustering algorithm with the same metrics as described in the paper _TRAVEL: Traversable Ground and
 Above-Ground Object Segmentation Using Graph Representation of 3D LiDAR
@@ -186,12 +182,12 @@ Scans_ ([arXiv](https://arxiv.org/abs/2206.03190), [GitHub](https://github.com/u
 Under-Segmentation Entropy (USE) for clustering performance and precision / recall / accuracy / F1-Score for ground
 point segmentation.
 
-### Results
+## Results
 
 The following results were obtained at Commit
 SHA [fa3c53b](https://github.com/UniBwTAS/continuous_clustering/commit/fa3c53bab51975b06ae5ec3a9e56567729149e4f)
 
-#### Clustering
+### Clustering
 
 | Sequence | USE &mu; &darr; / &sigma; &darr; | OSE &mu; &darr; / &sigma; &darr; |
 | :---: | :---: | :---: |
@@ -209,7 +205,7 @@ SHA [fa3c53b](https://github.com/UniBwTAS/continuous_clustering/commit/fa3c53bab
 | 9 | 18.45 / 6.25 | 39.62 / 11.86 |
 | 10 | 20.10 / 8.70 | 34.33 / 12.37 |
 
-#### Ground Point Segmentation:
+### Ground Point Segmentation:
 
 | Sequence | Recall &mu; &uarr; / &sigma; &darr; | Precision &mu; &uarr; / &sigma; &darr; | F1-Score &mu; &uarr; / &sigma; &darr; | Accuracy &mu; &uarr; / &sigma; &darr; |
 | :---: | :---: | :---: | :---: | :---: |
@@ -227,14 +223,14 @@ SHA [fa3c53b](https://github.com/UniBwTAS/continuous_clustering/commit/fa3c53bab
 | 9 | 95.31 / 4.03 | 88.22 / 5.70 | 91.45 / 3.37 | 91.74 / 3.20 |
 | 10 | 91.62 / 6.79 | 85.76 / 7.22 | 88.33 / 5.45 | 91.83 / 3.63 |
 
-### Download/Generate Ground Truth Data
+## Download/Generate Ground Truth Data
 
 In order to evaluate OSE and USE for clustering performance additional labels are required, which are generated from the
 Semantic Kitti Labels and using a euclidean distance-based clustering.
 See [Issue](https://github.com/url-kaist/TRAVEL/issues/6) in TRAVEL GitHub repository
 and [src/evaluation/kitti_evaluation.cpp](src/evaluation/kitti_evaluation.cpp) for more details.
 
-#### Option 1: Download pre-generated labels
+### Option 1: Download pre-generated labels
 
 ```bash
 cd /tmp
@@ -247,7 +243,7 @@ Alternatively download it manually from
 our [Google Drive](https://drive.google.com/file/d/1MOfLbUQcwRMLhRca0bxJMLVriU3G8Tg3/view?usp=sharing) and unzip it to
 the correct location (in parent directory of `dataset` folder).
 
-#### Option 2: Generate with GUI & ROS setup (assumes prepared ROS setup, see above, useful for debugging etc.)
+### Option 2: Generate with GUI & ROS setup (assumes prepared ROS setup, see above, useful for debugging etc.)
 
 Generate labels, which are saved to `${KITTI_SEQUENCES_PATH}/<sequence>/labels_euclidean_clustering/`
 If you want to visualize the generated ground truth labels in ROS then remove the `--no-ros` flag and use just one
@@ -257,7 +253,7 @@ thread (default).
 rosrun continuous_clustering gt_label_generator_tool ${KITTI_SEQUENCES_PATH} --no-ros --num-threads 8
 ```
 
-#### Option 3: Generate without GUI or ROS within Minimal Docker Container
+### Option 3: Generate without GUI or ROS within Minimal Docker Container
 
 ```bash
 # build docker image
@@ -272,9 +268,9 @@ docker run --rm -v ${KITTI_SEQUENCES_PATH}:/mnt/kitti_sequences --name build_no_
 docker stop build_no_ros
 ```
 
-### Run Evaluation
+## Run Evaluation
 
-#### Option 1: Evaluate with GUI & ROS setup (assumes prepared ROS setup, see above, useful for debugging)
+### Option 1: Evaluate with GUI & ROS setup (assumes prepared ROS setup, see above, useful for debugging)
 
 ```bash
 # run evaluation slowly with visual output
@@ -285,7 +281,7 @@ roslaunch continuous_clustering demo_kitti_folder.launch path:=${KITTI_SEQUENCES
 roslaunch continuous_clustering demo_kitti_folder.launch path:=${KITTI_SEQUENCES_PATH} evaluate-fast:=true
 ```
 
-#### Option 2: Evaluate without GUI or ROS within Minimal Docker Container
+### Option 2: Evaluate without GUI or ROS within Minimal Docker Container
 
 ```bash
 # build docker image (if not already done)
@@ -299,18 +295,18 @@ docker run --rm -v ${KITTI_SEQUENCES_PATH}:/mnt/kitti_sequences --name build_no_
 docker stop build_no_ros
 ```
 
-## Tips for Rviz Visualization:
+# Tips for Rviz Visualization:
 
 TODO
 
-## Info about our LiDAR Drivers
+# Info about our LiDAR Drivers
 
 Our clustering algorithm is able to process the UDP packets from the LiDAR sensor. So the firings can be processed
 immediately. We directly process the raw UDP packets from the corresponding sensor, which makes the input
 manufacturer/sensor specific. Luckily, we can use external libraries, so it is not necessary reimplement the decoding
 part (UDP Packet -> Euclidean Point Positions). Currently, we support following sensor manufacturers:
 
-### Velodyne
+## Velodyne
 
 - Tested Sensors: VLS 128
 - All other rotating Velodyne LiDARs should work, too
@@ -340,7 +336,7 @@ part (UDP Packet -> Euclidean Point Positions). Currently, we support following 
   from [ros-drivers/velodyne](https://github.com/ros-drivers/velodyne) to decode packets to euclidean points
     - See source code at: [velodyne_input.hpp](include/continuous_clustering/ros/velodyne_input.hpp)
 
-### Ouster
+## Ouster
 
 - Tested Sensors: OS 32
 - All other rotating Ouster LiDARs should work, too
