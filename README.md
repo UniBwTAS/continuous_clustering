@@ -36,6 +36,33 @@ based low-latency instance segmentation.
 
 Get PDF [here](https://arxiv.org/abs/2311.13976).
 
+### Acknowledgement
+
+The authors gratefully acknowledge funding by the Federal Office of Bundeswehr Equipment, Information Technology and In-Service Support (BAAINBw).
+
+## Examples:
+
+### Works with uncommon mounting positions
+
+We mounted two Ouster OS 32 at a tilted angle in order to get rid of the blind spots of our main LiDAR sensor. Our
+clustering also works with these mounting positions. The main challenge here is the ground point segmentation not the
+clustering. It works ok, but we hope to improve it in the future.
+![](https://github.com/UniBwTAS/continuous_clustering/blob/master/assets/demo_ouster.gif)
+
+### Works with Fog
+
+There are many clutter points and the camera image is almost useless. But the clustering still works quite well after
+filtering potential fog points.
+![](https://github.com/UniBwTAS/continuous_clustering/blob/master/assets/demo_fog.gif)
+
+### Works on German Highway
+
+There are often no speed limits on the German Highway. So it is not uncommon to see cars with velocities of 180 km/h or
+much higher. A latency of e.g. 200ms leads to positional errors of `(180 / 3.6) m/s * 0.2s = 10m`. This shows the need 
+to keep latencies at a minimum.
+
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/DZKuAQBngNE/0.jpg)](https://www.youtube.com/watch?v=DZKuAQBngNE&t=98s)
+
 ## Run it yourself:
 
 ### Download Sensor Data
@@ -79,6 +106,13 @@ environment variable `ROSBAG_PATH` to download folder:
 ```bash
 export ROSBAG_PATH=/download/folder/of/rosbag/file
 ```
+Available bags:
+- `gdown 1zM4xPRahgxdJXJGHNXYUpM_g4-9UrcwC` (3.9GB, [Manual Download](https://drive.google.com/file/d/1zM4xPRahgxdJXJGHNXYUpM_g4-9UrcwC/view?usp=sharing))
+  - Long recording in urban scenario (no for small file size, no Ouster sensors)
+- `gdown 1qjCG6-nWBZ_2wJwoP80jj0gGopBT2c23` (2.4GB, [Manual Download](https://drive.google.com/file/d/1qjCG6-nWBZ_2wJwoP80jj0gGopBT2c23/view?usp=sharing))
+  - Recording including Ouster 32 sensor data (blurred camera for privacy reasons)
+- `gdown 146IaBdEmkfBWdIgGV5HzrEYDTol84a1H` (0.7GB, [Manual Download](https://drive.google.com/file/d/146IaBdEmkfBWdIgGV5HzrEYDTol84a1H/view?usp=sharing))
+  - Short recording of German Highway (blurred camera for privacy reasons)
 
 ### Setup Environment
 
@@ -133,7 +167,7 @@ roslaunch continuous_clustering demo_touareg.launch bag_file:=${ROSBAG_PATH}/vw_
 
 **Note:** For the latter launch file, you can use `--wait_for_tf:=false` (default: `true`) argument. It controls whether
 to wait for the transform from velodyne to fixed frame (e.g. odometry frame) with a timestamp larger than the one of the
-firing or whether to use the latest available (probably incorrect) transform. The former is the accurate approach 
+firing or whether to use the latest available (probably incorrect) transform. The former is the accurate approach
 (that's why it is the default) but the columns are published in larger batches/slices because they are accumulated
 between two transforms. The size of a slice depends on the update rate of the transform (i.e. transforms with 50Hz lead
 to batches/slices of 1/5 rotation for a LiDAR rotating with 10Hz). So for a nice visualization where the columns are
