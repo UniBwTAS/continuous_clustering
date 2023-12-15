@@ -585,7 +585,7 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
         }
 
         // ignore this point if it is too close
-        if (point.distance < 1.5 * config_.clustering.max_distance)
+        if (point.distance < 1. * config_.clustering.max_distance)
         {
             point.is_ignored = true;
             continue;
