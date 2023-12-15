@@ -41,6 +41,33 @@ Get PDF [here](https://arxiv.org/abs/2311.13976).
 
 The authors gratefully acknowledge funding by the Federal Office of Bundeswehr Equipment, Information Technology and In-Service Support (BAAINBw).
 
+## Overview
+- [Examples](#examples)
+- [Run it yourself](#run-it-yourself)
+    - [1. Download Sensor Data](#1-download-sensor-data)
+      - [1.1. SemanticKitti](#11-semantickitti)
+      - [1.2. Rosbag of our test vehicle VW Touareg](#12-rosbag-of-our-test-vehicle-vw-touareg)
+    - [2. Setup Environment](#2-setup-environment)
+      - [2.1. Option: Docker + GUI (VNC)](#21-option-docker--gui-vnc)
+      - [2.2. Option: Locally on Ubuntu 20.04 (Focal) and ROS Noetic](#22-option-locally-on-ubuntu-2004-focal-and-ros-noetic)
+    - [3. Run Continuous Clustering](#3-run-continuous-clustering)
+- [Evaluation on SemanticKITTI Dataset](#evaluation-on-semantickitti-dataset)
+  - [1. Evaluation Results](#1-evaluation-results)
+    - [1.1. Clustering](#11-clustering)
+    - [1.2. Ground Point Segmentation](#12-ground-point-segmentation)
+  - [2. Get Ground Truth Labels](#2-get-ground-truth-labels)
+    - [2.1. Option: Download pre-generated labels](#21-option-download-pre-generated-labels-fastest)
+    - [2.2. Option: Generate with GUI & ROS setup](#22-option-generate-with-gui--ros-setup-assumes-prepared-ros-setup-see-above-useful-for-debugging-etc)
+    - [2.3. Option: Generate without GUI or ROS within Minimal Docker Container](#23-option-generate-without-gui-or-ros-within-minimal-docker-container)
+  - [3. Run Evaluation](#3-run-evaluation)
+    - [3.1. Option: Evaluate with GUI & ROS setup](#31-option-evaluate-with-gui--ros-setup-assumes-prepared-ros-setup-useful-for-debugging)
+    - [3.2. Option: Evaluate without GUI or ROS within Minimal Docker Container](#32-option-evaluate-without-gui-or-ros-within-minimal-docker-container)
+- [Info about our LiDAR Drivers](#info-about-our-lidar-drivers)
+  - [Velodyne](#velodyne)
+  - [Ouster](#ouster)
+- [Tips for Rviz Visualization](#tips-for-rviz-visualization)
+- [TODOs](#todos)
+
 # Examples:
 
 ## Works with uncommon mounting positions
@@ -116,7 +143,7 @@ Available bags:
 
 ## 2. Setup Environment
 
-### 2.1. Option: Docker + GUI (VNC):
+### 2.1. Option: Docker + GUI (VNC)
 
 This option is the fastest to set up. However, due to missing hardware acceleration in the VNC Docker container for RVIZ
 the rosbag is played at 1/10 speed.
@@ -206,7 +233,7 @@ point segmentation.
 | 9 | 18.45 / 6.25 | 39.62 / 11.86 |
 | 10 | 20.10 / 8.70 | 34.33 / 12.37 |
 
-### 1.2. Ground Point Segmentation:
+### 1.2. Ground Point Segmentation
 
 | Sequence | Recall &mu; &uarr; / &sigma; &darr; | Precision &mu; &uarr; / &sigma; &darr; | F1-Score &mu; &uarr; / &sigma; &darr; | Accuracy &mu; &uarr; / &sigma; &darr; |
 | :---: | :---: | :---: | :---: | :---: |
@@ -299,7 +326,7 @@ docker run --rm -v ${KITTI_SEQUENCES_PATH}:/mnt/kitti_sequences --name build_no_
 docker stop build_no_ros
 ```
 
-# Tips for Rviz Visualization:
+# Tips for Rviz Visualization
 
 TODO
 
