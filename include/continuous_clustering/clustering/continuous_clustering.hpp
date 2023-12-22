@@ -130,9 +130,6 @@ struct Point
     uint8_t ground_point_label{0};
     float height_over_ground{std::nanf("")};
     uint8_t debug_ground_point_label{WHITE};
-    std::shared_ptr<int64_t> pointer_to_global_column_index_of_next_ground_point{};
-    int local_column_index_of_left_ground_neighbor{0};
-    int local_column_index_of_right_ground_neighbor{0};
 
     // clustering
     bool is_ignored{false};

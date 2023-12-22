@@ -1056,11 +1056,6 @@ void ContinuousClustering::clearColumns(int64_t from_global_column_index, int64_
             point.ground_point_label = GP_UNKNOWN;
             point.height_over_ground = std::nanf("");
             point.debug_ground_point_label = WHITE;
-            // can be cleared because we ensure that at least one rotation is still available when
-            // calculating the column range to clear
-            // point.pointer_to_global_column_index_of_next_ground_point.reset();
-            point.local_column_index_of_left_ground_neighbor = 0;
-            point.local_column_index_of_right_ground_neighbor = 0;
 
             // clear clustering
             point.is_ignored = false;
