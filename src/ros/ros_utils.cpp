@@ -288,9 +288,8 @@ void addPointToMessage(PointCloud2Iterators& container,
     *(*container.iter_tree_root_column_index + data_index_message) =
         static_cast<double>(point.tree_root_.column_index); // (*)
     *(*container.iter_number_of_visited_neighbors + data_index_message) = point.number_of_visited_neighbors;
-    *(*container.iter_tree_id + data_index_message) =
-        static_cast<double>(point.tree_root_.column_index * num_rows + point.tree_root_.row_index); // (*)
-    *(*container.iter_id + data_index_message) = static_cast<double>(point.id);                     // (*)
+    *(*container.iter_tree_id + data_index_message) = static_cast<double>(point.tree_id); // (*)
+    *(*container.iter_id + data_index_message) = static_cast<double>(point.id);           // (*)
 }
 
 void addRawPointToMessage(PointCloud2Iterators& container, int data_index_message, const RawPoint& point)

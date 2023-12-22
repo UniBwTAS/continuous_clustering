@@ -139,6 +139,8 @@ struct Point
     std::set<RangeImageIndex> associated_trees{};
     RangeImageIndex tree_root_{0, -1};
     uint32_t tree_num_points{0};
+    uint32_t cluster_width{0};
+    uint64_t tree_id{0};
     uint64_t id{0};
     double visited_at_continuous_azimuth_angle{-1.};
     bool belongs_to_finished_cluster{false};

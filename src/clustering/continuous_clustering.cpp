@@ -723,17 +723,26 @@ void ContinuousClustering::associatePointsInColumn(AssociationJob&& job)
                     {
                         if (point.tree_root_.column_index == -1)
                         {
-                            // this point is not associated to any tree -> associate it
-                            point.tree_root_ = point_other.tree_root_;
-                            point_other.child_points.push_back(index);
-
-                            // new point was associated to tree -> check if finish time will be delayed
+                            // this point is not associated to any tree -> associate it if the resulting cluster will be
+                            // not wider than one full rotation
                             Point& point_root = range_image_[point_other.tree_root_.column_index * num_rows_ +
                                                              point_other.tree_root_.row_index];
-                            point_root.finished_at_continuous_azimuth_angle =
-                                std::max(point_root.finished_at_continuous_azimuth_angle,
-                                         point.continuous_azimuth_angle + max_angle_diff);
-                            point_root.tree_num_points++;
+                            uint32_t new_cluster_width = point.global_column_index - point_root.global_column_index;
+                            if (new_cluster_width < num_columns_)
+                            {
+                                point.tree_root_ = point_other.tree_root_;
+                                point.tree_id = point_root.global_column_index * num_rows_ + point_root.row_index;
+                                point_other.child_points.push_back(index);
+
+                                // keep track of cluster width
+                                point_root.cluster_width = new_cluster_width;
+
+                                // new point was associated to tree -> check if finish time will be delayed
+                                point_root.finished_at_continuous_azimuth_angle =
+                                    std::max(point_root.finished_at_continuous_azimuth_angle,
+                                             point.continuous_azimuth_angle + max_angle_diff);
+                                point_root.tree_num_points++;
+                            }
                         }
                         else
                         {
@@ -787,9 +796,11 @@ void ContinuousClustering::associatePointsInColumn(AssociationJob&& job)
         {
             // this point could not be associated to any tree -> init new tree
             point.tree_root_ = index;
+            point.tree_id = point.global_column_index * num_rows_ + point.row_index;
 
             // calculate finish time (will be increased when new points are associated to tree)
             point.finished_at_continuous_azimuth_angle = point.continuous_azimuth_angle + max_angle_diff;
+            point.cluster_width = 1;
 
             // new tree has 1 point
             point.tree_num_points = 1;
@@ -1065,6 +1076,8 @@ void ContinuousClustering::clearColumns(int64_t from_global_column_index, int64_
             point.tree_root_.row_index = 0;
             point.tree_root_.column_index = -1;
             point.tree_num_points = 0;
+            point.cluster_width = 0;
+            point.tree_id = 0;
             point.id = 0;
             point.visited_at_continuous_azimuth_angle = -1.;
             point.belongs_to_finished_cluster = false;
