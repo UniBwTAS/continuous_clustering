@@ -723,12 +723,22 @@ void ContinuousClustering::associatePointsInColumn(AssociationJob&& job)
                     {
                         if (point.tree_root_.column_index == -1)
                         {
-                            // this point is not associated to any tree -> associate it if the resulting cluster will be
-                            // not wider than one full rotation
+                            // this point is not associated to any point tree -> associate it
+
+                            // Furthermore, we also have to check that clusters are forcibly published when they span a
+                            // full rotation. For this we take two measures: (1) don't associate this point to the point
+                            // tree when it would cover more than one rotation; (2) don't associate this point to the
+                            // point tree, when its cluster is considered to be finished. Normally, the latter can not
+                            // happen because a cluster is only considered to be finished when no more point can be
+                            // associated (LiDAR rotated far enough away from a cluster's point trees). It can only
+                            // happen when a cluster is forcibly considered to be finished because it already spans a
+                            // full rotation. Then we do not want to associate more points to it.
                             Point& point_root = range_image_[point_other.tree_root_.column_index * num_rows_ +
                                                              point_other.tree_root_.row_index];
-                            uint32_t new_cluster_width = point.global_column_index - point_root.global_column_index;
-                            if (new_cluster_width < num_columns_)
+                            uint32_t new_cluster_width = point.global_column_index - point_root.global_column_index + 1;
+                            bool point_tree_is_smaller_than_one_rotation = new_cluster_width <= num_columns_; // (1)
+                            bool point_tree_is_finished_forcibly = point_root.belongs_to_finished_cluster;    // (2)
+                            if (point_tree_is_smaller_than_one_rotation && !point_tree_is_finished_forcibly)
                             {
                                 point.tree_root_ = point_other.tree_root_;
                                 point.tree_id = point_root.global_column_index * num_rows_ + point_root.row_index;
@@ -755,9 +765,17 @@ void ContinuousClustering::associatePointsInColumn(AssociationJob&& job)
                             Point& point_root_other = range_image_[point_other.tree_root_.column_index * num_rows_ +
                                                                    point_other.tree_root_.row_index];
 
-                            // add mutual link
-                            point_root.associated_trees.insert(point_other.tree_root_);
-                            point_root_other.associated_trees.insert(point.tree_root_);
+                            // similar to above (unassociated point is added to point tree) we also don't want to
+                            // introduce links between point trees when either of them was forcibly finished because its
+                            // corresponding cluster already covers a full rotation
+                            bool neither_cluster_was_forcibly_finished = !point_root.belongs_to_finished_cluster &&
+                                                                         !point_root_other.belongs_to_finished_cluster;
+                            if (neither_cluster_was_forcibly_finished)
+                            {
+                                // add mutual link
+                                point_root.associated_trees.insert(point_other.tree_root_);
+                                point_root_other.associated_trees.insert(point.tree_root_);
+                            }
                         }
                     }
 
@@ -825,16 +843,20 @@ void ContinuousClustering::findFinishedTreesAndAssignSameId(TreeCombinationJob&&
     std::list<std::list<RangeImageIndex>> trees_per_finished_cluster;
     std::list<uint64_t> finished_cluster_ids;
 
+    // run breath-first search (BFS) on each unpublished point tree. If a BFS from a specific starting node completes
+    // without finding an unfinished point tree, then these point trees form a finished cluster.
     std::list<RangeImageIndex> trees_collected_for_current_cluster;
     std::list<RangeImageIndex> trees_to_visit_for_current_cluster;
     for (RangeImageIndex& tree_root_index : sc_unfinished_point_trees_)
     {
         Point& point_root = range_image_[tree_root_index.column_index * num_rows_ + tree_root_index.row_index];
         if (point_root.visited_at_continuous_azimuth_angle == job.current_minimum_continuous_azimuth_angle)
-            continue; // this tree was already visited
+            continue; // this point tree was already visited, no need to use it as start node for BFS
         trees_collected_for_current_cluster.clear();
         trees_to_visit_for_current_cluster.clear();
         trees_to_visit_for_current_cluster.emplace_back(tree_root_index);
+        int64_t min_column_index = std::numeric_limits<int64_t>::max();
+        int64_t max_column_index = 0;
         uint32_t cluster_num_points = 0;
         bool cluster_has_at_least_one_unfinished_tree = false;
         while (!trees_to_visit_for_current_cluster.empty())
@@ -843,12 +865,34 @@ void ContinuousClustering::findFinishedTreesAndAssignSameId(TreeCombinationJob&&
             trees_to_visit_for_current_cluster.pop_front();
             Point& cur_point_root =
                 range_image_[cur_tree_root_index.column_index * num_rows_ + cur_tree_root_index.row_index];
+
+            // The following condition is always false under normal circumstances. It can only be true when a cluster in
+            // the current graph was forcibly finished (exceeds full rotation) and when there was a race condition with
+            // the association. In this case we simply ignore that a link between current point tree and the previous
+            // (forcibly finished) point tree was found
+            if (cur_point_root.belongs_to_finished_cluster)
+                continue;
+
+            // keep track of the column range occupied by this cluster (to detect clusters larger than a full
+            // rotation)
+            min_column_index = std::min(min_column_index, cur_point_root.global_column_index);
+            max_column_index =
+                std::max(max_column_index, cur_point_root.global_column_index + cur_point_root.cluster_width);
+
+            // check if cluster is finished because LiDAR rotated far enough away
             if (cur_point_root.finished_at_continuous_azimuth_angle > job.current_minimum_continuous_azimuth_angle)
                 cluster_has_at_least_one_unfinished_tree = true;
+
+            // check if this point tree was already visited. This can happen because the undirected graph (where each
+            // node represents a point tree) is traversed by breath-first search.
             if (cur_point_root.visited_at_continuous_azimuth_angle == job.current_minimum_continuous_azimuth_angle)
-                continue; // cluster was already visited
-            // cur_point_root.id = cluster_counter_;
+                continue;
+
+            // mark that this node (point tree) was already traversed. Instead of a boolean flag we use a monotonically
+            // rising value that does not need to be cleared
             cur_point_root.visited_at_continuous_azimuth_angle = job.current_minimum_continuous_azimuth_angle;
+
+            // add this point tree to the current cluster
             trees_collected_for_current_cluster.push_back(cur_tree_root_index);
             cluster_num_points += cur_point_root.tree_num_points;
 
@@ -857,16 +901,29 @@ void ContinuousClustering::findFinishedTreesAndAssignSameId(TreeCombinationJob&&
             {
                 Point& other_point_root =
                     range_image_[other_tree_root_index.column_index * num_rows_ + other_tree_root_index.row_index];
+                // if neighbor point tree was not already visited then traverse it too
                 if (other_point_root.visited_at_continuous_azimuth_angle !=
                     job.current_minimum_continuous_azimuth_angle)
                     trees_to_visit_for_current_cluster.push_back(other_tree_root_index);
             }
         }
 
-        if (trees_collected_for_current_cluster.empty() || cluster_has_at_least_one_unfinished_tree)
+        // check if finished point trees together already exceed one rotation
+        bool finished_point_trees_exceed_one_rotation = false;
+        if (max_column_index - min_column_index >= num_columns_)
+        {
+            std::cout << "Found a cluster exceeding one rotation: " << (max_column_index - min_column_index) << " ("
+                      << min_column_index << ", " << max_column_index << ")" << std::endl;
+            finished_point_trees_exceed_one_rotation = true;
+        }
+
+        // skip cluster if at least one point tree is not finished (but not if we already have a full rotation)
+        if ((trees_collected_for_current_cluster.empty() || cluster_has_at_least_one_unfinished_tree) &&
+            !finished_point_trees_exceed_one_rotation)
             continue;
 
-        // we found a completely finished cluster; now we mark its trees finished and prepare them for publishing
+        // we found an actually (or forcibly) finished cluster; now we mark its trees finished and prepare them for
+        // publishing
         for (const RangeImageIndex& cur_tree_root_index : trees_collected_for_current_cluster)
         {
             // mark current tree root as finished
