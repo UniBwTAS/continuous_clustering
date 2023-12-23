@@ -24,7 +24,7 @@ enum
 struct ContinuousRangeImageConfiguration
 {
     bool sensor_is_clockwise{true};
-    int num_columns{1700};
+    int num_columns{1700}; // rows are automatically read from number of points in firing
     bool supplement_inclination_angle_for_nan_cells{true};
 };
 

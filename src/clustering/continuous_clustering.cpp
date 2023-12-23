@@ -11,7 +11,7 @@ ContinuousClustering::ContinuousClustering() = default;
 void ContinuousClustering::reset(int num_rows, bool sequential_execution)
 {
     // recalculate some intermediate values in case the parameters have changed
-    num_columns_ = config_.range_image.num_columns; // TODO: also pass num columns as parameter here?
+    num_columns_ = config_.range_image.num_columns;
     num_rows_ = num_rows;
     srig_azimuth_width_per_column = static_cast<float>((2 * M_PI)) / static_cast<float>(num_columns_);
     ring_buffer_max_columns = num_columns_ * 10;

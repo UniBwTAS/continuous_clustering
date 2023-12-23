@@ -107,14 +107,25 @@ class RosContinuousClustering
         ros::Time stamp_current_firing;
         stamp_current_firing.fromNSec(firing->stamp);
 
-        // handle time jumps and bad start condition (TODO: put it into library?)
+        // handle time jumps and bad start condition
         double dt = (stamp_current_firing - last_update_).toSec();
-        if (clustering_.resetRequired() || (!first_firing_after_reset && std::abs(dt) > 0.1))
+        if (!first_firing_after_reset)
         {
-            ROS_WARN_STREAM("Detected jump in time ("
-                            << dt << ") or bad start condition was encountered. Reset continuous clustering.");
-            reset(static_cast<int>(firing->points.size()));
-            return;
+            // resetting takes some time (often more than 0.1s) therefore we do not want to reset again when the
+            // first firing after reset arrives
+
+            if (clustering_.resetRequired())
+            {
+                ROS_WARN_STREAM("Detected reconfiguration or bad start condition. Reset continuous clustering.");
+                reset(static_cast<int>(firing->points.size()));
+                return;
+            }
+            else if (std::abs(dt) > 0.1)
+            {
+                ROS_WARN_STREAM("Detected jump in time (" << dt << "). Reset continuous clustering.");
+                reset(static_cast<int>(firing->points.size()));
+                return;
+            }
         }
         first_firing_after_reset = false;
         last_update_ = stamp_current_firing;
