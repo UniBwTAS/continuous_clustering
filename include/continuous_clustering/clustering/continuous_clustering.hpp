@@ -21,6 +21,11 @@ enum
     GP_FOG = LIGHTGRAY,       // ground point: classified as fog
 };
 
+struct GeneralConfiguration
+{
+    bool is_single_threaded{false};
+};
+
 struct ContinuousRangeImageConfiguration
 {
     bool sensor_is_clockwise{true};
@@ -74,6 +79,7 @@ struct ContinuousClusteringConfiguration
 
 struct Configuration
 {
+    GeneralConfiguration general{};
     ContinuousRangeImageConfiguration range_image{};
     ContinuousGroundSegmentationConfiguration ground_segmentation{};
     ContinuousClusteringConfiguration clustering{};
@@ -189,7 +195,7 @@ class ContinuousClustering
 
   public:
     // general
-    void reset(int num_rows, bool sequential_execution = false);
+    void reset(int num_rows);
     void setConfiguration(const Configuration& config);
     bool resetRequired() const;
 

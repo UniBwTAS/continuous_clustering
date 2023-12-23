@@ -185,6 +185,9 @@ class RosContinuousClustering
         else if (config_.ground_segmentation.use_terrain && !config.use_terrain)
             sub_terrain.shutdown();
 
+        // general config
+        config_.general.is_single_threaded = config.is_single_threaded;
+
         // config for range image
         config_.range_image.sensor_is_clockwise = config.sensor_is_clockwise;
         config_.range_image.num_columns = config.num_columns;

@@ -8,6 +8,9 @@
     <!-- arguments to play directly a rosbag with this launch file -->
     <arg name="bag_file" default="" doc="path to bag file; if empty no bag file is replayed"/>
 
+    <!-- single threaded execution -->
+    <arg name="is_single_threaded" default="false"/>
+
     <!-- flags for enable/disable individual sensors -->
     <arg name="use_vls128_roof" default="true"/>
     <arg name="use_os32_left" default="true"/>

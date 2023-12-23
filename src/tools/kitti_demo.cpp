@@ -277,6 +277,7 @@ class KittiDemo
 
             // init some other configs
             Configuration config;
+            config.general.is_single_threaded = true;
             config.range_image.num_columns = 2200;
             config.clustering.ignore_points_in_chessboard_pattern = false;
             config.clustering.max_distance = 0.5;
@@ -289,7 +290,7 @@ class KittiDemo
             config.ground_segmentation.width_ref_to_left_mirror_ = 1.5;
             config.ground_segmentation.width_ref_to_right_mirror_ = -1.5;
             clustering.setConfiguration(config);
-            clustering.reset(64, true);
+            clustering.reset(64);
             clustering.setTransformRobotFrameFromSensorFrame(Eigen::Isometry3d::Identity());
 
             // add callbacks

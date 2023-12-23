@@ -8,7 +8,7 @@ namespace continuous_clustering
 
 ContinuousClustering::ContinuousClustering() = default;
 
-void ContinuousClustering::reset(int num_rows, bool sequential_execution)
+void ContinuousClustering::reset(int num_rows)
 {
     // recalculate some intermediate values in case the parameters have changed
     num_columns_ = config_.range_image.num_columns;
@@ -46,8 +46,8 @@ void ContinuousClustering::reset(int num_rows, bool sequential_execution)
     sc_inclination_angles_between_lasers_.resize(num_rows, std::nanf(""));
 
     // re-initialize workers
-    int num_treads = sequential_execution ? 0 : 1;
-    int num_treads_pub = sequential_execution ? 0 : 3;
+    int num_treads = config_.general.is_single_threaded ? 0 : 1;
+    int num_treads_pub = config_.general.is_single_threaded ? 0 : 3;
     insertion_thread_pool.init(
         [this](InsertionJob&& job) { insertFiringIntoRangeImage(std::forward<InsertionJob>(job)); }, num_treads);
     segmentation_thread_pool.init([this](SegmentationJob&& job)
@@ -66,6 +66,8 @@ void ContinuousClustering::reset(int num_rows, bool sequential_execution)
 void ContinuousClustering::setConfiguration(const Configuration& config)
 {
     // some parameter changes need a hard reset
+    if (config_.general.is_single_threaded != config.general.is_single_threaded)
+        reset_required = true;
     if (config_.range_image.sensor_is_clockwise != config.range_image.sensor_is_clockwise)
         reset_required = true;
     if (config_.range_image.num_columns != config.range_image.num_columns)
