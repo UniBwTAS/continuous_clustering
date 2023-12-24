@@ -635,6 +635,160 @@ bool ContinuousClustering::hasTransformRobotFrameFromSensorFrame()
     return sgps_ego_robot_frame_from_sensor_frame_ != nullptr;
 }
 
+bool ContinuousClustering::checkClusteringCondition(const Point& point, const Point& point_other) const
+{
+    return (point.xyz - point_other.xyz).lengthSquared() < max_distance_squared;
+}
+
+void ContinuousClustering::associatePointToPointTree(Point& point, Point& point_other, float max_angle_diff)
+{
+    // this point is not associated to any point tree -> associate it
+    // Furthermore, we also have to check that clusters are forcibly published when they span a
+    // full rotation. For this we take two measures: (1) don't associate this point to the point
+    // tree when it would cover more than one rotation; (2) don't associate this point to the
+    // point tree, when its cluster is considered to be finished. Normally, the latter can not
+    // happen because a cluster is only considered to be finished when no more point can be
+    // associated (LiDAR rotated far enough away from a cluster's point trees). It can only
+    // happen when a cluster is forcibly considered to be finished because it already spans a
+    // full rotation. Then we do not want to associate more points to it.
+    Point& point_root =
+        range_image_[point_other.tree_root_.column_index * num_rows_ + point_other.tree_root_.row_index];
+    uint32_t new_cluster_width = point.global_column_index - point_root.global_column_index + 1;
+    bool point_tree_is_smaller_than_one_rotation = new_cluster_width <= num_columns_; // (1)
+    bool point_tree_is_finished_forcibly = point_root.belongs_to_finished_cluster;    // (2)
+    if (point_tree_is_smaller_than_one_rotation && !point_tree_is_finished_forcibly)
+    {
+        point.tree_root_ = point_other.tree_root_;
+        point.tree_id = point_root.global_column_index * num_rows_ + point_root.row_index;
+        point_other.child_points.emplace_back(static_cast<uint16_t>(point.row_index), point.local_column_index);
+
+        // keep track of cluster width
+        point_root.cluster_width = new_cluster_width;
+
+        // new point was associated to tree -> check if finish time will be delayed
+        point_root.finished_at_continuous_azimuth_angle =
+            std::max(point_root.finished_at_continuous_azimuth_angle, point.continuous_azimuth_angle + max_angle_diff);
+        point_root.tree_num_points++;
+    }
+}
+
+void ContinuousClustering::associatePointTreeToPointTree(const Point& point, const Point& point_other)
+{
+    // tree root of this point must be different to the other point (because of check above
+    // *1) so we must add a mutual link between the trees roots
+
+    // get tree root of current and other point
+    Point& point_root = range_image_[point.tree_root_.column_index * num_rows_ + point.tree_root_.row_index];
+    Point& point_root_other =
+        range_image_[point_other.tree_root_.column_index * num_rows_ + point_other.tree_root_.row_index];
+
+    // similar to above (unassociated point is added to point tree) we also don't want to
+    // introduce links between point trees when either of them was forcibly finished because its
+    // corresponding cluster already covers a full rotation
+    bool neither_cluster_was_forcibly_finished =
+        !point_root.belongs_to_finished_cluster && !point_root_other.belongs_to_finished_cluster;
+    if (neither_cluster_was_forcibly_finished)
+    {
+        // add mutual link
+        point_root.associated_trees.insert(point_other.tree_root_);
+        point_root_other.associated_trees.insert(point.tree_root_);
+    }
+}
+
+void ContinuousClustering::traverseFieldOfView(Point& point,
+                                               float max_angle_diff,
+                                               int ring_buffer_first_local_column_index)
+{
+    // go left each column until azimuth angle difference gets too large
+    double min_possible_continuous_azimuth_angle = point.continuous_azimuth_angle - max_angle_diff;
+    int num_steps_back = 0;
+    int64_t other_column_index = point.local_column_index;
+    while (num_steps_back <= config_.clustering.max_steps_in_row)
+    {
+        bool at_least_one_point_of_this_column_in_azimuth_range = false;
+        for (int direction = -1; direction <= 1; direction += 2)
+        {
+            // do not go down in first column (these points are not associated to tree yet!)
+            if (direction == 1 && num_steps_back == 0)
+                continue;
+
+            // go up/down each row until the inclination angle difference gets too large
+            int num_steps_vertical = direction == 1 || num_steps_back == 0 ? 1 : 0;
+            int other_row_index = direction == 1 || num_steps_back == 0 ? point.row_index + direction : point.row_index;
+            while (other_row_index >= 0 && other_row_index < num_rows_ &&
+                   num_steps_vertical <= config_.clustering.max_steps_in_column)
+            {
+                // get other point
+                Point& point_other = range_image_[other_column_index * num_rows_ + other_row_index];
+
+                // count number of visited points for analyzing
+                point.number_of_visited_neighbors += 1;
+
+                // no cluster can be associated because the inclination angle diff gets too large
+                if (std::abs(point_other.inclination_angle - point.inclination_angle) > max_angle_diff)
+                    break;
+
+                // if this point is still in azimuth range then also search one column before
+                if (point_other.continuous_azimuth_angle >= min_possible_continuous_azimuth_angle)
+                    at_least_one_point_of_this_column_in_azimuth_range = true;
+                else
+                {
+                    other_row_index += direction;
+                    num_steps_vertical++;
+                    continue;
+                }
+
+                // if this point is ignored or has already the same tree root then do nothing (*1)
+                if (point_other.is_ignored ||
+                    (point.tree_root_.column_index >= 0 && point_other.tree_root_ == point.tree_root_))
+                {
+                    other_row_index += direction;
+                    num_steps_vertical++;
+                    continue;
+                }
+
+                // if distance is small enough then try to associate to tree
+                if (checkClusteringCondition(point, point_other))
+                {
+                    // check if point is already associated to any point tree
+                    if (point.tree_root_.column_index == -1)
+                        associatePointToPointTree(point, point_other, max_angle_diff);
+                    else
+                        associatePointTreeToPointTree(point, point_other);
+                }
+
+                // stop searching if point was already associated and minimum number of columns were processed
+                if (point.tree_root_.column_index != -1 && config_.clustering.stop_after_association_enabled &&
+                    num_steps_vertical >= config_.clustering.stop_after_association_min_steps)
+                    break;
+
+                other_row_index += direction;
+                num_steps_vertical++;
+            }
+        }
+
+        // stop searching if point was already associated and minimum number of points were processed
+        if (point.tree_root_.column_index != -1 && config_.clustering.stop_after_association_enabled &&
+            num_steps_back >= config_.clustering.stop_after_association_min_steps)
+            break;
+
+        // stop searching in previous columns because in previous run all points were already out of angle range
+        if (num_steps_back > 0 && !at_least_one_point_of_this_column_in_azimuth_range)
+            break;
+
+        // stop searching if we are at the beginning of the ring buffer
+        if (other_column_index == ring_buffer_first_local_column_index)
+            break;
+
+        other_column_index--;
+        num_steps_back++;
+
+        // jump to the end of the ring buffer
+        if (other_column_index < 0)
+            other_column_index += ring_buffer_max_columns;
+    }
+}
+
 void ContinuousClustering::associatePointsInColumn(AssociationJob&& job)
 {
     // collect new point trees
@@ -668,150 +822,11 @@ void ContinuousClustering::associatePointsInColumn(AssociationJob&& job)
 
         // calculate minimum possible azimuth angle
         float max_angle_diff = std::asin(config_.clustering.max_distance / point.distance);
-        double min_possible_continuous_azimuth_angle = point.continuous_azimuth_angle - max_angle_diff;
 
-        // go left each column until azimuth angle difference gets too large
-        int num_steps_back = 0;
-        int64_t other_column_index = ring_buffer_current_local_column_index;
-        while (num_steps_back <= config_.clustering.max_steps_in_row)
-        {
-            bool at_least_one_point_of_this_column_in_azimuth_range = false;
-            for (int direction = -1; direction <= 1; direction += 2)
-            {
-                // do not go down in first column (these points are not associated to tree yet!)
-                if (direction == 1 && num_steps_back == 0)
-                    continue;
+        // traverse field of view
+        traverseFieldOfView(point, max_angle_diff, ring_buffer_first_local_column_index);
 
-                // go up/down each row until the inclination angle difference gets too large
-                int num_steps_vertical = direction == 1 || num_steps_back == 0 ? 1 : 0;
-                int other_row_index = direction == 1 || num_steps_back == 0 ? row_index + direction : row_index;
-                while (other_row_index >= 0 && other_row_index < num_rows_ &&
-                       num_steps_vertical <= config_.clustering.max_steps_in_column)
-                {
-                    // get other point
-                    Point& point_other = range_image_[other_column_index * num_rows_ + other_row_index];
-
-                    // count number of visited points for analyzing
-                    point.number_of_visited_neighbors += 1;
-
-                    // no cluster can be associated because the inclination angle diff gets too large
-                    if (std::abs(point_other.inclination_angle - point.inclination_angle) > max_angle_diff)
-                        break;
-
-                    // if this point is still in azimuth range then also search one column before
-                    if (point_other.continuous_azimuth_angle >= min_possible_continuous_azimuth_angle)
-                        at_least_one_point_of_this_column_in_azimuth_range = true;
-                    else
-                    {
-                        other_row_index += direction;
-                        num_steps_vertical++;
-                        continue;
-                    }
-
-                    // if this point is ignored or has already the same tree root then do nothing (*1)
-                    if (point_other.is_ignored ||
-                        (point.tree_root_.column_index >= 0 && point_other.tree_root_ == point.tree_root_))
-                    {
-                        other_row_index += direction;
-                        num_steps_vertical++;
-                        continue;
-                    }
-
-                    // calculate the distance to other point
-                    float distance_squared = (point.xyz - point_other.xyz).lengthSquared();
-
-                    // if distance is small enough then try to associate to tree
-                    if (distance_squared < max_distance_squared)
-                    {
-                        if (point.tree_root_.column_index == -1)
-                        {
-                            // this point is not associated to any point tree -> associate it
-
-                            // Furthermore, we also have to check that clusters are forcibly published when they span a
-                            // full rotation. For this we take two measures: (1) don't associate this point to the point
-                            // tree when it would cover more than one rotation; (2) don't associate this point to the
-                            // point tree, when its cluster is considered to be finished. Normally, the latter can not
-                            // happen because a cluster is only considered to be finished when no more point can be
-                            // associated (LiDAR rotated far enough away from a cluster's point trees). It can only
-                            // happen when a cluster is forcibly considered to be finished because it already spans a
-                            // full rotation. Then we do not want to associate more points to it.
-                            Point& point_root = range_image_[point_other.tree_root_.column_index * num_rows_ +
-                                                             point_other.tree_root_.row_index];
-                            uint32_t new_cluster_width = point.global_column_index - point_root.global_column_index + 1;
-                            bool point_tree_is_smaller_than_one_rotation = new_cluster_width <= num_columns_; // (1)
-                            bool point_tree_is_finished_forcibly = point_root.belongs_to_finished_cluster;    // (2)
-                            if (point_tree_is_smaller_than_one_rotation && !point_tree_is_finished_forcibly)
-                            {
-                                point.tree_root_ = point_other.tree_root_;
-                                point.tree_id = point_root.global_column_index * num_rows_ + point_root.row_index;
-                                point_other.child_points.push_back(index);
-
-                                // keep track of cluster width
-                                point_root.cluster_width = new_cluster_width;
-
-                                // new point was associated to tree -> check if finish time will be delayed
-                                point_root.finished_at_continuous_azimuth_angle =
-                                    std::max(point_root.finished_at_continuous_azimuth_angle,
-                                             point.continuous_azimuth_angle + max_angle_diff);
-                                point_root.tree_num_points++;
-                            }
-                        }
-                        else
-                        {
-                            // tree root of this point must be different to the other point (because of check above
-                            // *1) so we must add a mutual link between the trees roots
-
-                            // get tree root of current and other point
-                            Point& point_root =
-                                range_image_[point.tree_root_.column_index * num_rows_ + point.tree_root_.row_index];
-                            Point& point_root_other = range_image_[point_other.tree_root_.column_index * num_rows_ +
-                                                                   point_other.tree_root_.row_index];
-
-                            // similar to above (unassociated point is added to point tree) we also don't want to
-                            // introduce links between point trees when either of them was forcibly finished because its
-                            // corresponding cluster already covers a full rotation
-                            bool neither_cluster_was_forcibly_finished = !point_root.belongs_to_finished_cluster &&
-                                                                         !point_root_other.belongs_to_finished_cluster;
-                            if (neither_cluster_was_forcibly_finished)
-                            {
-                                // add mutual link
-                                point_root.associated_trees.insert(point_other.tree_root_);
-                                point_root_other.associated_trees.insert(point.tree_root_);
-                            }
-                        }
-                    }
-
-                    // stop searching if point was already associated and minimum number of columns were processed
-                    if (point.tree_root_.column_index != -1 && config_.clustering.stop_after_association_enabled &&
-                        num_steps_vertical >= config_.clustering.stop_after_association_min_steps)
-                        break;
-
-                    other_row_index += direction;
-                    num_steps_vertical++;
-                }
-            }
-
-            // stop searching if point was already associated and minimum number of points were processed
-            if (point.tree_root_.column_index != -1 && config_.clustering.stop_after_association_enabled &&
-                num_steps_back >= config_.clustering.stop_after_association_min_steps)
-                break;
-
-            // stop searching in previous columns because in previous run all points were already out of angle range
-            if (num_steps_back > 0 && !at_least_one_point_of_this_column_in_azimuth_range)
-                break;
-
-            // stop searching if we are at the beginning of the ring buffer
-            if (other_column_index == ring_buffer_first_local_column_index)
-                break;
-
-            other_column_index--;
-            num_steps_back++;
-
-            // jump to the end of the ring buffer
-            if (other_column_index < 0)
-                other_column_index += ring_buffer_max_columns;
-        }
-
+        // point could not be associated to any other point in field of view
         if (point.tree_root_.column_index == -1)
         {
             // this point could not be associated to any tree -> init new tree

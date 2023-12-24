@@ -225,6 +225,10 @@ class ContinuousClustering
     }
 
     // continuous clustering
+    inline bool checkClusteringCondition(const Point& point, const Point& point_other) const;
+    inline void associatePointToPointTree(Point& point, Point& point_other, float max_angle_diff);
+    inline void associatePointTreeToPointTree(const Point& point, const Point& point_other);
+    inline void traverseFieldOfView(Point& point, float max_angle_diff, int ring_buffer_first_local_column_index);
     inline void associatePointsInColumn(AssociationJob&& job);
     inline void findFinishedTreesAndAssignSameId(TreeCombinationJob&& job);
     inline void collectPointsForCusterAndPublish(PublishingJob&& job);
