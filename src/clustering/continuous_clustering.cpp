@@ -701,11 +701,11 @@ void ContinuousClustering::traverseFieldOfView(Point& point,
 {
     // go left each column until azimuth angle difference gets too large
     double min_possible_continuous_azimuth_angle = point.continuous_azimuth_angle - max_angle_diff;
-    int num_steps_back = 0;
+    int required_steps_back = static_cast<int>(std::ceil(max_angle_diff / srig_azimuth_width_per_column));
+    required_steps_back = std::min(required_steps_back, config_.clustering.max_steps_in_row);
     int64_t other_column_index = point.local_column_index;
-    while (num_steps_back <= config_.clustering.max_steps_in_row)
+    for (int num_steps_back = 0; num_steps_back <= required_steps_back; num_steps_back++)
     {
-        bool at_least_one_point_of_this_column_in_azimuth_range = false;
         for (int direction = -1; direction <= 1; direction += 2)
         {
             // do not go down in first column (these points are not associated to tree yet!)
@@ -728,33 +728,19 @@ void ContinuousClustering::traverseFieldOfView(Point& point,
                 if (std::abs(point_other.inclination_angle - point.inclination_angle) > max_angle_diff)
                     break;
 
-                // if this point is still in azimuth range then also search one column before
-                if (point_other.continuous_azimuth_angle >= min_possible_continuous_azimuth_angle)
-                    at_least_one_point_of_this_column_in_azimuth_range = true;
-                else
+                // if other point is ignored or has already the same tree root then do nothing (*1)
+                if (!point_other.is_ignored &&
+                    (point.tree_root_.column_index == 0 || point_other.tree_root_ != point.tree_root_))
                 {
-                    other_row_index += direction;
-                    num_steps_vertical++;
-                    continue;
-                }
-
-                // if this point is ignored or has already the same tree root then do nothing (*1)
-                if (point_other.is_ignored ||
-                    (point.tree_root_.column_index >= 0 && point_other.tree_root_ == point.tree_root_))
-                {
-                    other_row_index += direction;
-                    num_steps_vertical++;
-                    continue;
-                }
-
-                // if distance is small enough then try to associate to tree
-                if (checkClusteringCondition(point, point_other))
-                {
-                    // check if point is already associated to any point tree
-                    if (point.tree_root_.column_index == -1)
-                        associatePointToPointTree(point, point_other, max_angle_diff);
-                    else
-                        associatePointTreeToPointTree(point, point_other);
+                    // if distance is small enough then try to associate to tree
+                    if (checkClusteringCondition(point, point_other))
+                    {
+                        // check if point is already associated to any point tree
+                        if (point.tree_root_.column_index == -1)
+                            associatePointToPointTree(point, point_other, max_angle_diff);
+                        else
+                            associatePointTreeToPointTree(point, point_other);
+                    }
                 }
 
                 // stop searching if point was already associated and minimum number of columns were processed
@@ -772,16 +758,11 @@ void ContinuousClustering::traverseFieldOfView(Point& point,
             num_steps_back >= config_.clustering.stop_after_association_min_steps)
             break;
 
-        // stop searching in previous columns because in previous run all points were already out of angle range
-        if (num_steps_back > 0 && !at_least_one_point_of_this_column_in_azimuth_range)
-            break;
-
         // stop searching if we are at the beginning of the ring buffer
         if (other_column_index == ring_buffer_first_local_column_index)
             break;
 
         other_column_index--;
-        num_steps_back++;
 
         // jump to the end of the ring buffer
         if (other_column_index < 0)

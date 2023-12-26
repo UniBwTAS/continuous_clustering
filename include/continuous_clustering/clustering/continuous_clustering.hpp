@@ -97,6 +97,12 @@ class RangeImageIndex
         return row_index == other.row_index && column_index == other.column_index;
     }
 
+    bool operator!=(const RangeImageIndex& other) const
+    {
+        return row_index != other.row_index || column_index != other.column_index;
+    }
+
+
     bool operator<(const RangeImageIndex& other) const
     {
         return row_index < other.row_index || (row_index == other.row_index && column_index < other.column_index);
