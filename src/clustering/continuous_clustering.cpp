@@ -163,7 +163,7 @@ void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
             global_column_index += num_columns_; // add one rotation
             rotation_index_offset = 1;
         }
-        else if (srig_previous_global_column_index_of_rearmost_laser > 0 && column_diff > columns_of_half_rotation)
+        else if (srig_previous_global_column_index_of_rearmost_laser > 0 && column_diff > columns_of_half_rotation && global_column_index >= num_columns_)
         {
             // In very rare cases this can happen because the minimum azimuth of rearmost laser can be smaller than
             // that of previous firing (most probably due to ego motion correction).

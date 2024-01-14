@@ -163,9 +163,18 @@ class KittiDemo
         std::cout << "EVALUATE FRAME: " << current_sequence_index << ", " << previous_frame_index << std::endl;
 
         auto it = map_frame_to_point_cloud.find({current_sequence_index, previous_frame_index});
-        evaluation.evaluate(it->second, current_sequence_index);
-        if (enable_publishers)
-            middleware.publishEvaluationPointCloud(it->second);
+        if (it->second.empty())
+        {
+            std::cout << "NO GROUND TRUTH AVAILABLE FOR FRAME: " << current_sequence_index << ", "
+                      << previous_frame_index << std::endl;
+        }
+        else
+        {
+            std::cout << "EVALUATE FRAME: " << current_sequence_index << ", " << previous_frame_index << std::endl;
+            evaluation.evaluate(it->second, current_sequence_index);
+            if (enable_publishers)
+                middleware.publishEvaluationPointCloud(it->second);
+        }
         map_frame_to_point_cloud.erase(it);
         previous_frame_index++;
     }
@@ -202,18 +211,26 @@ class KittiDemo
 
                     // check if we have a new frame
                     if (frame_index < previous_frame_index)
-                        throw std::runtime_error("Found a point belonging to a frame that was already evaluated!");
+                    {
+                        // std::cout << "Found a point belonging to a frame that was already evaluated: " << frame_index
+                        //           << std::endl;
+                        continue;
+                    }
                     else if (frame_index > previous_frame_index + 1)
-                        throw std::runtime_error("Found a point whose frame is too far ahead!");
+                        throw std::runtime_error("Found a point whose frame is too far ahead: " +
+                                                 std::to_string(frame_index));
                     else if (frame_index == previous_frame_index + 1)
                         new_frame = true;
 
                     // add detection label to point in current ground truth point cloud
                     auto it = map_frame_to_point_cloud.find({sequence_index, frame_index});
-                    KittiSegmentationEvaluationPoint& evaluation_point = it->second[kitti_point_index];
-                    evaluation_point.is_ground_point = (point.ground_point_label == GP_GROUND);
-                    evaluation_point.detection_label = point.id;
-                    evaluation_point.has_corresponding_point_in_detection_point_cloud = true;
+                    if (!it->second.empty())
+                    {
+                        KittiSegmentationEvaluationPoint& evaluation_point = it->second[kitti_point_index];
+                        evaluation_point.is_ground_point = (point.ground_point_label == GP_GROUND);
+                        evaluation_point.detection_label = point.id;
+                        evaluation_point.has_corresponding_point_in_detection_point_cloud = true;
+                    }
                 }
             }
 
@@ -257,15 +274,8 @@ class KittiDemo
             Path calib_path{sequence_folder / Path{"calib.txt"}};
             Eigen::Isometry3d tf_cam0_from_velodyne;
             Eigen::Affine3d projection_matrix_cam0;
-            Eigen::Affine3d projection_matrix_cam1;
-            Eigen::Affine3d projection_matrix_cam2;
-            Eigen::Affine3d projection_matrix_cam3;
-            kitti_loader.getStaticTransformAndProjectionMatrices(calib_path,
-                                                                 tf_cam0_from_velodyne,
-                                                                 projection_matrix_cam0,
-                                                                 projection_matrix_cam1,
-                                                                 projection_matrix_cam2,
-                                                                 projection_matrix_cam3);
+            kitti_loader.getStaticTransformAndProjectionMatrices(
+                calib_path, tf_cam0_from_velodyne, projection_matrix_cam0);
 
             // load all transforms odom from velodyne
             Path poses_path{sequence_folder / Path{"poses.txt"}};
@@ -278,19 +288,19 @@ class KittiDemo
             // init some other configs
             Configuration config;
             config.general.is_single_threaded = true;
-            config.range_image.num_columns = 2200;
+            config.range_image.num_columns = KittiLoader::RANGE_IMAGE_WIDTH;
             config.clustering.ignore_points_in_chessboard_pattern = false;
             config.clustering.max_distance = 0.5;
 
             // ego bounding box (ref is here origin of lidar frame)
-            config.ground_segmentation.height_ref_to_maximum_ = 0.5;
-            config.ground_segmentation.height_ref_to_ground_ = -1.7;
+            config.ground_segmentation.height_ref_to_maximum_ = 0.1;
+            config.ground_segmentation.height_ref_to_ground_ = -2.2;
             config.ground_segmentation.length_ref_to_front_end_ = 3;
             config.ground_segmentation.length_ref_to_rear_end_ = -3;
             config.ground_segmentation.width_ref_to_left_mirror_ = 1.5;
             config.ground_segmentation.width_ref_to_right_mirror_ = -1.5;
             clustering.setConfiguration(config);
-            clustering.reset(64);
+            clustering.reset(KittiLoader::NUM_LASERS);
             clustering.setTransformRobotFrameFromSensorFrame(Eigen::Isometry3d::Identity());
 
             // add callbacks
@@ -314,7 +324,7 @@ class KittiDemo
 
             // info required for evaluation
             current_sequence_index = sequence_index;
-            previous_frame_index = 0;
+            previous_frame_index = 147;
             if (evaluate && !std::filesystem::exists(labels_folder))
             {
                 std::cout << "SemanticKitti labels were not found -> Don't evaluate this sequence." << std::endl;
@@ -323,7 +333,7 @@ class KittiDemo
 
             // iterate over individual frames (i.e. full LiDAR rotations)
             auto num_frames = static_cast<uint16_t>(timestamps_velodyne_middle.size());
-            for (uint16_t frame_index = 0; frame_index < num_frames; ++frame_index)
+            for (uint16_t frame_index = 147; frame_index < num_frames; ++frame_index)
             {
                 std::cout << "RUN SEQUENCE: " << sequence_index << ", FRAME: " << frame_index << std::endl;
 
@@ -335,51 +345,83 @@ class KittiDemo
                 // check weather there is ground truth for this sequence available
                 if (evaluate)
                 {
+                    std::vector<KittiSegmentationEvaluationPoint> pc_eval(0);
+
                     // also load semantic kitti labels (for ground point segmentation evaluation)
                     std::string label_filename = KittiLoader::padWithZeros(frame_index, 6) + ".label";
-                    kitti_loader.loadSemanticKittiLabels(labels_folder / Path{label_filename}, points);
-
-                    // generate/load euclidean clustering labels for evaluation
-                    std::vector<uint16_t> euclidean_clustering_labels;
-                    if (!std::filesystem::exists(euclidean_labels_folder))
+                    Path label_file_path = labels_folder / Path{label_filename};
+                    std::cout << "LOAD LABELS" << std::endl;
+                    if (std::filesystem::exists(label_file_path))
                     {
-                        std::cerr << "WARNING: Ground Truth Euclidean Clustering Labels were not found ("
-                                  << euclidean_labels_folder
-                                  << "). Now they will be generated online. Consider to generate them statically by "
-                                     "using the 'gt_label_generator_tool' in order to run evaluation much faster."
-                                  << std::endl;
-                        euclidean_clustering_labels = evaluation.generateEuclideanClusteringLabels(points);
+                        kitti_loader.loadSemanticKittiLabels(label_file_path, points);
+
+                        // generate/load euclidean clustering labels for evaluation
+                        std::vector<uint16_t> euclidean_clustering_labels;
+                        if (!std::filesystem::exists(euclidean_labels_folder))
+                        {
+                            std::cerr
+                                << "WARNING: Ground Truth Euclidean Clustering Labels were not found ("
+                                << euclidean_labels_folder
+                                << "). Now they will be generated online. Consider to generate them statically by "
+                                   "using the 'gt_label_generator_tool' in order to run evaluation much faster."
+                                << std::endl;
+                            euclidean_clustering_labels = evaluation.generateEuclideanClusteringLabels(points);
+                        }
+                        else
+                        {
+                            euclidean_clustering_labels = KittiLoader::loadFlattenedPointCloud<uint16_t>(
+                                euclidean_labels_folder / Path{label_filename});
+                        }
+
+                        // convert it to a point cloud with additional point fields for evaluation and save it
+                        // add euclidean clustering labels (for Over-/Under-Segmentation-Entropy evaluation, see
+                        // "TRAVEL" paper)
+                        pc_eval = KittiEvaluation::convertPointCloud(points);
+                        for (int i = 0; i < euclidean_clustering_labels.size(); i++)
+                            pc_eval[i].euclidean_clustering_label = euclidean_clustering_labels[i];
+                        std::cout << "SUCCESS" << std::endl;
                     }
                     else
                     {
-                        euclidean_clustering_labels = KittiLoader::loadFlattenedPointCloud<uint16_t>(
-                            euclidean_labels_folder / Path{label_filename});
+                        std::cout << "FAILED" << std::endl;
                     }
-
-                    // convert it to a point cloud with additional point fields for evaluation and save it
-                    // add euclidean clustering labels (for Over-/Under-Segmentation-Entropy evaluation, see "TRAVEL"
-                    // paper)
-                    std::vector<KittiSegmentationEvaluationPoint> pc_eval = KittiEvaluation::convertPointCloud(points);
-                    for (int i = 0; i < euclidean_clustering_labels.size(); i++)
-                        pc_eval[i].euclidean_clustering_label = euclidean_clustering_labels[i];
                     map_frame_to_point_cloud.insert({{sequence_index, frame_index}, std::move(pc_eval)});
                 }
 
                 // recover the laser indices (in order to know the row index for the range image)
-                kitti_loader.recoverLaserIndices(points);
+                // kitti_loader.recoverLaserIndices(points);
+                if (points.size() > 1710 * 128)
+                    std::cout << "INPUT CLOUD is larger than expected!!!: " << points.size() << std::endl;
+                std::vector<KittiPoint> range_image(KittiLoader::RANGE_IMAGE_HEIGHT * KittiLoader::RANGE_IMAGE_WIDTH,
+                                                    KittiPoint());
+                for (int point_index = 0; point_index < points.size(); point_index++)
+                {
+                    int row_index = 128 - (point_index % 128) - 1;
+                    int column_index = point_index / 128;
+
+                    points[point_index].laser_index = row_index;
+
+                    if (column_index >= KittiLoader::RANGE_IMAGE_WIDTH)
+                        continue;
+
+                    uint32_t flattened_index = row_index * KittiLoader::RANGE_IMAGE_WIDTH + column_index;
+                    KittiPoint* const organized_point = &range_image[flattened_index];
+                    *organized_point = points[point_index];
+                    organized_point->original_kitti_index = point_index;
+                }
 
                 // undo ego motion correction. It is possible to omit this step. However, the number of cell
                 // collisions during range image generation is greatly reduced. Furthermore, the jump in the rings
                 // at the back of the ego vehicle is almost removed (not completely because there are some
                 // reconstruction errors) we want the points to be as raw as possible
-                kitti_loader.undoEgoMotionCorrection(points,
-                                                     timestamps_velodyne_start[frame_index],
-                                                     timestamps_velodyne_end[frame_index],
-                                                     transforms_odom_from_velodyne[frame_index].pose,
-                                                     transforms_odom_from_velodyne);
+                // kitti_loader.undoEgoMotionCorrection(points,
+                //                                      timestamps_velodyne_start[frame_index],
+                //                                      timestamps_velodyne_end[frame_index],
+                //                                      transforms_odom_from_velodyne[frame_index].pose,
+                //                                      transforms_odom_from_velodyne);
 
                 // generate (flattened) range image from point cloud (height corresponds to number of lasers)
-                std::vector<KittiPoint> range_image = kitti_loader.generateRangeImage(points);
+                // std::vector<KittiPoint> range_image = kitti_loader.generateRangeImage(points);
 
                 // publish individual firings (here column and firing is the same as we pretend that the lasers
                 // of one firing have the same azimuth angle, this is not the case for real velodyne sensors)

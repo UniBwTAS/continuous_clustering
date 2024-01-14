@@ -81,9 +81,9 @@ struct StampedPose
 class KittiLoader
 {
   public:
-    static const int NUM_LASERS = 64;
+    static const int NUM_LASERS = 128;
     static const int RANGE_IMAGE_HEIGHT = NUM_LASERS;
-    static const int RANGE_IMAGE_WIDTH = 2200; // max observed so far: 2172
+    static const int RANGE_IMAGE_WIDTH = 1710; // max observed so far: 2172
 
   public:
     explicit KittiLoader();
@@ -140,10 +140,7 @@ class KittiLoader
                             const Eigen::Isometry3d& tf_cam0_from_x = Eigen::Isometry3d::Identity());
     void getStaticTransformAndProjectionMatrices(const Path& path_calib_file,
                                                  Eigen::Isometry3d& tf_cam0_from_velodyne,
-                                                 Eigen::Affine3d& projection_matrix_cam0,
-                                                 Eigen::Affine3d& projection_matrix_cam1,
-                                                 Eigen::Affine3d& projection_matrix_cam2,
-                                                 Eigen::Affine3d& projection_matrix_cam3);
+                                                 Eigen::Affine3d& projection_matrix_cam0);
 
     // Calibrations
     Eigen::Isometry3d loadStaticTransform(const Path& calibration_file);

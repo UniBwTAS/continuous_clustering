@@ -117,6 +117,8 @@ std::vector<KittiPoint> KittiLoader::generateRangeImage(const std::vector<KittiP
     {
         // process unorganized point and get its azimuth angle
         const KittiPoint& unorganized_point = unorganized_points[original_index];
+        if (std::isnan(unorganized_point.x) || std::isnan(unorganized_point.y) || std::isnan(unorganized_point.z))
+            continue;
         double cur_azimuth = std::atan2(unorganized_point.y, unorganized_point.x);
 
         // get column index
@@ -199,6 +201,9 @@ void KittiLoader::undoEgoMotionCorrection(std::vector<KittiPoint>& corrected_poi
     // transform each point
     for (auto& p : corrected_points)
     {
+        if (std::isnan(p.x) || std::isnan(p.y) || std::isnan(p.z))
+            continue;
+
         double fraction_of_scan_completed = (M_PI - std::atan2(p.y, p.x)) / (2.0 * M_PI);
         int bin_index = static_cast<int>((fraction_of_scan_completed * static_cast<double>(duration)) /
                                          static_cast<double>(bin_resolution));
@@ -370,10 +375,7 @@ std::vector<StampedPose> KittiLoader::getAllDynamicTransforms(const Path& path_p
 
 void KittiLoader::getStaticTransformAndProjectionMatrices(const Path& path_calib_file,
                                                           Eigen::Isometry3d& tf_cam0_from_velodyne,
-                                                          Eigen::Affine3d& projection_matrix_cam0,
-                                                          Eigen::Affine3d& projection_matrix_cam1,
-                                                          Eigen::Affine3d& projection_matrix_cam2,
-                                                          Eigen::Affine3d& projection_matrix_cam3)
+                                                          Eigen::Affine3d& projection_matrix_cam0)
 {
     std::ifstream calibration_is(path_calib_file);
 
@@ -389,26 +391,26 @@ void KittiLoader::getStaticTransformAndProjectionMatrices(const Path& path_calib
         std::stod(v[6]), std::stod(v[7]), std::stod(v[9]), std::stod(v[10]), std::stod(v[11]);
     projection_matrix_cam0.translation() << std::stod(v[4]), std::stod(v[8]), std::stod(v[12]);
 
-    // projection matrix P1
-    std::getline(calibration_is, line);
-    v = split(line, ' ');
-    projection_matrix_cam1.linear() << std::stod(v[1]), std::stod(v[2]), std::stod(v[3]), std::stod(v[5]),
-        std::stod(v[6]), std::stod(v[7]), std::stod(v[9]), std::stod(v[10]), std::stod(v[11]);
-    projection_matrix_cam1.translation() << std::stod(v[4]), std::stod(v[8]), std::stod(v[12]);
+    /* // projection matrix P1
+     std::getline(calibration_is, line);
+     v = split(line, ' ');
+     projection_matrix_cam1.linear() << std::stod(v[1]), std::stod(v[2]), std::stod(v[3]), std::stod(v[5]),
+         std::stod(v[6]), std::stod(v[7]), std::stod(v[9]), std::stod(v[10]), std::stod(v[11]);
+     projection_matrix_cam1.translation() << std::stod(v[4]), std::stod(v[8]), std::stod(v[12]);
 
-    // projection matrix P2
-    std::getline(calibration_is, line);
-    v = split(line, ' ');
-    projection_matrix_cam2.linear() << std::stod(v[1]), std::stod(v[2]), std::stod(v[3]), std::stod(v[5]),
-        std::stod(v[6]), std::stod(v[7]), std::stod(v[9]), std::stod(v[10]), std::stod(v[11]);
-    projection_matrix_cam2.translation() << std::stod(v[4]), std::stod(v[8]), std::stod(v[12]);
+     // projection matrix P2
+     std::getline(calibration_is, line);
+     v = split(line, ' ');
+     projection_matrix_cam2.linear() << std::stod(v[1]), std::stod(v[2]), std::stod(v[3]), std::stod(v[5]),
+         std::stod(v[6]), std::stod(v[7]), std::stod(v[9]), std::stod(v[10]), std::stod(v[11]);
+     projection_matrix_cam2.translation() << std::stod(v[4]), std::stod(v[8]), std::stod(v[12]);
 
-    // projection matrix P3
-    std::getline(calibration_is, line);
-    v = split(line, ' ');
-    projection_matrix_cam3.linear() << std::stod(v[1]), std::stod(v[2]), std::stod(v[3]), std::stod(v[5]),
-        std::stod(v[6]), std::stod(v[7]), std::stod(v[9]), std::stod(v[10]), std::stod(v[11]);
-    projection_matrix_cam3.translation() << std::stod(v[4]), std::stod(v[8]), std::stod(v[12]);
+     // projection matrix P3
+     std::getline(calibration_is, line);
+     v = split(line, ' ');
+     projection_matrix_cam3.linear() << std::stod(v[1]), std::stod(v[2]), std::stod(v[3]), std::stod(v[5]),
+         std::stod(v[6]), std::stod(v[7]), std::stod(v[9]), std::stod(v[10]), std::stod(v[11]);
+     projection_matrix_cam3.translation() << std::stod(v[4]), std::stod(v[8]), std::stod(v[12]);*/
 
     // transform matrix Tr
     std::getline(calibration_is, line);

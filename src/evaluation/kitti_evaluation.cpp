@@ -224,15 +224,24 @@ std::vector<KittiSegmentationEvaluationPoint> KittiEvaluation::convertPointCloud
 std::vector<uint16_t> KittiEvaluation::generateEuclideanClusteringLabels(std::vector<KittiPoint>& points) const
 {
     // convert to pcl point cloud
-    pcl::PointCloud<pcl::PointXYZINormal>::Ptr pcl_pc{new pcl::PointCloud<pcl::PointXYZINormal>(points.size(), 1)};
+    /*pcl::PointCloud<pcl::PointXYZINormal>::Ptr pcl_pc{new pcl::PointCloud<pcl::PointXYZINormal>(points.size(), 1)};
     for (int i = 0; i < points.size(); i++)
     {
         const KittiPoint& p_in = points[i];
         pcl::PointXYZINormal& p_out = (*pcl_pc)[i];
 
-        p_out.x = p_in.x;
-        p_out.y = p_in.y;
-        p_out.z = p_in.z;
+        if (!std::isnan(p_in.x) && !std::isnan(p_in.y) && !std::isnan(p_in.z))
+        {
+            p_out.x = p_in.x;
+            p_out.y = p_in.y;
+            p_out.z = p_in.z;
+        }
+        else
+        {
+            p_out.x = 0;
+            p_out.y = 0;
+            p_out.z = 0;
+        }
         p_out.intensity = static_cast<float>(p_in.semantic_label);
         p_out.curvature = static_cast<float>(p_in.instance_label);
     }
@@ -245,11 +254,11 @@ std::vector<uint16_t> KittiEvaluation::generateEuclideanClusteringLabels(std::ve
     cluster_extractor.setMinClusterSize(euclidean_clustering::MIN_CLUSTER_SIZE);
     cluster_extractor.setMaxClusterSize(euclidean_clustering::MAX_CLUSTER_SIZE);
     cluster_extractor.setClusterTolerance(euclidean_clustering::MAX_DISTANCE);
-    cluster_extractor.segment(points_per_cluster);
+    cluster_extractor.segment(points_per_cluster);*/
 
     // generate labels from clustering result
     std::vector<uint16_t> generated_labels(points.size(), 0);
-    uint16_t cluster_index = 1;
+    /*uint16_t cluster_index = 1;
     for (const auto& points_in_same_cluster : points_per_cluster)
     {
         for (const auto& point_idx : points_in_same_cluster.indices)
@@ -262,7 +271,7 @@ std::vector<uint16_t> KittiEvaluation::generateEuclideanClusteringLabels(std::ve
                 generated_labels[point_idx] = cluster_index;
         }
         cluster_index++;
-    }
+    }*/
 
     return generated_labels;
 }

@@ -192,7 +192,7 @@ Visualization Manager:
               Decay Time: 0
               Enable continuous:
                 Flip: false
-                Maximum Columns: 2200
+                Maximum Columns: 1710
                 Upside Down: false
                 Value: true
               Enabled: false
@@ -230,7 +230,7 @@ Visualization Manager:
               Decay Time: 0
               Enable continuous:
                 Flip: false
-                Maximum Columns: 2200
+                Maximum Columns: 1710
                 Upside Down: false
                 Value: true
               Enabled: false
@@ -269,7 +269,7 @@ Visualization Manager:
               Color: 255; 255; 255
               Color Transformer: Intensity
               Enable continuous:
-                Maximum Columns: 1700
+                Maximum Columns: 1710
                 Value: true
               Enabled: false
               Flip: false
@@ -301,7 +301,7 @@ Visualization Manager:
               Color: 255; 255; 255
               Color Transformer: Label
               Enable continuous:
-                Maximum Columns: 1700
+                Maximum Columns: 1710
                 Value: true
               Enabled: true
               Flip: false
@@ -333,7 +333,7 @@ Visualization Manager:
               Color: 255; 255; 255
               Color Transformer: Label
               Enable continuous:
-                Maximum Columns: 1700
+                Maximum Columns: 1710
                 Value: true
               Enabled: false
               Flip: false
