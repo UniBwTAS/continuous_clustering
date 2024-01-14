@@ -322,7 +322,7 @@ sensor_msgs::PointCloud2Ptr evaluationToPointCloud(const std::vector<KittiSegmen
     msg->is_dense = false;
 
     sensor_msgs::PointCloud2Modifier output_modifier(*msg);
-    output_modifier.setPointCloud2Fields(8,
+    output_modifier.setPointCloud2Fields(10,
                                          "x",
                                          1,
                                          sensor_msgs::PointField::FLOAT32,
@@ -332,6 +332,12 @@ sensor_msgs::PointCloud2Ptr evaluationToPointCloud(const std::vector<KittiSegmen
                                          "z",
                                          1,
                                          sensor_msgs::PointField::FLOAT32,
+                                         "semantic_label",
+                                         1,
+                                         sensor_msgs::PointField::UINT16,
+                                         "instance_label",
+                                         1,
+                                         sensor_msgs::PointField::UINT16,
                                          "has_corresponding_point_in_detection_point_cloud",
                                          1,
                                          sensor_msgs::PointField::UINT8,
@@ -351,6 +357,8 @@ sensor_msgs::PointCloud2Ptr evaluationToPointCloud(const std::vector<KittiSegmen
     sensor_msgs::PointCloud2Iterator<float> iter_x_out(*msg, "x");
     sensor_msgs::PointCloud2Iterator<float> iter_y_out(*msg, "y");
     sensor_msgs::PointCloud2Iterator<float> iter_z_out(*msg, "z");
+    sensor_msgs::PointCloud2Iterator<uint16_t> iter_semantic_label_out(*msg, "semantic_label");
+    sensor_msgs::PointCloud2Iterator<uint16_t> iter_instance_label_out(*msg, "instance_label");
     sensor_msgs::PointCloud2Iterator<uint8_t> iter_has_corresponding_point_in_detection_point_cloud_out(
         *msg, "has_corresponding_point_in_detection_point_cloud");
     sensor_msgs::PointCloud2Iterator<uint32_t> iter_gpe_out(*msg, "ground_point_evaluation");
@@ -374,6 +382,8 @@ sensor_msgs::PointCloud2Ptr evaluationToPointCloud(const std::vector<KittiSegmen
         *(iter_x_out + i) = p.point.x;
         *(iter_y_out + i) = p.point.y;
         *(iter_z_out + i) = p.point.z;
+        *(iter_semantic_label_out + i) = p.point.semantic_label;
+        *(iter_instance_label_out + i) = p.point.instance_label;
         *(iter_has_corresponding_point_in_detection_point_cloud_out + i) =
             p.has_corresponding_point_in_detection_point_cloud ? WHITE : RED;
         *(iter_gpe_out + i) = ground_point_evaluation_color;
