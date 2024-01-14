@@ -33,6 +33,9 @@ void KittiLoader::loadSemanticKittiLabels(const Path& path, std::vector<KittiPoi
     // load labels
     std::vector<uint16_t> labels_flattened = loadFlattenedPointCloud<uint16_t>(path);
     uint32_t num_points = labels_flattened.size() / 2;
+    if (num_points != points.size())
+        throw std::runtime_error("Number of points does not match (label/bin): " + std::to_string(num_points) + " / " +
+                                 std::to_string(points.size()));
     int flattened_index = 0;
     for (int32_t i = 0; i < num_points; i++)
     {
