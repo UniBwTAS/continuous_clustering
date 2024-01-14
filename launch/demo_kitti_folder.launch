@@ -4,6 +4,8 @@
     <arg name="evaluate_fast" default="false" doc="same as 'evaluate' but without ROS publishers and with no delays"/>
     <arg name="delay_between_columns" default="2000" doc="artificial delay in microseconds between image columns"/>
 
+    <arg name="use_rviz" default="true" doc="whether to start also rviz"/>
+
     <arg name="_evaluate" value="$(eval '--evaluate' if evaluate else '')"/>
     <arg name="_evaluate_fast" value="$(eval '--evaluate-fast' if evaluate_fast else '')"/>
 
@@ -13,7 +15,7 @@
           args="$(arg path) --delay-between-columns $(arg delay_between_columns) $(arg _evaluate) $(arg _evaluate_fast)"
           output="screen"/>
 
-    <node name="rviz" pkg="rviz" type="rviz"
+    <node name="rviz" pkg="rviz" type="rviz" if="$(arg use_rviz)"
           args="--display-config $(find continuous_clustering)/rviz/demo_kitti_folder.rviz"/>
 
     <!-- below is just for visualization of a dummy car in Rviz (has not the correct dimensions) -->
