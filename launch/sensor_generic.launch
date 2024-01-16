@@ -48,6 +48,7 @@
     <arg name="fog_filtering_inclination_above" default="-0.06" doc="this cond. + others to consider as fog point"/>
 
     <!-- clustering parameters -->
+    <arg name="max_distance" default="0.7" doc="the maximum euclidean 3D distance between two points to be clustered"/>
     <arg name="use_last_point_for_cluster_stamp" default="false" doc="use middle or last point for cluster stamp"/>
     <arg name="ignore_points_in_chessboard_pattern" default="true" doc="use this if clustering is too slow"/>
     <arg name="ignore_points_with_too_big_inclination_angle_diff" default="true" doc="avoids small distant clusters"/>
@@ -94,6 +95,7 @@
             <param name="fog_filtering_inclination_above" value="$(arg fog_filtering_inclination_above)"/>
 
             <!-- clustering -->
+            <param name="max_distance" value="$(arg max_distance)"/>
             <param name="use_last_point_for_cluster_stamp" value="$(arg use_last_point_for_cluster_stamp)"/>
             <param name="ignore_points_in_chessboard_pattern" value="$(arg ignore_points_in_chessboard_pattern)"/>
             <param name="ignore_points_with_too_big_inclination_angle_diff"
