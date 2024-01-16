@@ -117,9 +117,9 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
     else if (fill_fields_up_to_stage == RANGE_IMAGE_GENERATION)
         up_to_field = 15;
     else if (fill_fields_up_to_stage == GROUND_POINT_SEGMENTATION)
-        up_to_field = 18;
+        up_to_field = 19;
     else if (fill_fields_up_to_stage == CONTINUOUS_CLUSTERING)
-        up_to_field = 25;
+        up_to_field = 26;
 
     // Some point fields below should be actually UINT64. Unfortunately, this type is not available for a PointCloud2
     // message: http://docs.ros.org/en/melodic/api/sensor_msgs/html/msg/PointField.html. Therefore, we use FLOAT64 which
@@ -181,6 +181,9 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
                                          "height_over_ground",
                                          1,
                                          sensor_msgs::PointField::FLOAT32,
+                                         "ignore_for_clustering",
+                                         1,
+                                         sensor_msgs::PointField::UINT8,
                                          "finished_at_continuous_azimuth_angle",
                                          1,
                                          sensor_msgs::PointField::FLOAT64,
@@ -226,6 +229,7 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
     iterators.iter_gp_label_out = {msg, "ground_point_label"};
     iterators.iter_dbg_gp_label_out = {msg, "debug_ground_point_label"};
     iterators.iter_height_over_ground_out = {msg, "height_over_ground"};
+    iterators.iter_ignore_for_clustering_out = {msg, "ignore_for_clustering"};
     if (fill_fields_up_to_stage == GROUND_POINT_SEGMENTATION)
         return iterators;
     iterators.iter_finished_at_azimuth_angle = {msg, "finished_at_continuous_azimuth_angle"};
@@ -278,6 +282,7 @@ void addPointToMessage(PointCloud2Iterators& container,
     *(*container.iter_gp_label_out + data_index_message) = point.ground_point_label;
     *(*container.iter_dbg_gp_label_out + data_index_message) = point.debug_ground_point_label;
     *(*container.iter_height_over_ground_out + data_index_message) = point.height_over_ground;
+    *(*container.iter_ignore_for_clustering_out + data_index_message) = point.is_ignored ? BLUE : ORANGE;
     if (fill_fields_up_to_stage == GROUND_POINT_SEGMENTATION)
         return;
 
