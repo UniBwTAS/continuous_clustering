@@ -42,7 +42,7 @@ void ContinuousClustering::reset(int num_rows)
     sc_first_unpublished_global_column_index = -1;
     sc_minimum_required_global_column_indices.clear();
     sc_unfinished_point_trees_.clear();
-    sc_cluster_counter_ = 0;
+    sc_cluster_counter_ = 1;
     sc_inclination_angles_between_lasers_.resize(num_rows, std::nanf(""));
 
     // re-initialize workers
