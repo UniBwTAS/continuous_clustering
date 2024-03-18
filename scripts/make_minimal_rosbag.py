@@ -25,14 +25,14 @@ def generate_rectify_map(cam_model):
 
 
 def debayer_blur_and_rectify_image(msg_image, topic):
-    cv_image = open_cv_bridge.imgmsg_to_cv2(msg_image, desired_encoding='rgb8')
-    cv_image = cv.GaussianBlur(cv_image, (41, 41), 0)
+    cv_image = open_cv_bridge.imgmsg_to_cv2(msg_image, desired_encoding='bgr8')
+    cv_image = cv.GaussianBlur(cv_image, (21, 21), 0)
     # try to rectify image if camera info is already available
     try:
         cv_image_rectified = cv.remap(cv_image, rectify_maps[topic], None, cv.INTER_CUBIC)
     except KeyError:
         cv_image_rectified = cv_image
-    out = open_cv_bridge.cv2_to_imgmsg(cv_image_rectified, encoding="rgb8")
+    out = open_cv_bridge.cv2_to_compressed_imgmsg(cv_image_rectified, "jpg")
     out.header = msg_image.header
     return out
 
@@ -72,6 +72,9 @@ with rosbag.Bag(args.output_bag, 'w') as output_bag:
     bar = progressbar.ProgressBar(input_bag.get_message_count())
     for m in bar(input_bag.read_messages(return_connection_header=True)):
 
+        # copy connection header
+        connection_header = m.connection_header
+
         # calculate the relative time delta between current and first message
         if record_stamp_of_first_msg is None:
             record_stamp_of_first_msg = m.timestamp
@@ -81,21 +84,22 @@ with rosbag.Bag(args.output_bag, 'w') as output_bag:
         if m.topic in topic_whitelist:
 
             # generate rectify map from camera info in order to be able to rectify the raw image later
-            if args.blur_image and m.connection_header['type'] == b'sensor_msgs/CameraInfo' and m.topic not in rectify_maps:
+            if args.blur_image and connection_header['type'] == b'sensor_msgs/CameraInfo' and m.topic not in rectify_maps:
                 model = PinholeCameraModel()
                 model.fromCameraInfo(m.message)
                 rectify_maps[m.topic.replace("/camera_info", "")] = generate_rectify_map(model)
 
             # check if image and whether it should be blurred
-            if args.blur_image and m.connection_header['type'] == b'sensor_msgs/Image' and m.topic.endswith(
+            if args.blur_image and connection_header['type'] == b'sensor_msgs/Image' and m.topic.endswith(
                     'image_raw'):
                 msg = debayer_blur_and_rectify_image(m.message, m.topic.replace("/image_raw", ""))
-                topic = m.topic[:-9] + "image_rect_color"
+                topic = m.topic[:-9] + "image_rect_color/compressed"
+                connection_header = None  # generate new connection header as message type has changed
             else:
                 msg = m.message
                 topic = m.topic
 
-            if t_rel < start and 'latching' in m.connection_header and m.connection_header['latching'] == b'1':
+            if t_rel < start and 'latching' in connection_header and connection_header['latching'] == b'1':
                 # latched message before start; save and insert it later
                 latched_messages_before_start.append(m)
             elif t_rel >= start and (t_rel < end or end < 0):
@@ -106,4 +110,4 @@ with rosbag.Bag(args.output_bag, 'w') as output_bag:
                                      connection_header=m_latched.connection_header)  # using timestamp of m to avoid gap
 
                 # write message
-                output_bag.write(topic, msg, m.timestamp, connection_header=m.connection_header)
+                output_bag.write(topic, msg, m.timestamp, connection_header=connection_header)
