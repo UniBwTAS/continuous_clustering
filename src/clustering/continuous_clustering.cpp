@@ -838,6 +838,9 @@ void ContinuousClustering::findFinishedTreesAndAssignSameId(TreeCombinationJob&&
 {
     sc_unfinished_point_trees_.splice(sc_unfinished_point_trees_.end(), std::move(job.new_unfinished_point_trees));
 
+    if (job.ring_buffer_current_global_column_index % config_.clustering.cluster_point_trees_every_nth_column != 0)
+        return;
+
     std::list<std::list<RangeImageIndex>> trees_per_finished_cluster;
     std::list<uint64_t> finished_cluster_ids;
 

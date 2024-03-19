@@ -229,6 +229,7 @@ class RosContinuousClustering
         config_.clustering.ignore_points_with_too_big_inclination_angle_diff =
             config.ignore_points_with_too_big_inclination_angle_diff;
         config_.clustering.use_last_point_for_cluster_stamp = config.use_last_point_for_cluster_stamp;
+        config_.clustering.cluster_point_trees_every_nth_column = config.cluster_point_trees_every_nth_column;
 
         clustering_.setConfiguration(config_);
     }

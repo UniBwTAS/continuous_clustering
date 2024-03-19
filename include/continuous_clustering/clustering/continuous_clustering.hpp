@@ -75,6 +75,7 @@ struct ContinuousClusteringConfiguration
     bool ignore_points_in_chessboard_pattern{true};
     bool ignore_points_with_too_big_inclination_angle_diff{true};
     bool use_last_point_for_cluster_stamp{false};
+    int cluster_point_trees_every_nth_column{1};
 };
 
 struct Configuration
