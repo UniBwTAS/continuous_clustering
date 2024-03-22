@@ -10,11 +10,13 @@ ContinuousClustering::ContinuousClustering() = default;
 
 void ContinuousClustering::reset(int num_rows)
 {
-    // recalculate some intermediate values in case the parameters have changed
-    num_columns_ = config_.range_image.num_columns;
-    num_rows_ = num_rows;
-    srig_azimuth_width_per_column = static_cast<float>((2 * M_PI)) / static_cast<float>(num_columns_);
-    ring_buffer_max_columns = num_columns_ * 10;
+    // init range image
+    range_image = ContinuousRangeImage(num_rows,
+                                       config_.range_image.num_columns,
+                                       config_.range_image.num_columns * 10,
+                                       config_.range_image.sensor_is_clockwise);
+    range_image.setFinishedColumnCallback(
+        std::bind(finished_column_callback_, std::placeholders::_1, std::placeholders::_2, true));
 
     // shutdown workers
     insertion_thread_pool.shutdown();
@@ -23,24 +25,12 @@ void ContinuousClustering::reset(int num_rows)
     tree_combination_thread_pool.shutdown();
     publishing_thread_pool.shutdown();
 
-    // init/reset range image (implemented as ring buffer)
-    range_image_.resize(ring_buffer_max_columns * num_rows);
-    clearColumns(0, ring_buffer_max_columns - 1);
-    ring_buffer_start_global_column_index = -1; // does not start at zero but at the minimum laser of first firing
-    ring_buffer_end_global_column_index = -1;
-
-    // reset members for continuous range image generation (srig)
-    srig_previous_global_column_index_of_rearmost_laser = 0;
-    srig_previous_global_column_index_of_foremost_laser = -1;
-    srig_first_unfinished_global_column_index = -1;
     reset_required = false;
 
     // reset members for continuous ground point segmentation (sgps)
     sgps_ego_robot_frame_from_sensor_frame_.reset();
 
     // reset members for continuous clustering (sc)
-    sc_first_unpublished_global_column_index = -1;
-    sc_minimum_required_global_column_indices.clear();
     sc_unfinished_point_trees_.clear();
     sc_cluster_counter_ = 1;
     sc_inclination_angles_between_lasers_.resize(num_rows, std::nanf(""));
@@ -87,7 +77,7 @@ bool ContinuousClustering::resetRequired() const
 
 void ContinuousClustering::addFiring(const RawPoints::ConstPtr& firing, const Eigen::Isometry3d& odom_from_sensor)
 {
-    if (num_rows_ != firing->points.size())
+    if (range_image.num_rows != firing->points.size())
         throw std::runtime_error("The number of points in a firing has changed. This is probably a bug!");
     insertion_thread_pool.enqueue({firing, odom_from_sensor});
 }
@@ -95,6 +85,8 @@ void ContinuousClustering::addFiring(const RawPoints::ConstPtr& firing, const Ei
 void ContinuousClustering::setFinishedColumnCallback(std::function<void(int64_t, int64_t, bool)> cb)
 {
     finished_column_callback_ = std::move(cb);
+    range_image.setFinishedColumnCallback(
+        std::bind(finished_column_callback_, std::placeholders::_1, std::placeholders::_2, true));
 }
 
 void ContinuousClustering::setFinishedClusterCallback(std::function<void(const std::vector<Point>&, uint64_t)> cb)
@@ -104,196 +96,23 @@ void ContinuousClustering::setFinishedClusterCallback(std::function<void(const s
 
 void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
 {
-    // save sensor position in odom frame
-    srig_sensor_position = job.odom_frame_from_sensor_frame.translation();
-
-    // sensor position
-    sgps_sensor_position.x = static_cast<float>(srig_sensor_position.x());
-    sgps_sensor_position.y = static_cast<float>(srig_sensor_position.y());
-    sgps_sensor_position.z = static_cast<float>(srig_sensor_position.z());
-
-    // keep track of the global column indices of the foremost and rearmost laser (w.r.t. azimuth angle clockwise =
-    // rotation direction of lidar sensor) in this firing
-    int64_t global_column_index_of_foremost_laser = -1;
-    int64_t global_column_index_of_rearmost_laser = -1;
-
-    // rotation index
-    int64_t previous_rotation_index_of_rearmost_laser =
-        srig_previous_global_column_index_of_rearmost_laser / num_columns_;
-
-    // process firing from top to bottom
-    for (int row_index = 0; row_index < job.firing->points.size(); row_index++)
-    {
-        // obtain point
-        const RawPoint& raw_point = job.firing->points[row_index];
-        Eigen::Vector3d p(raw_point.x, raw_point.y, raw_point.z);
-
-        if (std::isnan(p.x()))
-            continue;
-
-        // transform point into odom
-        Eigen::Vector3d p_odom = job.odom_frame_from_sensor_frame * p;
-
-        // get point relative to sensor origin
-        Eigen::Vector3d p_odom_rel = p_odom - srig_sensor_position;
-
-        // calculate azimuth angle
-        // float azimuth_angle = std::atan2(static_cast<float>(p_odom_rel.y()), static_cast<float>(p_odom_rel.x()));
-        float azimuth_angle = std::atan2(static_cast<float>(p.y()), static_cast<float>(p.x()));
-
-        // calculate azimuth angle which starts at negative X-axis with 0 and increases with ongoing lidar rotation
-        // to 2 pi, which is more intuitive and important for fast array index calculation
-        float increasing_azimuth_angle = config_.range_image.sensor_is_clockwise ?
-                                             -azimuth_angle + static_cast<float>(M_PI) :
-                                             azimuth_angle + static_cast<float>(M_PI);
-
-        // global column index
-        int column_index_within_rotation = static_cast<int>(increasing_azimuth_angle / srig_azimuth_width_per_column);
-        int64_t global_column_index =
-            previous_rotation_index_of_rearmost_laser * num_columns_ + column_index_within_rotation;
-
-        // check if we hit negative x-axis with w.r.t. previous firing
-        int column_index_within_rotation_of_previous_rearmost_laser =
-            static_cast<int>(srig_previous_global_column_index_of_rearmost_laser % num_columns_);
-        int column_diff = column_index_within_rotation - column_index_within_rotation_of_previous_rearmost_laser;
-        int columns_of_half_rotation = num_columns_ / 2;
-        int rotation_index_offset = 0;
-        if (column_diff < -columns_of_half_rotation)
-        {
-            global_column_index += num_columns_; // add one rotation
-            rotation_index_offset = 1;
-        }
-        else if (srig_previous_global_column_index_of_rearmost_laser > 0 && column_diff > columns_of_half_rotation)
-        {
-            // In very rare cases this can happen because the minimum azimuth of rearmost laser can be smaller than
-            // that of previous firing (most probably due to ego motion correction).
-            // This gets only tricky when srig_previous_global_column_index_of_rearmost_laser % num_columns == 0 and
-            // azimuth of rearmost laser in current firing is smaller than previous one.
-            // So we have to subtract one rotation.
-            global_column_index -= num_columns_; // subtract one rotation
-            rotation_index_offset = -1;
-        }
-
-        // local column index
-        int local_column_index = static_cast<int>(global_column_index % ring_buffer_max_columns);
-
-        // get correct point
-        Point* point = &range_image_[local_column_index * num_rows_ + row_index]; // column major order
-
-        // calculate continuous azimuth angle (even if we move it to the next cell, this value remains the same)
-        double continuous_azimuth_angle =
-            (2 * M_PI) * static_cast<double>(previous_rotation_index_of_rearmost_laser + rotation_index_offset) +
-            increasing_azimuth_angle;
-
-        // in case this cell is already occupied, try next column
-        auto distance = static_cast<float>(p_odom_rel.norm());
-        if (!std::isnan(point->distance) && !std::isnan(distance))
-        {
-            int next_local_column_index = local_column_index + 1;
-            if (next_local_column_index >= ring_buffer_max_columns)
-                next_local_column_index -= ring_buffer_max_columns;
-            Point* next_point = &range_image_[next_local_column_index * num_rows_ + row_index];
-            if (std::isnan(next_point->distance))
-            {
-                point = next_point;
-                local_column_index = next_local_column_index;
-                global_column_index++;
-            }
-        }
-
-        // avoid that a valid cell (non-nan) is overwritten by a nan or more distant value
-        if (!std::isnan(point->distance) && (std::isnan(distance) || distance >= point->distance))
-            continue;
-
-        // do not insert into columns that were passed to the next processing step
-        bool laser_too_far_behind = false;
-        if (srig_first_unfinished_global_column_index >= 0 &&
-            global_column_index < srig_first_unfinished_global_column_index)
-        {
-            /*ROS_WARN_STREAM("Ignore point of firing because it would be inserted into a already published column. "
-                            "Wanted to insert at "
-                            << global_column_index << ", but first unfinished global column index is already at "
-                            << srig_first_unfinished_global_column_index << " (row index: " << row_index << ")");*/
-
-            laser_too_far_behind = true;
-        }
-
-        // fill point data
-        if (!laser_too_far_behind)
-        {
-            point->xyz.x = static_cast<float>(p_odom.x());
-            point->xyz.y = static_cast<float>(p_odom.y());
-            point->xyz.z = static_cast<float>(p_odom.z());
-            point->firing_index = raw_point.firing_index;
-            point->intensity = raw_point.intensity;
-            point->stamp = raw_point.stamp;
-            point->distance = distance;
-            point->azimuth_angle = azimuth_angle;
-            point->inclination_angle = std::asin(static_cast<float>(p_odom_rel.z()) / point->distance);
-            point->continuous_azimuth_angle = continuous_azimuth_angle; // omitted cells will be filled again later
-            point->global_column_index = global_column_index;           // omitted cells will be filled again later
-            point->local_column_index = local_column_index;
-            point->row_index = row_index;
-            point->globally_unique_point_index = raw_point.globally_unique_point_index;
-        }
-
-        // keep track of global column index of rearmost & foremost laser
-        if (global_column_index_of_rearmost_laser < 0 || global_column_index < global_column_index_of_rearmost_laser)
-            global_column_index_of_rearmost_laser = global_column_index;
-        if (global_column_index_of_foremost_laser < 0 || global_column_index > global_column_index_of_foremost_laser)
-            global_column_index_of_foremost_laser = global_column_index;
-    }
-
-    // if for this firing a minimum/maximum column index was found then use it as the new one
-    if (global_column_index_of_rearmost_laser >= 0 && global_column_index_of_foremost_laser >= 0)
-    {
-        // if the azimuth range of the firing covers more than 180 degrees, this means that the firing is
-        // intersected with negative x-axis (this means that the range image was incorrectly filled -> reset)
-        if ((global_column_index_of_foremost_laser - global_column_index_of_rearmost_laser) > num_columns_ / 2)
-        {
-            std::cout << "Very first firing after reset intersects with negative x-axis: " +
-                             std::to_string(global_column_index_of_rearmost_laser) + ", " +
-                             std::to_string(global_column_index_of_foremost_laser) + ", " +
-                             std::to_string(srig_previous_global_column_index_of_rearmost_laser) +
-                             ". This is invalid. Reset continuous clustering on next message.";
-            reset_required = true;
-            return;
-        }
-
-        if (global_column_index_of_rearmost_laser > srig_previous_global_column_index_of_rearmost_laser)
-            srig_previous_global_column_index_of_rearmost_laser = global_column_index_of_rearmost_laser;
-        if (global_column_index_of_foremost_laser > srig_previous_global_column_index_of_foremost_laser)
-            srig_previous_global_column_index_of_foremost_laser = global_column_index_of_foremost_laser;
-    }
-
-    // there is no information about minimum and maximum global column index
-    if (srig_previous_global_column_index_of_foremost_laser < 0)
-        return;
-
-    // initialize start of ring buffer
-    if (ring_buffer_start_global_column_index == -1)
-    {
-        ring_buffer_start_global_column_index = srig_previous_global_column_index_of_rearmost_laser;
-        sc_first_unpublished_global_column_index = srig_previous_global_column_index_of_rearmost_laser;
-    }
-
-    // update end of ring buffer (maximum global column index ever seen)
-    if (srig_previous_global_column_index_of_foremost_laser > ring_buffer_end_global_column_index)
-        ring_buffer_end_global_column_index = srig_previous_global_column_index_of_foremost_laser;
-
-    // start publishing at index of last laser of very first firing
-    if (srig_first_unfinished_global_column_index == -1)
-        srig_first_unfinished_global_column_index = srig_previous_global_column_index_of_rearmost_laser;
+    int64_t first, last;
+    range_image.insertFiring(job.firing, first, last);
 
     // iterate over finished but unfinished columns and publish them
-    while (srig_first_unfinished_global_column_index < srig_previous_global_column_index_of_rearmost_laser)
-        segmentation_thread_pool.enqueue(
-            {srig_first_unfinished_global_column_index++, job.odom_frame_from_sensor_frame});
+    for (int64_t global_column_index = first; global_column_index <= last; global_column_index++)
+        segmentation_thread_pool.enqueue({global_column_index, job.odom_frame_from_sensor_frame});
 }
 
 void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJob&& job)
 {
-    int local_column_index = static_cast<int>(job.ring_buffer_current_global_column_index % ring_buffer_max_columns);
+    Eigen::Vector3d t = job.odom_frame_from_sensor_frame.translation();
+    Point3D sensor_position_in_odom;
+    sensor_position_in_odom.x = static_cast<float>(t.x());
+    sensor_position_in_odom.y = static_cast<float>(t.y());
+    sensor_position_in_odom.z = static_cast<float>(t.z());
+
+    int local_column_index = range_image.toLocalColumnIndex(job.ring_buffer_current_global_column_index);
 
     if (!sgps_ego_robot_frame_from_sensor_frame_)
         throw std::runtime_error("Transform robot frame from sensor frame was not set yet!");
@@ -311,10 +130,17 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
     uint8_t previous_label;
     float inclination_previous_laser = 0; // calculate difference between inclination angles for subsequent steps
 
-    for (int row_index = num_rows_ - 1; row_index >= 0; row_index--)
+    for (int row_index = range_image.num_rows - 1; row_index >= 0; row_index--)
     {
         // obtain point
-        Point& point = range_image_[local_column_index * num_rows_ + row_index];
+        Point& point = range_image.getPoint(row_index, local_column_index);
+
+        // get point in odom
+        Eigen::Vector3d p{point.xyz.x, point.xyz.y, point.xyz.z};
+        p = job.odom_frame_from_sensor_frame * p;
+        point.xyz.x = static_cast<float>(p.x());
+        point.xyz.y = static_cast<float>(p.y());
+        point.xyz.z = static_cast<float>(p.z());
 
         // check if there is a problem with the ring buffer
         int64_t point_global_column_index_copy = point.global_column_index;
@@ -339,18 +165,17 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
                 "is some other issue with clearing (not cleared at all or written after clearing): " +
                 std::to_string(point_global_column_index_copy) + ", " +
                 std::to_string(job.ring_buffer_current_global_column_index) + ", " +
-                std::to_string(ring_buffer_max_columns) +
+                std::to_string(range_image.max_columns_ring_buffer) +
                 "; This typically happens when the clustering is not fast enough to handle all the firings. Consider "
                 "to play the sensor data more slowly or to adjust the parameters to make the clustering faster.");
         }
 
         // refill local/global column index because it was not filled for omitted cells
         point.global_column_index = job.ring_buffer_current_global_column_index;
-        point.local_column_index =
-            static_cast<int>(job.ring_buffer_current_global_column_index % ring_buffer_max_columns);
+        point.local_column_index = range_image.toLocalColumnIndex(job.ring_buffer_current_global_column_index);
 
         // keep track of (differences between) the inclination angles of the lasers (for later processing steps)
-        float inclination_current_laser = range_image_[local_column_index * num_rows_ + row_index].inclination_angle;
+        float inclination_current_laser = range_image.getPoint(row_index, local_column_index).inclination_angle;
         float diff = inclination_current_laser - inclination_previous_laser;
         if (!std::isnan(diff))
             sc_inclination_angles_between_lasers_[row_index] = diff; // last value is useless but we do not use it
@@ -361,15 +186,15 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
         {
             // use inclination angle from previous column (it is useful to supplement nan cells with an inclination
             // angle in order to be able to break the while loop earlier during association
-            if (config_.range_image.supplement_inclination_angle_for_nan_cells && row_index < num_rows_ - 1)
+            if (config_.range_image.supplement_inclination_angle_for_nan_cells && row_index < range_image.num_rows - 1)
             {
-                Point& point_below = range_image_[local_column_index * num_rows_ + (row_index + 1)];
+                Point& point_below = range_image.getPoint(row_index + 1, local_column_index);
                 point.inclination_angle =
                     point_below.inclination_angle + sc_inclination_angles_between_lasers_[row_index];
             }
             // recalculate continuous azimuth for omitted/NaN cells (for later processing steps)
             point.continuous_azimuth_angle = (static_cast<double>(job.ring_buffer_current_global_column_index) + 0.5) *
-                                             srig_azimuth_width_per_column;
+                                             range_image.azimuth_range_of_single_column;
             continue;
         }
 
@@ -403,7 +228,7 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
             continue;
         }
 
-        Point3D current_position_wrt_sensor = current_position - sgps_sensor_position;
+        Point3D current_position_wrt_sensor = current_position - sensor_position_in_odom;
 
         // special handling first point outside the ego bounding box
         if (!first_point_found)
@@ -512,10 +337,10 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
 
             // go down in the rows and mark very close points also as obstacle
             int prev_row_index = row_index + 1;
-            while (prev_row_index < num_rows_)
+            while (prev_row_index < range_image.num_rows)
             {
-                Point& cur_point = range_image_[local_column_index * num_rows_ + prev_row_index];
-                Point2D prev_position_wrt_sensor_2d = to2dInAzimuthPlane(cur_point.xyz - sgps_sensor_position);
+                Point& cur_point = range_image.getPoint(prev_row_index, local_column_index);
+                Point2D prev_position_wrt_sensor_2d = to2dInAzimuthPlane(cur_point.xyz - sensor_position_in_odom);
                 if (cur_point.debug_ground_point_label == YELLOW ||
                     (cur_point.ground_point_label == GP_GROUND &&
                      std::abs((current_position_wrt_sensor_2d - prev_position_wrt_sensor_2d).x) <
@@ -564,10 +389,9 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
         previous_label = point.debug_ground_point_label;
     }
 
-    for (int row_index = num_rows_ - 1; row_index >= 0; row_index--)
+    for (int row_index = range_image.num_rows - 1; row_index >= 0; row_index--)
     {
-        int current_data_index_ri = local_column_index * num_rows_ + row_index; // column major
-        Point& point = range_image_[current_data_index_ri];
+        Point& point = range_image.getPoint(row_index, local_column_index);
 
         // prepare everything for next step in pipeline (point association)
         point.is_ignored = false;
@@ -594,7 +418,8 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
         }
 
         // ignore this point if the distance in combination with inclination diff can't be below distance threshold
-        if (config_.clustering.ignore_points_with_too_big_inclination_angle_diff && row_index < (num_rows_ - 1) &&
+        if (config_.clustering.ignore_points_with_too_big_inclination_angle_diff &&
+            row_index < (range_image.num_rows - 1) &&
             std::atan2(config_.clustering.max_distance, point.distance) <
                 sc_inclination_angles_between_lasers_[row_index])
         {
@@ -652,15 +477,16 @@ void ContinuousClustering::associatePointToPointTree(Point& point, Point& point_
     // happen when a cluster is forcibly considered to be finished because it already spans a
     // full rotation. Then we do not want to associate more points to it.
     Point& point_root =
-        range_image_[point_other.tree_root_.column_index * num_rows_ + point_other.tree_root_.row_index];
+        range_image.getPoint(point_other.tree_root_.row_index, point_other.tree_root_.local_column_index);
     uint32_t new_cluster_width = point.global_column_index - point_root.global_column_index + 1;
-    bool point_tree_is_smaller_than_one_rotation = new_cluster_width <= num_columns_; // (1)
-    bool point_tree_is_finished_forcibly = point_root.belongs_to_finished_cluster;    // (2)
+    bool point_tree_is_smaller_than_one_rotation = new_cluster_width <= range_image.num_columns_per_rotation; // (1)
+    bool point_tree_is_finished_forcibly = point_root.belongs_to_finished_cluster;                            // (2)
     if (point_tree_is_smaller_than_one_rotation && !point_tree_is_finished_forcibly)
     {
         point.tree_root_ = point_other.tree_root_;
-        point.tree_id = point_root.global_column_index * num_rows_ + point_root.row_index;
-        point_other.child_points.emplace_back(static_cast<uint16_t>(point.row_index), point.local_column_index);
+        point.tree_id = point_root.global_column_index * range_image.num_rows + point_root.row_index;
+        point_other.child_points.emplace_back(
+            static_cast<uint16_t>(point.row_index), point.global_column_index, point.local_column_index);
 
         // keep track of cluster width
         point_root.cluster_width = new_cluster_width;
@@ -678,9 +504,9 @@ void ContinuousClustering::associatePointTreeToPointTree(const Point& point, con
     // *1) so we must add a mutual link between the trees roots
 
     // get tree root of current and other point
-    Point& point_root = range_image_[point.tree_root_.column_index * num_rows_ + point.tree_root_.row_index];
+    Point& point_root = range_image.getPoint(point.tree_root_.row_index, point.tree_root_.local_column_index);
     Point& point_root_other =
-        range_image_[point_other.tree_root_.column_index * num_rows_ + point_other.tree_root_.row_index];
+        range_image.getPoint(point_other.tree_root_.row_index, point_other.tree_root_.local_column_index);
 
     // similar to above (unassociated point is added to point tree) we also don't want to
     // introduce links between point trees when either of them was forcibly finished because its
@@ -695,15 +521,12 @@ void ContinuousClustering::associatePointTreeToPointTree(const Point& point, con
     }
 }
 
-void ContinuousClustering::traverseFieldOfView(Point& point,
-                                               float max_angle_diff,
-                                               int ring_buffer_first_local_column_index)
+void ContinuousClustering::traverseFieldOfView(Point& point, float max_angle_diff, int minium_column_index)
 {
     // go left each column until azimuth angle difference gets too large
-    double min_possible_continuous_azimuth_angle = point.continuous_azimuth_angle - max_angle_diff;
-    int required_steps_back = static_cast<int>(std::ceil(max_angle_diff / srig_azimuth_width_per_column));
+    int required_steps_back = static_cast<int>(std::ceil(max_angle_diff / range_image.azimuth_range_of_single_column));
     required_steps_back = std::min(required_steps_back, config_.clustering.max_steps_in_row);
-    int64_t other_column_index = point.local_column_index;
+    int other_column_index = point.local_column_index;
     for (int num_steps_back = 0; num_steps_back <= required_steps_back; num_steps_back++)
     {
         for (int direction = -1; direction <= 1; direction += 2)
@@ -715,11 +538,11 @@ void ContinuousClustering::traverseFieldOfView(Point& point,
             // go up/down each row until the inclination angle difference gets too large
             int num_steps_vertical = direction == 1 || num_steps_back == 0 ? 1 : 0;
             int other_row_index = direction == 1 || num_steps_back == 0 ? point.row_index + direction : point.row_index;
-            while (other_row_index >= 0 && other_row_index < num_rows_ &&
+            while (other_row_index >= 0 && other_row_index < range_image.num_rows &&
                    num_steps_vertical <= config_.clustering.max_steps_in_column)
             {
                 // get other point
-                Point& point_other = range_image_[other_column_index * num_rows_ + other_row_index];
+                Point& point_other = range_image.getPoint(other_row_index, other_column_index);
 
                 // count number of visited points for analyzing
                 point.number_of_visited_neighbors += 1;
@@ -730,13 +553,13 @@ void ContinuousClustering::traverseFieldOfView(Point& point,
 
                 // if other point is ignored or has already the same tree root then do nothing (*1)
                 if (!point_other.is_ignored &&
-                    (point.tree_root_.column_index == 0 || point_other.tree_root_ != point.tree_root_))
+                    (point.tree_root_.local_column_index == 0 || point_other.tree_root_ != point.tree_root_))
                 {
                     // if distance is small enough then try to associate to tree
                     if (checkClusteringCondition(point, point_other))
                     {
                         // check if point is already associated to any point tree
-                        if (point.tree_root_.column_index == -1)
+                        if (point.tree_root_.local_column_index == -1)
                             associatePointToPointTree(point, point_other, max_angle_diff);
                         else
                             associatePointTreeToPointTree(point, point_other);
@@ -744,7 +567,7 @@ void ContinuousClustering::traverseFieldOfView(Point& point,
                 }
 
                 // stop searching if point was already associated and minimum number of columns were processed
-                if (point.tree_root_.column_index != -1 && config_.clustering.stop_after_association_enabled &&
+                if (point.tree_root_.local_column_index != -1 && config_.clustering.stop_after_association_enabled &&
                     num_steps_vertical >= config_.clustering.stop_after_association_min_steps)
                     break;
 
@@ -754,19 +577,19 @@ void ContinuousClustering::traverseFieldOfView(Point& point,
         }
 
         // stop searching if point was already associated and minimum number of points were processed
-        if (point.tree_root_.column_index != -1 && config_.clustering.stop_after_association_enabled &&
+        if (point.tree_root_.local_column_index != -1 && config_.clustering.stop_after_association_enabled &&
             num_steps_back >= config_.clustering.stop_after_association_min_steps)
             break;
 
         // stop searching if we are at the beginning of the ring buffer
-        if (other_column_index == ring_buffer_first_local_column_index)
+        if (other_column_index == minium_column_index)
             break;
 
         other_column_index--;
 
         // jump to the end of the ring buffer
         if (other_column_index < 0)
-            other_column_index += ring_buffer_max_columns;
+            other_column_index += range_image.max_columns_ring_buffer;
     }
 }
 
@@ -778,17 +601,21 @@ void ContinuousClustering::associatePointsInColumn(AssociationJob&& job)
     // keep track of the current minimum azimuth angle of the current column
     double current_minimum_continuous_azimuth_angle = std::numeric_limits<double>::max();
 
-    // get local start index of ring buffer start TODO: Ensure that this column is not cleared during this run
-    int ring_buffer_first_local_column_index =
-        static_cast<int>(sc_first_unpublished_global_column_index % ring_buffer_max_columns);
+    // get global & local column indices of current column
+    int64_t column_index = job.ring_buffer_current_global_column_index;
+    int local_column_index = range_image.toLocalColumnIndex(column_index);
 
-    int ring_buffer_current_local_column_index =
-        static_cast<int>(job.ring_buffer_current_global_column_index % ring_buffer_max_columns);
+    // get lower bound we want to reserve in order to ensure that columns are not cleared during fov traversal
+    int64_t minimum_column_index = job.ring_buffer_current_global_column_index - config_.clustering.max_steps_in_row;
 
-    for (int row_index = 0; row_index < num_rows_; row_index++)
+    // ensure that no columns are cleared during traversal and that we do not iterate past the start of the range image
+    minimum_column_index = range_image.addMinimumRequiredStartColumnIndex(minimum_column_index, true);
+    int minimum_local_column_index = range_image.toLocalColumnIndex(minimum_column_index);
+
+    for (int row_index = 0; row_index < range_image.num_rows; row_index++)
     {
         // get current point
-        Point& point = range_image_[ring_buffer_current_local_column_index * num_rows_ + row_index];
+        Point& point = range_image.getPoint(row_index, local_column_index);
 
         // keep track of the current minimum continuous azimuth angle
         if (point.continuous_azimuth_angle < current_minimum_continuous_azimuth_angle)
@@ -799,20 +626,20 @@ void ContinuousClustering::associatePointsInColumn(AssociationJob&& job)
             continue;
 
         // create index of this point
-        RangeImageIndex index{static_cast<uint16_t>(row_index), ring_buffer_current_local_column_index};
+        RangeImageIndex index{static_cast<uint16_t>(row_index), column_index, local_column_index};
 
         // calculate minimum possible azimuth angle
         float max_angle_diff = std::asin(config_.clustering.max_distance / point.distance);
 
         // traverse field of view
-        traverseFieldOfView(point, max_angle_diff, ring_buffer_first_local_column_index);
+        traverseFieldOfView(point, max_angle_diff, minimum_local_column_index);
 
         // point could not be associated to any other point in field of view
-        if (point.tree_root_.column_index == -1)
+        if (point.tree_root_.local_column_index == -1)
         {
             // this point could not be associated to any tree -> init new tree
             point.tree_root_ = index;
-            point.tree_id = point.global_column_index * num_rows_ + point.row_index;
+            point.tree_id = point.global_column_index * range_image.num_rows + point.row_index;
 
             // calculate finish time (will be increased when new points are associated to tree)
             point.finished_at_continuous_azimuth_angle = point.continuous_azimuth_angle + max_angle_diff;
@@ -823,8 +650,15 @@ void ContinuousClustering::associatePointsInColumn(AssociationJob&& job)
 
             // create shortcut to this tree root
             new_unfinished_point_trees.push_back(index);
+
+            // signal continuous range image a new minimum required start index in order to ensure that columns will not
+            // be erased until this point tree is fully processed
+            range_image.addMinimumRequiredStartColumnIndex(column_index);
         }
     }
+
+    // remove our column lock
+    range_image.removeMinimumRequiredStartColumnIndex(minimum_column_index);
 
     // pass this job to the next thread
     TreeCombinationJob next_job;
@@ -847,7 +681,7 @@ void ContinuousClustering::findFinishedTreesAndAssignSameId(TreeCombinationJob&&
     std::list<RangeImageIndex> trees_to_visit_for_current_cluster;
     for (RangeImageIndex& tree_root_index : sc_unfinished_point_trees_)
     {
-        Point& point_root = range_image_[tree_root_index.column_index * num_rows_ + tree_root_index.row_index];
+        Point& point_root = range_image.getPoint(tree_root_index.row_index, tree_root_index.local_column_index);
         if (point_root.visited_at_continuous_azimuth_angle == job.current_minimum_continuous_azimuth_angle)
             continue; // this point tree was already visited, no need to use it as start node for BFS
         trees_collected_for_current_cluster.clear();
@@ -862,7 +696,7 @@ void ContinuousClustering::findFinishedTreesAndAssignSameId(TreeCombinationJob&&
             RangeImageIndex cur_tree_root_index = trees_to_visit_for_current_cluster.front();
             trees_to_visit_for_current_cluster.pop_front();
             Point& cur_point_root =
-                range_image_[cur_tree_root_index.column_index * num_rows_ + cur_tree_root_index.row_index];
+                range_image.getPoint(cur_tree_root_index.row_index, cur_tree_root_index.local_column_index);
 
             // The following condition is always false under normal circumstances. It can only be true when a cluster in
             // the current graph was forcibly finished (exceeds full rotation) and when there was a race condition with
@@ -898,7 +732,7 @@ void ContinuousClustering::findFinishedTreesAndAssignSameId(TreeCombinationJob&&
             for (const RangeImageIndex& other_tree_root_index : cur_point_root.associated_trees)
             {
                 Point& other_point_root =
-                    range_image_[other_tree_root_index.column_index * num_rows_ + other_tree_root_index.row_index];
+                    range_image.getPoint(other_tree_root_index.row_index, other_tree_root_index.local_column_index);
                 // if neighbor point tree was not already visited then traverse it too
                 if (other_point_root.visited_at_continuous_azimuth_angle !=
                     job.current_minimum_continuous_azimuth_angle)
@@ -908,7 +742,7 @@ void ContinuousClustering::findFinishedTreesAndAssignSameId(TreeCombinationJob&&
 
         // check if finished point trees together already exceed one rotation
         bool finished_point_trees_exceed_one_rotation = false;
-        if (max_column_index - min_column_index >= num_columns_)
+        if (max_column_index - min_column_index >= range_image.num_columns_per_rotation)
         {
             std::cout << "Found a cluster exceeding one rotation: " << (max_column_index - min_column_index) << " ("
                       << min_column_index << ", " << max_column_index << ")" << std::endl;
@@ -926,45 +760,28 @@ void ContinuousClustering::findFinishedTreesAndAssignSameId(TreeCombinationJob&&
         {
             // mark current tree root as finished
             Point& cur_point_root =
-                range_image_[cur_tree_root_index.column_index * num_rows_ + cur_tree_root_index.row_index];
+                range_image.getPoint(cur_tree_root_index.row_index, cur_tree_root_index.local_column_index);
             cur_point_root.belongs_to_finished_cluster = true;
         }
 
-        if (cluster_num_points > 5)
-        {
-            trees_per_finished_cluster.push_back(std::move(trees_collected_for_current_cluster));
-            finished_cluster_ids.push_back(sc_cluster_counter_++);
-        }
+        trees_per_finished_cluster.push_back(std::move(trees_collected_for_current_cluster));
+        finished_cluster_ids.push_back(sc_cluster_counter_++);
     }
 
-    // erase finished trees belonging to finished clusters + keep track of the minimum global column index of tree roots
-    int64_t minimum_required_global_column_index = std::numeric_limits<int64_t>::max();
+    // erase finished trees belonging to finished clusters
     auto it_erase = sc_unfinished_point_trees_.begin();
     while (it_erase != sc_unfinished_point_trees_.end())
     {
-        Point& cur_point_root = range_image_[it_erase->column_index * num_rows_ + it_erase->row_index];
-        if (cur_point_root.global_column_index < minimum_required_global_column_index)
-            minimum_required_global_column_index = cur_point_root.global_column_index;
+        Point& cur_point_root = range_image.getPoint(it_erase->row_index, it_erase->local_column_index);
         if (cur_point_root.belongs_to_finished_cluster)
             it_erase = sc_unfinished_point_trees_.erase(it_erase);
         else
             it_erase++;
     }
 
-    // if there are no unfinished clusters then set the start index one after current global column index
-    if (minimum_required_global_column_index == std::numeric_limits<int64_t>::max())
-        minimum_required_global_column_index = job.ring_buffer_current_global_column_index + 1;
-
-    // save the minimum required global column index of this job in order not to publish/clear the data too early
-    {
-        std::lock_guard<std::mutex> lock(sc_first_unfinished_global_column_index_mutex);
-        sc_minimum_required_global_column_indices.push_back(minimum_required_global_column_index);
-    }
-
     // create job for new clusters
     PublishingJob next_job;
     next_job.ring_buffer_current_global_column_index = job.ring_buffer_current_global_column_index;
-    next_job.ring_buffer_min_required_global_column_index = minimum_required_global_column_index;
     next_job.cluster_ids = std::move(finished_cluster_ids);
     next_job.trees_per_finished_cluster = std::move(trees_per_finished_cluster);
     publishing_thread_pool.enqueue(std::move(next_job));
@@ -998,7 +815,7 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PublishingJob&& job)
             {
                 RangeImageIndex cur_point_index = points_to_visit_for_this_tree.front();
                 points_to_visit_for_this_tree.pop_front();
-                Point& cur_point = range_image_[cur_point_index.column_index * num_rows_ + cur_point_index.row_index];
+                Point& cur_point = range_image.getPoint(cur_point_index.row_index, cur_point_index.local_column_index);
                 cur_point.id = cluster_id;
                 cluster_points.push_back(cur_point);
                 if (cur_point.stamp < min_stamp_for_this_cluster)
@@ -1010,6 +827,9 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PublishingJob&& job)
                 for (const RangeImageIndex& child_point_index : cur_point.child_points)
                     points_to_visit_for_this_tree.push_back(child_point_index);
             }
+
+            // tell the range image that there is no need to wait for this point tree anymore
+            range_image.removeMinimumRequiredStartColumnIndex(cur_tree_root_index.column_index);
         }
 
         // keep track of minimum stamp for this message
@@ -1029,116 +849,9 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PublishingJob&& job)
         it_trees_per_finished_cluster++;
     }
 
-    // update start of column index (this is challenging because this job could be finished earlier than a previous one
-    // due to parallelization).
-    int64_t first_unpublished_global_column_index_old;
-    int64_t first_unpublished_global_column_index_new;
-    int64_t ring_buffer_start_global_column_index_old;
-    int64_t ring_buffer_start_global_column_index_new;
-    {
-        std::lock_guard<std::mutex> lock(sc_first_unfinished_global_column_index_mutex);
-
-        // remove the minimum required global column index from the list, as this job (batch of clusters) is finished
-        auto pos = std::lower_bound(sc_minimum_required_global_column_indices.begin(),
-                                    sc_minimum_required_global_column_indices.end(),
-                                    job.ring_buffer_min_required_global_column_index);
-        if (pos != sc_minimum_required_global_column_indices.end() &&
-            *pos == job.ring_buffer_min_required_global_column_index)
-            sc_minimum_required_global_column_indices.erase(pos);
-        else
-            throw std::runtime_error("The minimum unprocessed column index is not available! This is a bug!");
-
-        // start of the publishing/clear range
-        ring_buffer_start_global_column_index_old = ring_buffer_start_global_column_index;
-        first_unpublished_global_column_index_old = sc_first_unpublished_global_column_index;
-
-        // find end of publish range
-        if (!sc_minimum_required_global_column_indices.empty())
-        {
-            // set start of ring buffer to the minimum required global column index along all unpublished clusters
-            sc_first_unpublished_global_column_index = sc_minimum_required_global_column_indices.front();
-        }
-        else
-        {
-            // no other unfinished clusters -> set ring buffer start to the minimum unprocessed column associated to
-            // current batch of clusters
-            sc_first_unpublished_global_column_index = job.ring_buffer_min_required_global_column_index;
-        }
-
-        // ensure that first unpublished global column index is never decreasing
-        if (sc_first_unpublished_global_column_index < first_unpublished_global_column_index_old)
-            throw std::runtime_error("This shouldn't happen, ring buffer is not allowed to increase at the front: " +
-                                     std::to_string(sc_first_unpublished_global_column_index) + ", " +
-                                     std::to_string(first_unpublished_global_column_index_old));
-
-        // end of clear range: keep one rotation for visualization and for ground point segmentation ("next ground
-        // point")
-        ring_buffer_start_global_column_index = std::max(0l, sc_first_unpublished_global_column_index - num_columns_);
-
-        // save them
-        ring_buffer_start_global_column_index_new = ring_buffer_start_global_column_index;
-        first_unpublished_global_column_index_new = sc_first_unpublished_global_column_index;
-
-        // published needs to be here in order to ensure that the columns are in sequence and not interrupted by another
-        // publish call
-        if (finished_column_callback_)
-            finished_column_callback_(
-                first_unpublished_global_column_index_old, first_unpublished_global_column_index_new - 1, false);
-    }
-    clearColumns(ring_buffer_start_global_column_index_old, ring_buffer_start_global_column_index_new - 1);
-}
-
-void ContinuousClustering::clearColumns(int64_t from_global_column_index, int64_t to_global_column_index)
-{
-    if (to_global_column_index < from_global_column_index)
-        return;
-
-    for (int64_t global_column_index = from_global_column_index; global_column_index <= to_global_column_index;
-         global_column_index++)
-    {
-        int local_column_index = static_cast<int>(global_column_index % ring_buffer_max_columns);
-
-        for (int row_index = 0; row_index < num_rows_; row_index++)
-        {
-            // get correct point
-            Point& point = range_image_[local_column_index * num_rows_ + row_index];
-
-            // clear range image generation / general
-            point.xyz.x = std::nanf("");
-            point.xyz.y = std::nanf("");
-            point.xyz.z = std::nanf("");
-            point.distance = std::nanf("");
-            point.azimuth_angle = std::nanf("");
-            point.inclination_angle = std::nanf("");
-            point.continuous_azimuth_angle = std::nan("");
-            point.global_column_index = -1;
-            point.local_column_index = -1;
-            point.row_index = -1;
-            point.intensity = 0;
-            point.stamp = 0;
-            point.globally_unique_point_index = static_cast<uint64_t>(-1);
-
-            // clear ground point segmentation
-            point.ground_point_label = GP_UNKNOWN;
-            point.height_over_ground = std::nanf("");
-            point.debug_ground_point_label = WHITE;
-
-            // clear clustering
-            point.is_ignored = false;
-            point.finished_at_continuous_azimuth_angle = 0.f;
-            point.child_points.clear();
-            point.associated_trees.clear();
-            point.tree_root_.row_index = 0;
-            point.tree_root_.column_index = -1;
-            point.tree_num_points = 0;
-            point.cluster_width = 0;
-            point.tree_id = 0;
-            point.id = 0;
-            point.visited_at_continuous_azimuth_angle = -1.;
-            point.belongs_to_finished_cluster = false;
-            point.number_of_visited_neighbors = 0;
-        }
-    }
+    // this identifies finished columns with fully processed point trees, triggers the finished_columns_callback, and
+    // clears the columns
+    range_image.clearFinishedColumns(job.ring_buffer_current_global_column_index);
 }
 
 void ContinuousClustering::recordJobQueueWorkload(size_t num_jobs_sensor_input)

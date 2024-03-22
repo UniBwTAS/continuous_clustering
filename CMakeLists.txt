@@ -34,7 +34,7 @@ endif ()
 include_directories(include ${EIGEN3_INCLUDE_DIRS})
 
 # core continuous clustering library
-add_library(continuous_clustering src/clustering/continuous_clustering.cpp)
+add_library(continuous_clustering src/clustering/continuous_clustering.cpp src/clustering/continuous_range_image.cpp)
 target_link_libraries(continuous_clustering pthread)
 
 # library to load kitti odometry dataset

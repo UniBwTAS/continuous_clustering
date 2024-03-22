@@ -5,21 +5,13 @@
 
 #include <Eigen/Geometry>
 
+#include <continuous_clustering/clustering/continuous_range_image.hpp>
 #include <continuous_clustering/clustering/general.hpp>
 #include <continuous_clustering/clustering/point_types.hpp>
 #include <continuous_clustering/utils/thread_pool.hpp>
 
 namespace continuous_clustering
 {
-
-enum
-{
-    GP_UNKNOWN = WHITE,       // ground point: unknown
-    GP_GROUND = GREEN,        // ground point: ground
-    GP_OBSTACLE = RED,        // ground point: unknown
-    GP_EGO_VEHICLE = MAGENTA, // ground point: point on ego vehicle
-    GP_FOG = LIGHTGRAY,       // ground point: classified as fog
-};
 
 struct GeneralConfiguration
 {
@@ -85,80 +77,6 @@ struct Configuration
     ContinuousClusteringConfiguration clustering{};
 };
 
-class RangeImageIndex
-{
-  public:
-    RangeImageIndex(uint16_t row_index, int64_t column_index) : row_index(row_index), column_index(column_index)
-    {
-    }
-
-    bool operator==(const RangeImageIndex& other) const
-    {
-        return row_index == other.row_index && column_index == other.column_index;
-    }
-
-    bool operator!=(const RangeImageIndex& other) const
-    {
-        return row_index != other.row_index || column_index != other.column_index;
-    }
-
-
-    bool operator<(const RangeImageIndex& other) const
-    {
-        return row_index < other.row_index || (row_index == other.row_index && column_index < other.column_index);
-    }
-
-  public:
-    int64_t column_index{0};
-    uint16_t row_index{0};
-};
-
-class RangeImageIndexHash
-{
-  public:
-    std::size_t operator()(const RangeImageIndex& k) const
-    {
-        return (static_cast<std::size_t>(k.row_index) << 48) ^ k.column_index;
-    }
-};
-
-struct Point
-{
-    // range image generation / general
-    Point3D xyz{std::nanf(""), std::nanf(""), std::nanf("")};
-    uint64_t firing_index{0};
-    uint8_t intensity{0};
-    float distance{std::nanf("")};
-    float azimuth_angle{std::nanf("")};
-    float inclination_angle{std::nanf("")};
-    double continuous_azimuth_angle{std::nan("")};
-    int64_t global_column_index{-1};
-    int local_column_index{-1};
-    int row_index{-1};
-    uint64_t stamp{0};
-    uint64_t globally_unique_point_index{static_cast<uint64_t>(-1)};
-
-    // ground point segmentation
-    uint8_t ground_point_label{0};
-    float height_over_ground{std::nanf("")};
-    uint8_t debug_ground_point_label{WHITE};
-
-    // clustering
-    bool is_ignored{false};
-    double finished_at_continuous_azimuth_angle{0.f};
-    std::list<RangeImageIndex> child_points{};
-    // std::unordered_set<RangeImageIndex, RangeImageIndexHash> associated_trees{};
-    std::set<RangeImageIndex> associated_trees{};
-    RangeImageIndex tree_root_{0, -1};
-    uint32_t tree_num_points{0};
-    uint32_t cluster_width{0};
-    uint64_t tree_id{0};
-    uint64_t id{0};
-    double visited_at_continuous_azimuth_angle{-1.};
-    bool belongs_to_finished_cluster{false};
-    int number_of_visited_neighbors{0};
-};
-
 struct InsertionJob
 {
     RawPoints::ConstPtr firing;
@@ -187,8 +105,6 @@ struct TreeCombinationJob
 struct PublishingJob
 {
     int64_t ring_buffer_current_global_column_index;
-    int64_t ring_buffer_min_required_global_column_index;
-
     std::list<uint64_t> cluster_ids;
     std::list<std::list<RangeImageIndex>> trees_per_finished_cluster;
 };
@@ -234,41 +150,23 @@ class ContinuousClustering
     inline bool checkClusteringCondition(const Point& point, const Point& point_other) const;
     inline void associatePointToPointTree(Point& point, Point& point_other, float max_angle_diff);
     inline void associatePointTreeToPointTree(const Point& point, const Point& point_other);
-    inline void traverseFieldOfView(Point& point, float max_angle_diff, int ring_buffer_first_local_column_index);
+    inline void traverseFieldOfView(Point& point, float max_angle_diff, int ring_buffer_start_local_column_index);
     inline void associatePointsInColumn(AssociationJob&& job);
     inline void findFinishedTreesAndAssignSameId(TreeCombinationJob&& job);
     inline void collectPointsForCusterAndPublish(PublishingJob&& job);
-    inline void clearColumns(int64_t from_global_column_index, int64_t to_global_column_index);
 
   public:
-    // range image (implemented as ring buffer)
-    int ring_buffer_max_columns{0};
-    int num_columns_{};
-    int num_rows_{-1};
-    std::vector<Point> range_image_{0};
-    int64_t ring_buffer_start_global_column_index{};
-    int64_t ring_buffer_end_global_column_index{};
+    ContinuousRangeImage range_image{0, 0, 0, {}};
 
   private:
     Configuration config_;
-
-    // continuous range image generation (srig)
-    float srig_azimuth_width_per_column{};
-    int64_t srig_previous_global_column_index_of_rearmost_laser{0};
-    int64_t srig_previous_global_column_index_of_foremost_laser{0};
-    int64_t srig_first_unfinished_global_column_index{-1};
-    Eigen::Vector3d srig_sensor_position{0, 0, 0};
-    bool reset_required{false};
+    bool reset_required{true};
 
     // continuous ground point segmentation (sgps)
-    Point3D sgps_sensor_position{0, 0, 0};
     std::unique_ptr<Eigen::Isometry3d> sgps_ego_robot_frame_from_sensor_frame_;
 
     // continuous clustering (sc)
     float max_distance_squared{0.7 * 0.7};
-    int64_t sc_first_unpublished_global_column_index{-1};
-    std::mutex sc_first_unfinished_global_column_index_mutex;
-    std::list<int64_t> sc_minimum_required_global_column_indices;
     std::list<RangeImageIndex> sc_unfinished_point_trees_;
     uint64_t sc_cluster_counter_{1};
     std::vector<float> sc_inclination_angles_between_lasers_;
@@ -281,7 +179,6 @@ class ContinuousClustering
     ThreadPool<AssociationJob> association_thread_pool{"A"};
     ThreadPool<TreeCombinationJob> tree_combination_thread_pool{"C"};
     ThreadPool<PublishingJob> publishing_thread_pool{"P"};
-    bool do_sequential_execution{false};
 
     // performance statistics
     bool stop_statistics = false;

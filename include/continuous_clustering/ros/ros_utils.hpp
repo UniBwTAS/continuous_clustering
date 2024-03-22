@@ -62,7 +62,6 @@ struct PointCloud2Iterators
 };
 
 sensor_msgs::PointCloud2Ptr clusterToPointCloud(const std::vector<Point>& cluster_points,
-                                                int num_rows_in_range_image,
                                                 uint64_t stamp_cluster,
                                                 const std::string& frame_id);
 
@@ -80,7 +79,6 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
 void addPointToMessage(PointCloud2Iterators& container,
                        int data_index_message,
                        const Point& point,
-                       int num_rows,
                        ProcessingStage fill_fields_up_to_stage);
 void addRawPointToMessage(PointCloud2Iterators& container, int data_index_message, const RawPoint& point);
 

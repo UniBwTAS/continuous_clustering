@@ -8,10 +8,8 @@
 namespace continuous_clustering
 {
 
-sensor_msgs::PointCloud2Ptr clusterToPointCloud(const std::vector<Point>& cluster_points,
-                                                int num_rows_in_range_image,
-                                                uint64_t stamp_cluster,
-                                                const std::string& frame_id)
+sensor_msgs::PointCloud2Ptr
+clusterToPointCloud(const std::vector<Point>& cluster_points, uint64_t stamp_cluster, const std::string& frame_id)
 {
     sensor_msgs::PointCloud2Ptr msg(new sensor_msgs::PointCloud2);
     msg->header.stamp.fromNSec(stamp_cluster);
@@ -24,7 +22,7 @@ sensor_msgs::PointCloud2Ptr clusterToPointCloud(const std::vector<Point>& cluste
     int data_index_message = 0;
     for (const Point& point : cluster_points)
     {
-        addPointToMessage(container, data_index_message, point, num_rows_in_range_image, CONTINUOUS_CLUSTERING);
+        addPointToMessage(container, data_index_message, point, CONTINUOUS_CLUSTERING);
         data_index_message++;
     }
 
@@ -44,7 +42,7 @@ sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousClustering& clust
     sensor_msgs::PointCloud2Ptr msg(new sensor_msgs::PointCloud2);
     msg->header.frame_id = frame_id;
     msg->width = num_columns_to_publish;
-    msg->height = clustering.num_rows_;
+    msg->height = clustering.range_image.num_rows;
 
     PointCloud2Iterators container = prepareMessageAndCreateIterators(*msg, fill_fields_up_to_stage);
 
@@ -54,13 +52,12 @@ sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousClustering& clust
     for (int message_column_index = 0; message_column_index < msg->width; ++message_column_index)
     {
         int ring_buffer_local_column_index =
-            static_cast<int>((from_global_column_index + message_column_index) % clustering.ring_buffer_max_columns);
-        for (int row_index = 0; row_index < clustering.num_rows_; ++row_index)
+            clustering.range_image.toLocalColumnIndex(from_global_column_index + message_column_index);
+        for (int row_index = 0; row_index < clustering.range_image.num_rows; ++row_index)
         {
-            const Point& point =
-                clustering.range_image_[ring_buffer_local_column_index * clustering.num_rows_ + row_index];
+            const Point& point = clustering.range_image.getPoint(row_index, ring_buffer_local_column_index);
             int data_index_message = row_index * static_cast<int>(msg->width) + message_column_index;
-            addPointToMessage(container, data_index_message, point, clustering.num_rows_, fill_fields_up_to_stage);
+            addPointToMessage(container, data_index_message, point, fill_fields_up_to_stage);
 
             if (point.stamp != 0 && point.stamp < minimum_point_stamp)
                 minimum_point_stamp = point.stamp;
@@ -245,7 +242,6 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
 void addPointToMessage(PointCloud2Iterators& container,
                        int data_index_message,
                        const Point& point,
-                       int num_rows,
                        ProcessingStage fill_fields_up_to_stage)
 {
     ros::Time stamp;

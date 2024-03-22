@@ -58,11 +58,11 @@ class ROSInterface
         }
     };
 
-    void publishCluster(const std::vector<Point>& cluster_points, int num_rows_in_range_image, uint64_t stamp_cluster)
+    void publishCluster(const std::vector<Point>& cluster_points, uint64_t stamp_cluster)
     {
         if (pub_cluster.getNumSubscribers() == 0)
             return;
-        pub_cluster.publish(clusterToPointCloud(cluster_points, num_rows_in_range_image, stamp_cluster, "odom"));
+        pub_cluster.publish(clusterToPointCloud(cluster_points, stamp_cluster, "odom"));
     };
 
     void publishFiringAndClockAndTF(const RawPoints::Ptr& firing,
@@ -180,17 +180,16 @@ class KittiDemo
         for (int relative_column_index = 0; relative_column_index < num_columns_to_publish; ++relative_column_index)
         {
             // get local column index from global column index
-            int ring_buffer_local_column_index = static_cast<int>((from_global_column_index + relative_column_index) %
-                                                                  clustering.ring_buffer_max_columns);
+            int ring_buffer_local_column_index =
+                clustering.range_image.toLocalColumnIndex(from_global_column_index + relative_column_index);
 
             // variables to check if a frame is finished
             bool new_frame = false;
 
-            for (int row_index = 0; row_index < clustering.num_rows_; ++row_index)
+            for (int row_index = 0; row_index < clustering.range_image.num_rows; ++row_index)
             {
                 // get processed point
-                const Point& point =
-                    clustering.range_image_[ring_buffer_local_column_index * clustering.num_rows_ + row_index];
+                const Point& point = clustering.range_image.getPoint(row_index, ring_buffer_local_column_index);
 
                 // check if cell in range image contains point
                 if (point.globally_unique_point_index != static_cast<uint64_t>(-1))
@@ -309,7 +308,7 @@ class KittiDemo
                 [&](const std::vector<Point>& cluster_points, uint64_t stamp_cluster)
                 {
                     if (enable_publishers)
-                        middleware.publishCluster(cluster_points, clustering.num_rows_, stamp_cluster);
+                        middleware.publishCluster(cluster_points, stamp_cluster);
                 });
 
             // info required for evaluation
