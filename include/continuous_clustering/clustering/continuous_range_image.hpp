@@ -32,10 +32,81 @@ class ContinuousRangeImage
                       int64_t& last_complete_column_index);
     void clearColumns(int64_t from_column_index, int64_t to_column_index);
 
-    int64_t addMinimumRequiredStartColumnIndex(int64_t minimum_required_start_column_index,
-                                                      bool allow_before_start = false);
-    void removeMinimumRequiredStartColumnIndex(int64_t minimum_required_start_column_index);
-    void clearFinishedColumns(int64_t current_column_index);
+    inline int64_t addMinimumRequiredStartColumnIndexNonGuarded(int64_t minimum_required_start_column_index,
+                                                                bool allow_before_start)
+    {
+        if (minimum_required_start_column_index < start_column_index)
+        {
+            if (allow_before_start)
+                minimum_required_start_column_index = start_column_index;
+            else
+                throw std::runtime_error(
+                    "Your minimum required start column index is before the start of the range image");
+        }
+        // std::cout << "ADDED MINIMUM REQUIRED COLUMN INDEX2: " << minimum_required_start_column_index << ", "
+        //           << allow_before_start << std::endl;
+        minimum_required_start_column_indices[minimum_required_start_column_index]++;
+        return minimum_required_start_column_index;
+    }
+
+    inline int64_t addMinimumRequiredStartColumnIndex(int64_t minimum_required_start_column_index,
+                                                      bool allow_before_start)
+    {
+        std::lock_guard<std::mutex> lock_guard(*minimum_required_start_column_index_mutex);
+        return addMinimumRequiredStartColumnIndexNonGuarded(minimum_required_start_column_index, allow_before_start);
+    }
+
+    inline void addMinimumRequiredStartColumnIndices(const std::vector<int64_t>& column_indices)
+    {
+        std::lock_guard<std::mutex> lock_guard(*minimum_required_start_column_index_mutex);
+        for (int64_t c : column_indices)
+            addMinimumRequiredStartColumnIndexNonGuarded(c, false);
+    }
+
+    inline void removeMinimumRequiredStartColumnIndexNonGuarded(int64_t minimum_required_start_column_index)
+    {
+        auto it = minimum_required_start_column_indices.find(minimum_required_start_column_index);
+        if (it == minimum_required_start_column_indices.end() || it->second < 1)
+            throw std::runtime_error(
+                "There is no minimum required start column index with this value. This is invalid.");
+        // std::cout << "REMOVE: " << it->first << ", " << it->second << std::endl;
+        it->second--;
+        if (it->second == 0)
+        {
+            // std::cout << "ERASE: " << it->first << std::endl;
+            minimum_required_start_column_indices.erase(it);
+        }
+    }
+
+    inline void removeMinimumRequiredStartColumnIndex(int64_t minimum_required_start_column_index)
+    {
+        std::lock_guard<std::mutex> lock_guard(*minimum_required_start_column_index_mutex);
+        removeMinimumRequiredStartColumnIndexNonGuarded(minimum_required_start_column_index);
+    }
+
+    inline void clearFinishedColumns(int64_t current_column_index,
+                                     const std::vector<int64_t>& outdated_minimum_required_column_indices)
+    {
+        std::lock_guard<std::mutex> lock_guard(*minimum_required_start_column_index_mutex);
+        for (int64_t c : outdated_minimum_required_column_indices)
+            removeMinimumRequiredStartColumnIndexNonGuarded(c);
+        int64_t minimum_required_start_column_index = minimum_required_start_column_indices.empty() ?
+                                                          current_column_index + 1 :
+                                                          minimum_required_start_column_indices.begin()->first;
+        // std::cout << "ANDI: " << minimum_required_start_column_indices.empty() << ", "
+        //           << minimum_required_start_column_index << ", "
+        //           << (minimum_required_start_column_indices.empty() ? -1 :
+        //                                                               minimum_required_start_column_indices.begin()->second)
+        //           << std::endl;
+        if (minimum_required_start_column_index < start_column_index)
+            throw std::runtime_error("This shouldn't happen, ring buffer is not allowed to increase at the front: " +
+                                     std::to_string(minimum_required_start_column_index) + ", " +
+                                     std::to_string(start_column_index));
+        if (finished_column_callback)
+            finished_column_callback(start_column_index, minimum_required_start_column_index - 1);
+        clearColumns(start_column_index, minimum_required_start_column_index - 1);
+        start_column_index = minimum_required_start_column_index;
+    }
     void setFinishedColumnCallback(std::function<void(int64_t, int64_t)> cb);
 
     inline int toLocalColumnIndex(int64_t column_index) const

@@ -650,15 +650,16 @@ void ContinuousClustering::associatePointsInColumn(AssociationJob&& job)
 
             // create shortcut to this tree root
             new_unfinished_point_trees.push_back(index);
-
-            // signal continuous range image a new minimum required start index in order to ensure that columns will not
-            // be erased until this point tree is fully processed
-            range_image.addMinimumRequiredStartColumnIndex(column_index);
         }
     }
 
     // remove our column lock
     range_image.removeMinimumRequiredStartColumnIndex(minimum_column_index);
+
+    std::vector<int64_t> minimum_required_column_indices;
+    for (const auto& new_point_tree : new_unfinished_point_trees)
+        minimum_required_column_indices.push_back(new_point_tree.column_index);
+    range_image.addMinimumRequiredStartColumnIndices(minimum_required_column_indices);
 
     // pass this job to the next thread
     TreeCombinationJob next_job;
@@ -795,6 +796,9 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PublishingJob&& job)
     // create buffer
     std::vector<Point> cluster_points;
 
+    // todo
+    std::vector<int64_t> outdated_minimum_required_column_indices;
+
     auto it_trees_per_finished_cluster = job.trees_per_finished_cluster.begin();
     for (uint64_t cluster_id : job.cluster_ids)
     {
@@ -829,7 +833,7 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PublishingJob&& job)
             }
 
             // tell the range image that there is no need to wait for this point tree anymore
-            range_image.removeMinimumRequiredStartColumnIndex(cur_tree_root_index.column_index);
+            outdated_minimum_required_column_indices.push_back(cur_tree_root_index.column_index);
         }
 
         // keep track of minimum stamp for this message
@@ -851,7 +855,8 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PublishingJob&& job)
 
     // this identifies finished columns with fully processed point trees, triggers the finished_columns_callback, and
     // clears the columns
-    range_image.clearFinishedColumns(job.ring_buffer_current_global_column_index);
+    range_image.clearFinishedColumns(job.ring_buffer_current_global_column_index,
+                                     outdated_minimum_required_column_indices);
 }
 
 void ContinuousClustering::recordJobQueueWorkload(size_t num_jobs_sensor_input)
