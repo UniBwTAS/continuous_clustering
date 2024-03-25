@@ -117,10 +117,6 @@ void ContinuousRangeImage::insertFiring(RawPoints::ConstPtr& firing,
                          "Wanted to insert at "
                       << column_index << ", but rearmost laser in previous firing was already at "
                       << previous_column_index_of_foremost_laser << " (row index: " << row_index << ")" << std::endl;
-            // std::cout << "DBG: " << local_column_index << ", " << rotation_index << ", "
-            //           << previous_rotation_index_of_rearmost_laser << ", " << column_index_within_rotation << ", "
-            //           << column_index_within_rotation_of_previous_rearmost_laser << std::endl;
-            // throw std::runtime_error("Check if this still occurs after refactoring2");
         }
 
         // fill point data

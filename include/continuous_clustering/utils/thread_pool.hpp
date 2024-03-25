@@ -40,8 +40,8 @@ class ThreadPool
             threads.template emplace_back(
                 [this, f, i]()
                 {
-                    // std::string thread_name = "continuous_" + thread_name_prefix + std::to_string(i);
-                    // pthread_setname_np(pthread_self(), thread_name.c_str());
+                    std::string thread_name = "continuous_" + thread_name_prefix + std::to_string(i);
+                    pthread_setname_np(pthread_self(), thread_name.c_str());
                     while (!terminated)
                     {
                         T job = job_queue.dequeue();

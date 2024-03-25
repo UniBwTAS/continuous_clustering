@@ -15,8 +15,7 @@ void ContinuousClustering::reset(int num_rows)
                                        config_.range_image.num_columns,
                                        config_.range_image.num_columns * 10,
                                        config_.range_image.sensor_is_clockwise);
-    range_image.setFinishedColumnCallback(
-        std::bind(finished_column_callback_, std::placeholders::_1, std::placeholders::_2, true));
+    setFinishedColumnCallback(finished_column_callback_);
 
     // shutdown workers
     insertion_thread_pool.shutdown();
@@ -85,8 +84,8 @@ void ContinuousClustering::addFiring(const RawPoints::ConstPtr& firing, const Ei
 void ContinuousClustering::setFinishedColumnCallback(std::function<void(int64_t, int64_t, bool)> cb)
 {
     finished_column_callback_ = std::move(cb);
-    range_image.setFinishedColumnCallback(
-        std::bind(finished_column_callback_, std::placeholders::_1, std::placeholders::_2, true));
+    range_image.setFinishedColumnCallback([this](long from_column_index, long to_column_index)
+                                          { finished_column_callback_(from_column_index, to_column_index, false); });
 }
 
 void ContinuousClustering::setFinishedClusterCallback(std::function<void(const std::vector<Point>&, uint64_t)> cb)

@@ -165,8 +165,7 @@ class RosContinuousClustering
 
     void onFinishedCluster(const std::vector<Point>& cluster_points, uint64_t stamp_cluster)
     {
-        pub_clusters.publish(
-            clusterToPointCloud(cluster_points, stamp_cluster, odom_frame));
+        pub_clusters.publish(clusterToPointCloud(cluster_points, stamp_cluster, odom_frame));
     }
 
     void onFinishedColumn(int64_t from_global_column_index, int64_t to_global_column_index, bool ground_points_only)
