@@ -38,7 +38,7 @@
     <!-- range image parameters -->
     <arg name="num_columns" doc="number of columns of range image; should be the number of firings per rotations"/>
     <arg name="wait_for_tf" default="true" doc="whether to wait for appropriate TF or just use the latest available"/>
-    <arg name="supplement_inclination_angle_for_nan_cells" default="true" doc="use artificial inclination angles"/>
+    <arg name="interpolate_inclination_angle_for_nan_cells" default="true" doc="use artificial inclination angles"/>
 
     <!-- ground point segmentation parameters -->
     <arg name="use_terrain" default="False" doc="whether to use terrain (currently not supported!)"/>
@@ -83,8 +83,8 @@
             <!-- range image -->
             <param name="num_columns" value="$(arg num_columns)"/>
             <param name="wait_for_tf" value="$(arg wait_for_tf)"/>
-            <param name="supplement_inclination_angle_for_nan_cells"
-                   value="$(arg supplement_inclination_angle_for_nan_cells)"/>
+            <param name="interpolate_inclination_angle_for_nan_cells"
+                   value="$(arg interpolate_inclination_angle_for_nan_cells)"/>
 
             <!-- ground point segmentation -->
             <remap from="terrain" to="/perception/static_environment_model/estimated_terrain/anre"/>

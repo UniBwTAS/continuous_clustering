@@ -2,10 +2,10 @@
 #define CONTINUOUS_CLUSTERING_POINT_TYPES_HPP
 
 #include <continuous_clustering/clustering/general.hpp>
+#include <list>
 #include <memory>
 #include <set>
 #include <vector>
-#include <list>
 
 namespace continuous_clustering
 {
@@ -81,7 +81,10 @@ struct Point
     int64_t global_column_index{-1};
     int local_column_index{-1};
     int row_index{-1};
-    uint64_t stamp{0};
+    uint64_t stamp{0};               // exact time stamp
+    uint64_t column_stamp_middle{0}; // column time stamp (middle between min & max time stamp; only filled in top row)
+    uint64_t column_stamp_min{std::numeric_limits<uint64_t>::max()}; // time stamp of the oldest point in this column
+    uint64_t column_stamp_max{0};                                    // time stamp of the latest point in this column
     uint64_t globally_unique_point_index{static_cast<uint64_t>(-1)};
 
     // ground point segmentation

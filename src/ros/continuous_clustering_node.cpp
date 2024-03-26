@@ -191,7 +191,7 @@ class RosContinuousClustering
         // config for range image
         config_.range_image.sensor_is_clockwise = config.sensor_is_clockwise;
         config_.range_image.num_columns = config.num_columns;
-        config_.range_image.supplement_inclination_angle_for_nan_cells =
+        config_.range_image.interpolate_inclination_angle_for_nan_cells =
             config.supplement_inclination_angle_for_nan_cells;
 
         // config for ground segmentation

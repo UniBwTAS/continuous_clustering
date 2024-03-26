@@ -22,7 +22,7 @@ struct ContinuousRangeImageConfiguration
 {
     bool sensor_is_clockwise{true};
     int num_columns{1700}; // rows are automatically read from number of points in firing
-    bool supplement_inclination_angle_for_nan_cells{true};
+    bool interpolate_inclination_angle_for_nan_cells{true};
 };
 
 struct ContinuousGroundSegmentationConfiguration
@@ -83,6 +83,12 @@ struct InsertionJob
     Eigen::Isometry3d odom_frame_from_sensor_frame;
 };
 
+struct TransformJob
+{
+    int64_t ring_buffer_current_global_column_index;
+    Eigen::Isometry3d odom_frame_from_sensor_frame;
+};
+
 struct SegmentationJob
 {
     int64_t ring_buffer_current_global_column_index;
@@ -139,6 +145,9 @@ class ContinuousClustering
     // range image generation
     void insertFiringIntoRangeImage(InsertionJob&& job);
 
+    // transform range image
+    void transformColumnAndFindPointToIgnore(TransformJob&& job);
+
     // ground point segmentation
     inline void performGroundPointSegmentationForColumn(SegmentationJob&& job);
     static inline Point2D to2dInAzimuthPlane(const Point3D& p)
@@ -162,19 +171,19 @@ class ContinuousClustering
     Configuration config_;
     bool reset_required{true};
 
-    // continuous ground point segmentation (sgps)
-    std::unique_ptr<Eigen::Isometry3d> sgps_ego_robot_frame_from_sensor_frame_;
+    // continuous ground point segmentation
+    std::unique_ptr<Eigen::Isometry3d> ego_robot_frame_from_sensor_frame_;
 
-    // continuous clustering (sc)
+    // continuous clustering
     float max_distance_squared{0.7 * 0.7};
-    std::list<RangeImageIndex> sc_unfinished_point_trees_;
-    uint64_t sc_cluster_counter_{1};
-    std::vector<float> sc_inclination_angles_between_lasers_;
+    std::list<RangeImageIndex> unfinished_point_trees_;
+    uint64_t cluster_counter_{1};
     std::function<void(int64_t, int64_t, bool)> finished_column_callback_;
     std::function<void(const std::vector<Point>&, uint64_t)> finished_cluster_callback_;
 
     // multi-threading
     ThreadPool<InsertionJob> insertion_thread_pool{"I"};
+    ThreadPool<TransformJob> transform_thread_pool{"T"};
     ThreadPool<SegmentationJob> segmentation_thread_pool{"S"};
     ThreadPool<AssociationJob> association_thread_pool{"A"};
     ThreadPool<TreeCombinationJob> tree_combination_thread_pool{"C"};
