@@ -42,7 +42,7 @@ class SensorInput
         max_stamp = 0;
 
         current_firing.reset(new RawPoints());
-        current_firing->points.resize(num_lasers);
+        current_firing->points.resize(num_lasers, RawPoint());
     }
 
     inline void keepTrackOfMinAndMaxStamp(uint64_t point_stamp)
@@ -57,6 +57,7 @@ class SensorInput
     RawPoints::Ptr current_firing;
     std::function<void(const RawPoints::ConstPtr&)> callback;
     int num_lasers{};
+    std::vector<float> inclination_angles{};
     uint64_t firing_index{0};
     uint64_t min_stamp{0};
     uint64_t max_stamp{0};

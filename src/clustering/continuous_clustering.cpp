@@ -1,8 +1,5 @@
 #include <continuous_clustering/clustering/continuous_clustering.hpp>
 
-#include <iostream>
-#include <utility>
-
 namespace continuous_clustering
 {
 
@@ -28,6 +25,9 @@ void ContinuousClustering::reset(int num_rows)
 
     reset_required = false;
 
+    // reset members for transforming
+    column_indices_waiting_for_transform = std::queue<int64_t>();
+
     // reset members for continuous ground point segmentation (sgps)
     ego_robot_frame_from_sensor_frame_.reset();
 
@@ -41,7 +41,7 @@ void ContinuousClustering::reset(int num_rows)
     insertion_thread_pool.init(
         [this](InsertionJob&& job) { insertFiringIntoRangeImage(std::forward<InsertionJob>(job)); }, num_treads);
     transform_thread_pool.init([this](TransformJob&& job)
-                               { transformColumnAndFindPointToIgnore(std::forward<TransformJob>(job)); },
+                               { transformColumnAndFindPointsToIgnore(std::forward<TransformJob>(job)); },
                                num_treads);
     segmentation_thread_pool.init([this](SegmentationJob&& job)
                                   { performGroundPointSegmentationForColumn(std::forward<SegmentationJob>(job)); },
@@ -81,18 +81,25 @@ bool ContinuousClustering::resetRequired() const
     return reset_required;
 }
 
-void ContinuousClustering::addFiring(const RawPoints::ConstPtr& firing, const Eigen::Isometry3d& odom_from_sensor)
+void ContinuousClustering::addFiring(const RawPoints::ConstPtr& firing)
 {
     if (range_image.num_rows != firing->points.size())
         throw std::runtime_error("The number of points in a firing has changed. This is probably a bug!");
-    insertion_thread_pool.enqueue({firing, odom_from_sensor});
+    insertion_thread_pool.enqueue({firing});
 }
 
-void ContinuousClustering::setFinishedColumnCallback(std::function<void(int64_t, int64_t, bool)> cb)
+void continuous_clustering::ContinuousClustering::setRequestTransformOdomFromSensorCallback(
+    std::function<Eigen::Isometry3d(uint64_t, TransformStatus&)> cb)
+{
+    request_transform_odom_from_sensor_callback_ = std::move(cb);
+}
+
+void ContinuousClustering::setFinishedColumnCallback(std::function<void(int64_t, int64_t, ProcessingStage)> cb)
 {
     finished_column_callback_ = std::move(cb);
-    range_image.setFinishedColumnCallback([this](long from_column_index, long to_column_index)
-                                          { finished_column_callback_(from_column_index, to_column_index, false); });
+    range_image.setFinishedColumnCallback(
+        [this](long from_column_index, long to_column_index)
+        { finished_column_callback_(from_column_index, to_column_index, CONTINUOUS_CLUSTERING); });
 }
 
 void ContinuousClustering::setFinishedClusterCallback(std::function<void(const std::vector<Point>&, uint64_t)> cb)
@@ -107,85 +114,110 @@ void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
 
     // iterate over finished but unfinished columns and publish them
     for (int64_t global_column_index = first; global_column_index <= last; global_column_index++)
-        transform_thread_pool.enqueue({global_column_index, job.odom_frame_from_sensor_frame});
+        transform_thread_pool.enqueue({global_column_index});
+
+    // notify subscribers
+    if (finished_column_callback_)
+        finished_column_callback_(first, last, RANGE_IMAGE_GENERATION);
 }
 
-void ContinuousClustering::transformColumnAndFindPointToIgnore(TransformJob&& job)
+void ContinuousClustering::transformColumnAndFindPointsToIgnore(TransformJob&& job)
 {
-    int local_column_index = range_image.toLocalColumnIndex(job.ring_buffer_current_global_column_index);
-
-    float inclination_previous_laser = 0; // calculate difference between inclination angles for subsequent steps
-
-    // iterate from bottom to top
-    for (int row_index = range_image.num_rows - 1; row_index >= 0; row_index--)
+    if (!request_transform_odom_from_sensor_callback_)
     {
-        // obtain point
-        Point& point = range_image.getPoint(row_index, local_column_index);
+        std::cout << "Please set the callback with setRequestTransformOdomFromSensorCallback()" << std::endl;
+        return;
+    }
 
-        // by default this point should be not ignored for clustering (in the next steps)
-        point.is_ignored = false;
+    column_indices_waiting_for_transform.push(job.ring_buffer_current_global_column_index);
+    while (!column_indices_waiting_for_transform.empty())
+    {
+        int64_t column_index = column_indices_waiting_for_transform.front();
+        int local_column_index = range_image.toLocalColumnIndex(column_index);
 
-        // skip NaN's
-        if (std::isnan(point.distance))
+        // get timestamp for this column
+        uint64_t column_stamp = range_image.getColumnStamp(local_column_index);
+        if (column_stamp == 0)
         {
-            point.is_ignored = true;
+            column_indices_waiting_for_transform.pop();
             continue;
         }
 
-        // transform point to odom coordinate system
-        Eigen::Vector3d p{point.xyz.x, point.xyz.y, point.xyz.z};
-        p = job.odom_frame_from_sensor_frame * p;
-        point.xyz.x = static_cast<float>(p.x());
-        point.xyz.y = static_cast<float>(p.y());
-        point.xyz.z = static_cast<float>(p.z());
-
-        // skip points which seem to be fog
-        if (config_.ground_segmentation.fog_filtering_enabled &&
-            point.intensity < config_.ground_segmentation.fog_filtering_intensity_below &&
-            point.distance < config_.ground_segmentation.fog_filtering_distance_below &&
-            point.inclination_angle > config_.ground_segmentation.fog_filtering_inclination_above)
-        {
-            point.ground_point_label = GP_FOG;
-            point.debug_ground_point_label = LIGHTGRAY;
+        TransformStatus status;
+        auto tf = request_transform_odom_from_sensor_callback_(range_image.getColumnStamp(local_column_index), status);
+        if (status == TRANSFORM_NOT_AVAILABLE_YET) // wait and try again
+            break;
+        column_indices_waiting_for_transform.pop();
+        if (status == TRANSFORM_ERROR) // firing is not transformable as it arrived before every transform -> discard
             continue;
-        }
 
-        // ignore this point if it is too close
-        if (point.distance < 1. * config_.clustering.max_distance)
+        // iterate from bottom to top
+        for (int row_index = range_image.num_rows - 1; row_index >= 0; row_index--)
         {
-            point.is_ignored = true;
-            continue;
-        }
+            // obtain point
+            Point& point = range_image.getPoint(row_index, local_column_index);
 
-        // ignore this point if the distance in combination with inclination diff can't be below distance threshold
-        if (config_.clustering.ignore_points_with_too_big_inclination_angle_diff &&
-            row_index < (range_image.num_rows - 1) &&
-            std::atan2(config_.clustering.max_distance, point.distance) <
-                range_image.inclination_angles_between_lasers[row_index])
-        {
-            point.is_ignored = true;
-            continue;
-        }
+            // by default this point should be not ignored for clustering (in the next steps)
+            point.is_ignored = false;
 
-        // ignore this points in a chessboard pattern
-        if (config_.clustering.ignore_points_in_chessboard_pattern)
-        {
-            bool column_even = point.global_column_index % 2 == 0;
-            bool row_even = row_index % 2 == 0;
-            if ((column_even && !row_even) || (!column_even && row_even))
+            // skip NaN's
+            if (std::isnan(point.distance))
             {
                 point.is_ignored = true;
                 continue;
             }
+
+            // transform point to odom coordinate system
+            Eigen::Vector3d p{point.xyz.x, point.xyz.y, point.xyz.z};
+            p = tf * p;
+            point.xyz.x = static_cast<float>(p.x());
+            point.xyz.y = static_cast<float>(p.y());
+            point.xyz.z = static_cast<float>(p.z());
+
+            // skip points which seem to be fog
+            if (config_.ground_segmentation.fog_filtering_enabled &&
+                point.intensity < config_.ground_segmentation.fog_filtering_intensity_below &&
+                point.distance < config_.ground_segmentation.fog_filtering_distance_below &&
+                point.inclination_angle > config_.ground_segmentation.fog_filtering_inclination_above)
+            {
+                point.ground_point_label = GP_FOG;
+                point.debug_ground_point_label = LIGHTGRAY;
+                continue;
+            }
+
+            // ignore this point if it is too close
+            if (point.distance < 1. * config_.clustering.max_distance)
+            {
+                point.is_ignored = true;
+                continue;
+            }
+
+            // ignore this point if the distance in combination with inclination diff can't be below distance threshold
+            if (config_.clustering.ignore_points_with_too_big_inclination_angle_diff &&
+                row_index < (range_image.num_rows - 1) &&
+                std::atan2(config_.clustering.max_distance, point.distance) <
+                    range_image.inclination_angles_between_lasers[row_index])
+            {
+                point.is_ignored = true;
+                continue;
+            }
+
+            // ignore this points in a chessboard pattern
+            if (config_.clustering.ignore_points_in_chessboard_pattern)
+            {
+                bool column_even = point.global_column_index % 2 == 0;
+                bool row_even = row_index % 2 == 0;
+                if ((column_even && !row_even) || (!column_even && row_even))
+                {
+                    point.is_ignored = true;
+                    continue;
+                }
+            }
         }
+
+        // lets enqueue the ground point segmentation job for this column to do it in a separate thread
+        segmentation_thread_pool.enqueue({column_index, tf});
     }
-
-    // if (finished_column_callback_)
-    //     finished_column_callback_(
-    //         job.ring_buffer_current_global_column_index, job.ring_buffer_current_global_column_index, true);
-
-    // lets enqueue the ground point segmentation job for this column to do it in a separate thread
-    segmentation_thread_pool.enqueue({job.ring_buffer_current_global_column_index, job.odom_frame_from_sensor_frame});
 }
 
 void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJob&& job)
@@ -218,8 +250,8 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
         // obtain point
         Point& point = range_image.getPoint(row_index, local_column_index);
 
-        // skip ignored points
-        if (point.is_ignored)
+        // skip ignored points (todo: separate this)
+        if (std::isnan(point.distance) || point.ground_point_label == GP_FOG)
             continue;
 
         const Point3D& current_position = point.xyz;
@@ -290,58 +322,16 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
             point.ground_point_label = GP_GROUND;
             point.debug_ground_point_label = GREEN;
         }
-        else // try to find remaining ground points
+        else if (first_obstacle_detected && is_flat_wrt_prev && is_flat_wrt_last_ground)
         {
-            if (c.use_terrain)
-            {
-                /*if (last_terrain_msg_)
-                {
-                    auto& info = last_terrain_msg_->info;
-                    Point3D terrain_min_corner(static_cast<float>(info.pose.position.x - info.length_x / 2),
-                                               static_cast<float>(info.pose.position.y - info.length_y / 2),
-                                               static_cast<float>(info.pose.position.z));
-                    Point3D current_position_in_terrain = current_position - terrain_min_corner;
-                    auto& data = last_terrain_msg_->data[0];
-                    int num_cells_x = static_cast<int>(data.layout.dim[0].size);
-                    int num_cells_y = static_cast<int>(data.layout.dim[1].size);
-                    int idx_x = num_cells_x -
-                                static_cast<int>(
-                                    std::floor(current_position_in_terrain.x / static_cast<float>(info.resolution))) -
-                                1;
-                    int idx_y = num_cells_y -
-                                static_cast<int>(
-                                    std::floor(current_position_in_terrain.y / static_cast<float>(info.resolution))) -
-                                1;
-                    if (idx_x >= 0 && idx_x < num_cells_x && idx_y >= 0 && idx_y < num_cells_y)
-                    {
-                        uint32_t data_idx = idx_y * num_cells_x + idx_x;
-                        if (data_idx >= 0 && data_idx < data.data.size())
-                        {
-                            float relative_height = current_position.z - data.data[data_idx];
-                            if (std::abs(relative_height) < c.terrain_max_allowed_z_diff)
-                            {
-                                point.ground_point_label = GP_GROUND;
-                                point.debug_ground_point_label = BURLYWOOD;
-                            }
-                        }
-                    }
-                }*/
-            }
-            else
-            {
-                if (first_obstacle_detected && is_flat_wrt_prev && is_flat_wrt_last_ground)
-                {
-                    point.ground_point_label = GP_GROUND;
-                    point.debug_ground_point_label = YELLOWGREEN;
-                }
-                else if (std::abs(last_ground_to_current.x) <
-                             c.ground_because_close_to_last_certain_ground_max_dist_diff &&
-                         std::abs(last_ground_to_current.y) < c.ground_because_close_to_last_certain_ground_max_z_diff)
-                {
-                    point.ground_point_label = GP_GROUND;
-                    point.debug_ground_point_label = YELLOW;
-                }
-            }
+            point.ground_point_label = GP_GROUND;
+            point.debug_ground_point_label = YELLOWGREEN;
+        }
+        else if (std::abs(last_ground_to_current.x) < c.ground_because_close_to_last_certain_ground_max_dist_diff &&
+                 std::abs(last_ground_to_current.y) < c.ground_because_close_to_last_certain_ground_max_z_diff)
+        {
+            point.ground_point_label = GP_GROUND;
+            point.debug_ground_point_label = YELLOW;
         }
 
         // mark remaining points as obstacle
@@ -408,12 +398,14 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
         previous_label = point.debug_ground_point_label;
     }
 
-    if (finished_column_callback_)
-        finished_column_callback_(
-            job.ring_buffer_current_global_column_index, job.ring_buffer_current_global_column_index, true);
-
     // lets enqueue the association job for this column to do it in a separate thread
     association_thread_pool.enqueue({job.ring_buffer_current_global_column_index});
+
+    // notify subscribers
+    if (finished_column_callback_)
+        finished_column_callback_(job.ring_buffer_current_global_column_index,
+                                  job.ring_buffer_current_global_column_index,
+                                  GROUND_POINT_SEGMENTATION);
 }
 
 void ContinuousClustering::setTransformRobotFrameFromSensorFrame(const Eigen::Isometry3d& tf)
@@ -521,7 +513,7 @@ void ContinuousClustering::traverseFieldOfView(Point& point, float max_angle_dif
 
                 // if other point is ignored or has already the same tree root then do nothing (*1)
                 if (!point_other.is_ignored &&
-                    (point.tree_root_.local_column_index == 0 || point_other.tree_root_ != point.tree_root_))
+                    (point.tree_root_.local_column_index == -1 || point_other.tree_root_ != point.tree_root_))
                 {
                     // if distance is small enough then try to associate to tree
                     if (checkClusteringCondition(point, point_other))
@@ -627,6 +619,7 @@ void ContinuousClustering::associatePointsInColumn(AssociationJob&& job)
     std::vector<int64_t> minimum_required_column_indices;
     for (const auto& new_point_tree : new_unfinished_point_trees)
         minimum_required_column_indices.push_back(new_point_tree.column_index);
+    minimum_required_column_indices.push_back(job.ring_buffer_current_global_column_index);
     range_image.addMinimumRequiredStartColumnIndices(minimum_required_column_indices);
 
     // pass this job to the next thread
@@ -671,7 +664,8 @@ void ContinuousClustering::findFinishedTreesAndAssignSameId(TreeCombinationJob&&
             // the current graph was forcibly finished (exceeds full rotation) and when there was a race condition with
             // the association. In this case we simply ignore that a link between current point tree and the previous
             // (forcibly finished) point tree was found
-            if (cur_point_root.belongs_to_finished_cluster)
+            if (cur_point_root.belongs_to_finished_cluster ||
+                cur_tree_root_index.column_index < range_image.start_column_index)
                 continue;
 
             // keep track of the column range occupied by this cluster (to detect clusters larger than a full
@@ -823,6 +817,7 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PublishingJob&& job)
 
     // this identifies finished columns with fully processed point trees, triggers the finished_columns_callback, and
     // clears the columns
+    outdated_minimum_required_column_indices.push_back(job.ring_buffer_current_global_column_index);
     range_image.clearFinishedColumns(job.ring_buffer_current_global_column_index,
                                      outdated_minimum_required_column_indices);
 }

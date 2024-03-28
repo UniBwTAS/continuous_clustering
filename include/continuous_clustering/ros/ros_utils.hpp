@@ -12,14 +12,6 @@
 namespace continuous_clustering
 {
 
-enum ProcessingStage
-{
-    RAW_POINT,
-    RANGE_IMAGE_GENERATION,
-    GROUND_POINT_SEGMENTATION,
-    CONTINUOUS_CLUSTERING,
-};
-
 struct PointCloud2Iterators
 {
     // Some point fields below should be actually UINT64. Unfortunately, this type is not available for a PointCloud2
@@ -35,11 +27,11 @@ struct PointCloud2Iterators
     std::optional<sensor_msgs::PointCloud2Iterator<double>> iter_gpi_out; // (*)
     std::optional<sensor_msgs::PointCloud2Iterator<uint32_t>> iter_time_sec_out;
     std::optional<sensor_msgs::PointCloud2Iterator<uint32_t>> iter_time_nsec_out;
-
-    // range image generation
     std::optional<sensor_msgs::PointCloud2Iterator<float>> iter_d_out;
     std::optional<sensor_msgs::PointCloud2Iterator<float>> iter_a_out;
     std::optional<sensor_msgs::PointCloud2Iterator<float>> iter_ia_out;
+
+    // range image generation
     std::optional<sensor_msgs::PointCloud2Iterator<double>> iter_ca_out;
     std::optional<sensor_msgs::PointCloud2Iterator<double>> iter_gc_out; // (*)
     std::optional<sensor_msgs::PointCloud2Iterator<uint16_t>> iter_lc_out;

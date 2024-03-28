@@ -22,6 +22,9 @@ class VelodyneInput : public velodyne_rawdata::DataContainerBase, public RosSens
         if (calibration)
         {
             num_lasers = calibration->num_lasers;
+            inclination_angles.resize(num_lasers);
+            for (auto& c : calibration->laser_corrections)
+                inclination_angles[c.laser_ring] = c.vert_correction;
             prepareNewFiring();
         }
         else
@@ -57,6 +60,9 @@ class VelodyneInput : public velodyne_rawdata::DataContainerBase, public RosSens
         auto offset_in_ns = static_cast<uint64_t>(time / 1e9);
         current_firing->points[row_index].stamp = cur_packet_stamp.toNSec() + offset_in_ns;
         current_firing->points[row_index].firing_index = firing_index;
+        current_firing->points[row_index].azimuth_angle =
+            static_cast<float>(azimuth) * deg_to_rad + static_cast<float>(M_PI);
+        current_firing->points[row_index].inclination_angle = inclination_angles[ring];
         keepTrackOfMinAndMaxStamp(current_firing->points[row_index].stamp);
 
         if (distance > 0)
@@ -64,6 +70,7 @@ class VelodyneInput : public velodyne_rawdata::DataContainerBase, public RosSens
             current_firing->points[row_index].x = x;
             current_firing->points[row_index].y = y;
             current_firing->points[row_index].z = z;
+            current_firing->points[row_index].distance = distance;
             current_firing->points[row_index].intensity = static_cast<uint8_t>(intensity);
         }
         else
@@ -71,6 +78,7 @@ class VelodyneInput : public velodyne_rawdata::DataContainerBase, public RosSens
             current_firing->points[row_index].x = nanf("");
             current_firing->points[row_index].y = nanf("");
             current_firing->points[row_index].z = nanf("");
+            current_firing->points[row_index].distance = nanf("");
             current_firing->points[row_index].intensity = 0;
         }
     }
@@ -94,6 +102,7 @@ class VelodyneInput : public velodyne_rawdata::DataContainerBase, public RosSens
     velodyne_rawdata::RawData parser;
     ros::Time cur_packet_stamp{0, 0};
     bool interrupt_message{false};
+    float deg_to_rad{-M_PI / 18000};
 };
 
 } // namespace continuous_clustering

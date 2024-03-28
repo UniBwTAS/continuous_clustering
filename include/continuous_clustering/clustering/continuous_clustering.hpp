@@ -13,6 +13,21 @@
 namespace continuous_clustering
 {
 
+enum TransformStatus
+{
+    TRANSFORM_ERROR,
+    TRANSFORM_NOT_AVAILABLE_YET,
+    TRANSFORM_SUCCESS
+};
+
+enum ProcessingStage
+{
+    RAW_POINT,
+    RANGE_IMAGE_GENERATION,
+    GROUND_POINT_SEGMENTATION,
+    CONTINUOUS_CLUSTERING,
+};
+
 struct GeneralConfiguration
 {
     bool is_single_threaded{false};
@@ -80,13 +95,11 @@ struct Configuration
 struct InsertionJob
 {
     RawPoints::ConstPtr firing;
-    Eigen::Isometry3d odom_frame_from_sensor_frame;
 };
 
 struct TransformJob
 {
     int64_t ring_buffer_current_global_column_index;
-    Eigen::Isometry3d odom_frame_from_sensor_frame;
 };
 
 struct SegmentationJob
@@ -128,14 +141,15 @@ class ContinuousClustering
     bool resetRequired() const;
 
     // range image generation
-    void addFiring(const RawPoints::ConstPtr& firing, const Eigen::Isometry3d& odom_from_sensor);
+    void addFiring(const RawPoints::ConstPtr& firing);
 
     // ground point segmentation
     void setTransformRobotFrameFromSensorFrame(const Eigen::Isometry3d& tf);
+    void setRequestTransformOdomFromSensorCallback(std::function<Eigen::Isometry3d(uint64_t, TransformStatus&)> cb);
     bool hasTransformRobotFrameFromSensorFrame();
 
     // continuous clustering
-    void setFinishedColumnCallback(std::function<void(int64_t, int64_t, bool)> cb);
+    void setFinishedColumnCallback(std::function<void(int64_t, int64_t, ProcessingStage)> cb);
     void setFinishedClusterCallback(std::function<void(const std::vector<Point>&, uint64_t)> cb);
 
     // debugging
@@ -146,7 +160,7 @@ class ContinuousClustering
     void insertFiringIntoRangeImage(InsertionJob&& job);
 
     // transform range image
-    void transformColumnAndFindPointToIgnore(TransformJob&& job);
+    void transformColumnAndFindPointsToIgnore(TransformJob&& job);
 
     // ground point segmentation
     inline void performGroundPointSegmentationForColumn(SegmentationJob&& job);
@@ -171,6 +185,10 @@ class ContinuousClustering
     Configuration config_;
     bool reset_required{true};
 
+    // transform
+    std::function<Eigen::Isometry3d(uint64_t, TransformStatus&)> request_transform_odom_from_sensor_callback_;
+    std::queue<int64_t> column_indices_waiting_for_transform;
+
     // continuous ground point segmentation
     std::unique_ptr<Eigen::Isometry3d> ego_robot_frame_from_sensor_frame_;
 
@@ -178,7 +196,7 @@ class ContinuousClustering
     float max_distance_squared{0.7 * 0.7};
     std::list<RangeImageIndex> unfinished_point_trees_;
     uint64_t cluster_counter_{1};
-    std::function<void(int64_t, int64_t, bool)> finished_column_callback_;
+    std::function<void(int64_t, int64_t, ProcessingStage)> finished_column_callback_;
     std::function<void(const std::vector<Point>&, uint64_t)> finished_cluster_callback_;
 
     // multi-threading

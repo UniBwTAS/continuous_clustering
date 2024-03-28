@@ -27,6 +27,8 @@ class ROSInterface
         pub_clock = nh.advertise<rosgraph_msgs::Clock>("/clock", 100);
         pub_firing =
             nh.advertise<sensor_msgs::PointCloud2>("/perception/detections/lidar_roof/cluster/raw_firings", 1000);
+        pub_column_range = nh.advertise<sensor_msgs::PointCloud2>(
+            "/perception/detections/lidar_roof/cluster/continuous_range_image_generation", 1000);
         pub_column_ground = nh.advertise<sensor_msgs::PointCloud2>(
             "/perception/detections/lidar_roof/cluster/continuous_ground_point_segmentation", 1000);
         pub_column_cluster = nh.advertise<sensor_msgs::PointCloud2>(
@@ -44,15 +46,32 @@ class ROSInterface
 
     void publishColumn(int64_t from_global_column_index,
                        int64_t to_global_column_index,
-                       bool ground_points_only,
+                       ProcessingStage stage,
                        const ContinuousClustering& clustering)
     {
         // publish column in odom frame
-        ros::Publisher* pub = ground_points_only ? &pub_column_ground : &pub_column_cluster;
-        ProcessingStage stage = ground_points_only ? GROUND_POINT_SEGMENTATION : CONTINUOUS_CLUSTERING;
+        ros::Publisher* pub;
+        switch (stage)
+        {
+            case RANGE_IMAGE_GENERATION:
+                pub = &pub_column_range;
+                break;
+            case GROUND_POINT_SEGMENTATION:
+                pub = &pub_column_ground;
+                break;
+            case CONTINUOUS_CLUSTERING:
+                pub = &pub_column_cluster;
+                break;
+            default:
+                throw std::runtime_error("Invalid stage: " + std::to_string(stage));
+        }
         if (pub->getNumSubscribers() > 0)
         {
-            auto msg = columnToPointCloud(clustering, from_global_column_index, to_global_column_index, "odom", stage);
+            auto msg = columnToPointCloud(clustering,
+                                          from_global_column_index,
+                                          to_global_column_index,
+                                          stage == RANGE_IMAGE_GENERATION ? "velo_link" : "odom",
+                                          stage);
             if (msg)
                 pub->publish(msg);
         }
@@ -90,6 +109,7 @@ class ROSInterface
     tf2_ros::TransformBroadcaster pub_tf;
     ros::Publisher pub_clock;
     ros::Publisher pub_firing;
+    ros::Publisher pub_column_range;
     ros::Publisher pub_column_ground;
     ros::Publisher pub_column_cluster;
     ros::Publisher pub_cluster;
@@ -103,7 +123,7 @@ class DummyInterface
     void publishEvaluationPointCloud(const std::vector<KittiSegmentationEvaluationPoint>& point_cloud){};
     void publishColumn(int64_t from_global_column_index,
                        int64_t to_global_column_index,
-                       bool ground_points_only,
+                       ProcessingStage stage,
                        const ContinuousClustering& clustering){};
     void
     publishCluster(const std::vector<Point>& cluster_points, int num_rows_in_range_image, uint64_t stamp_cluster){};
@@ -294,12 +314,11 @@ class KittiDemo
 
             // add callbacks
             clustering.setFinishedColumnCallback(
-                [&](int64_t from_global_column_index, int64_t to_global_column_index, bool ground_points_only)
+                [&](int64_t from_global_column_index, int64_t to_global_column_index, ProcessingStage stage)
                 {
                     if (enable_publishers)
-                        middleware.publishColumn(
-                            from_global_column_index, to_global_column_index, ground_points_only, clustering);
-                    if (evaluate && !ground_points_only)
+                        middleware.publishColumn(from_global_column_index, to_global_column_index, stage, clustering);
+                    if (evaluate && stage == continuous_clustering::CONTINUOUS_CLUSTERING)
                         addColumnAndEvaluateFrameIfCompleted(
                             clustering, from_global_column_index, to_global_column_index);
                 });
@@ -399,7 +418,7 @@ class KittiDemo
                     if (enable_publishers)
                         middleware.publishFiringAndClockAndTF(firing, odom_from_velodyne, column_index % 200 == 0);
 
-                    clustering.addFiring(firing, odom_from_velodyne);
+                    clustering.addFiring(firing);
 
                     if (delay_between_columns > 0)
                     {

@@ -51,7 +51,7 @@ class OusterInput : public RosSensorInput<ouster_ros::PacketMsg>
     OusterInput(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private) : RosSensorInput(nh, nh_private)
     {
         std::string ouster_metadata_path;
-        if(!nh_private.getParam("ouster_metadata_path", ouster_metadata_path))
+        if (!nh_private.getParam("ouster_metadata_path", ouster_metadata_path))
             throw std::runtime_error("Please provide: ouster_metadata_path parameter!");
 
         info = ouster::sensor::metadata_from_json(ouster_metadata_path);
@@ -133,7 +133,7 @@ class OusterInput : public RosSensorInput<ouster_ros::PacketMsg>
 
             ouster::img_t<uint32_t> range_firing = ls.field<uint32_t>(ouster::sensor::ChanField::RANGE);
             ouster::PointsF lut_direction_firing = lut_direction.block(m_id * ls.h, 0, ls.h, 3);
-            ouster::PointsF lut_offset_firing = lut_direction.block(m_id * ls.h, 0, ls.h, 3);
+            ouster::PointsF lut_offset_firing = lut_offset.block(m_id * ls.h, 0, ls.h, 3);
             ouster::cartesianT(points, range_firing, lut_direction_firing, lut_offset_firing);
             ouster::img_t<uint32_t> signal_img = ls.field<uint32_t>(ouster::sensor::ChanField::SIGNAL);
 
@@ -147,6 +147,7 @@ class OusterInput : public RosSensorInput<ouster_ros::PacketMsg>
                     current_firing->points[ring].x = p(0);
                     current_firing->points[ring].y = p(1);
                     current_firing->points[ring].z = p(2);
+                    current_firing->points[ring].distance = static_cast<float>(range) / 1000.f;
 
                     // according to https://github.com/ouster-lidar/ouster_example/issues/128#issuecomment-558160200 the
                     // typical intensity range is between 0 - 1000 (can be theoretically higher, up to 6000)
@@ -159,10 +160,18 @@ class OusterInput : public RosSensorInput<ouster_ros::PacketMsg>
                     current_firing->points[ring].x = nanf("");
                     current_firing->points[ring].y = nanf("");
                     current_firing->points[ring].z = nanf("");
+                    current_firing->points[ring].distance = std::nanf("");
                     current_firing->points[ring].intensity = 0;
                 }
                 current_firing->points[ring].firing_index = firing_index;
                 current_firing->points[ring].stamp = packet_receive_time;
+
+                // calculate azimuth & inclination angle from direction vector
+                float dir_x = lut_direction_firing(ring, 0);
+                float dir_y = lut_direction_firing(ring, 1);
+                float dir_z = lut_direction_firing(ring, 2);
+                current_firing->points[ring].azimuth_angle = std::atan2(dir_y, dir_x);
+                current_firing->points[ring].inclination_angle = std::asin(dir_z * 1000);
                 keepTrackOfMinAndMaxStamp(packet_receive_time);
             }
 

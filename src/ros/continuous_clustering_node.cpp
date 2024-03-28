@@ -1,7 +1,6 @@
 #include <continuous_clustering/ContinuousClusteringConfig.h>
 #include <continuous_clustering/ros/generic_points_input.hpp>
 #include <continuous_clustering/ros/ouster_input.hpp>
-#include <continuous_clustering/ros/ros_transform_synchronizer.hpp>
 #include <continuous_clustering/ros/ros_utils.hpp>
 #include <continuous_clustering/ros/sensor_input.hpp>
 #include <continuous_clustering/ros/velodyne_input.hpp>
@@ -21,7 +20,8 @@ namespace continuous_clustering
 class RosContinuousClustering
 {
   public:
-    RosContinuousClustering(ros::NodeHandle nh, const ros::NodeHandle& nh_private) : nh_(nh), clustering_()
+    RosContinuousClustering(ros::NodeHandle nh, const ros::NodeHandle& nh_private)
+        : nh_(nh), clustering_(), tf_buffer(), tf_listener(tf_buffer, true, ros::TransportHints().tcpNoDelay())
     {
         // obtain ROS specific parameters
         nh_private.param<std::string>("sensor_manufacturer", sensor_manufacturer, "velodyne");
@@ -32,10 +32,12 @@ class RosContinuousClustering
 
         // add callbacks to clustering
         clustering_.setFinishedColumnCallback(
-            [this](int64_t from_global_column_index, int64_t to_global_column_index, bool ground_points_only)
-            { onFinishedColumn(from_global_column_index, to_global_column_index, ground_points_only); });
+            [this](int64_t from_global_column_index, int64_t to_global_column_index, ProcessingStage stage)
+            { onFinishedColumn(from_global_column_index, to_global_column_index, stage); });
         clustering_.setFinishedClusterCallback([this](const std::vector<Point>& cluster_points, uint64_t stamp_cluster)
                                                { onFinishedCluster(cluster_points, stamp_cluster); });
+        clustering_.setRequestTransformOdomFromSensorCallback(
+            [this](int64_t stamp, TransformStatus& status) { return onRequestTransformOdomFromSensor(stamp, status); });
 
         // use desired sensor input
         if (sensor_manufacturer == "velodyne")
@@ -71,13 +73,11 @@ class RosContinuousClustering
 
         // init publishers
         pub_raw_firings = nh.advertise<sensor_msgs::PointCloud2>("raw_firings", 1000);
+        pub_range_image_generation = nh.advertise<sensor_msgs::PointCloud2>("continuous_range_image_generation", 1000);
         pub_ground_point_segmentation =
             nh.advertise<sensor_msgs::PointCloud2>("continuous_ground_point_segmentation", 1000);
         pub_instance_segmentation = nh.advertise<sensor_msgs::PointCloud2>("continuous_instance_segmentation", 1000);
         pub_clusters = nh.advertise<sensor_msgs::PointCloud2>("continuous_clusters", 1000);
-
-        // init TF synchronizer
-        tf_synchronizer.setCallback(&RosContinuousClustering::onNewFiringsWithTfCallback, this);
 
         // init dynamic reconfigure
         reconfigure_server_.setCallback([this](ContinuousClusteringConfig& config, uint32_t level)
@@ -90,12 +90,11 @@ class RosContinuousClustering
         last_update_ = ros::Time(0, 0);
         first_firing_after_reset = true;
 
-        // reset tf synchronizer
-        tf_synchronizer.reset(odom_frame, sensor_frame);
-        tf_synchronizer.waitForTransform(wait_for_tf);
-
         // reset clustering
         clustering_.reset(num_rows);
+
+        // reset tf synchronizer
+        tf_buffer.clear();
 
         // clear sensor input
         sensor_input_->reset();
@@ -131,7 +130,7 @@ class RosContinuousClustering
         last_update_ = stamp_current_firing;
 
         // wait for transforms
-        tf_synchronizer.addMessage(stamp_current_firing, firing);
+        clustering_.addFiring(firing);
 
         // publish Firing (just for debugging/visualization)
         if (pub_raw_firings.getNumSubscribers() > 0)
@@ -141,26 +140,51 @@ class RosContinuousClustering
         clustering_.recordJobQueueWorkload(sensor_input_->dataCount());
     }
 
-    void onNewFiringsWithTfCallback(const RawPoints::ConstPtr& firing,
-                                    const geometry_msgs::TransformStamped& odom_from_sensor)
+    Eigen::Isometry3d onRequestTransformOdomFromSensor(uint64_t stamp, TransformStatus& status)
     {
-        // get ego robot frame from sensor frame in order to transform points from sensor (odom) into vehicle
-        // coordinates (important to find points on roof, etc.)
+
+        // todo: separate this?
         if (!clustering_.hasTransformRobotFrameFromSensorFrame())
         {
             try
             {
                 geometry_msgs::TransformStamped tf =
-                    tf_synchronizer.getTfBuffer()->lookupTransform(ego_robot_frame, sensor_frame, ros::Time());
+                    tf_buffer.lookupTransform(ego_robot_frame, sensor_frame, ros::Time());
                 clustering_.setTransformRobotFrameFromSensorFrame(tf2::transformToEigen(tf.transform));
             }
             catch (tf2::TransformException& ex)
             {
-                return;
+                status = TRANSFORM_ERROR;
+                return {};
             }
         }
 
-        clustering_.addFiring(firing, tf2::transformToEigen(odom_from_sensor));
+        geometry_msgs::TransformStamped tf_latest{}, tf_at_stamp{};
+        try
+        {
+            ros::Time t{0, 0};
+            tf_latest = tf_buffer.lookupTransform(odom_frame, sensor_frame, t);
+            if (!wait_for_tf)
+            {
+                status = TRANSFORM_SUCCESS;
+                return tf2::transformToEigen(tf_latest.transform);
+            }
+            else
+            {
+                t.fromNSec(stamp);
+                tf_at_stamp = tf_buffer.lookupTransform(odom_frame, sensor_frame, t, ros::Duration(0.005));
+                status = TRANSFORM_SUCCESS;
+                return tf2::transformToEigen(tf_at_stamp.transform);
+            }
+        }
+        catch (tf2::TransformException& ex)
+        {
+            if (!tf_latest.header.stamp.isZero() && stamp > tf_latest.header.stamp.toNSec())
+                status = TRANSFORM_NOT_AVAILABLE_YET;
+            else
+                status = TRANSFORM_ERROR;
+            return {};
+        }
     }
 
     void onFinishedCluster(const std::vector<Point>& cluster_points, uint64_t stamp_cluster)
@@ -168,11 +192,28 @@ class RosContinuousClustering
         pub_clusters.publish(clusterToPointCloud(cluster_points, stamp_cluster, odom_frame));
     }
 
-    void onFinishedColumn(int64_t from_global_column_index, int64_t to_global_column_index, bool ground_points_only)
+    void onFinishedColumn(int64_t from_global_column_index, int64_t to_global_column_index, ProcessingStage stage)
     {
-        ProcessingStage stage = ground_points_only ? GROUND_POINT_SEGMENTATION : CONTINUOUS_CLUSTERING;
-        auto msg = columnToPointCloud(clustering_, from_global_column_index, to_global_column_index, odom_frame, stage);
-        ros::Publisher* pub = ground_points_only ? &pub_ground_point_segmentation : &pub_instance_segmentation;
+        auto msg = columnToPointCloud(clustering_,
+                                      from_global_column_index,
+                                      to_global_column_index,
+                                      stage == RANGE_IMAGE_GENERATION ? sensor_frame : odom_frame,
+                                      stage);
+        ros::Publisher* pub;
+        switch (stage)
+        {
+            case RANGE_IMAGE_GENERATION:
+                pub = &pub_range_image_generation;
+                break;
+            case GROUND_POINT_SEGMENTATION:
+                pub = &pub_ground_point_segmentation;
+                break;
+            case CONTINUOUS_CLUSTERING:
+                pub = &pub_instance_segmentation;
+                break;
+            default:
+                throw std::runtime_error("Invalid stage: " + std::to_string(stage));
+        }
         if (msg && pub->getNumSubscribers() > 0)
             pub->publish(msg);
     }
@@ -248,14 +289,16 @@ class RosContinuousClustering
 
     // init ROS specific stuff
     ros::NodeHandle nh_;
-    RosTransformSynchronizer<RawPoints> tf_synchronizer;
     std::shared_ptr<SensorInput> sensor_input_;
     ros::Subscriber sub_terrain;
     ros::Publisher pub_raw_firings;
+    ros::Publisher pub_range_image_generation;
     ros::Publisher pub_ground_point_segmentation;
     ros::Publisher pub_instance_segmentation;
     ros::Publisher pub_clusters;
     ros::Time last_update_{0, 0};
+    tf2_ros::Buffer tf_buffer;
+    tf2_ros::TransformListener tf_listener;
     bool first_firing_after_reset{false};
 
     std::string sensor_manufacturer;

@@ -110,7 +110,7 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
 
     int up_to_field = 25;
     if (fill_fields_up_to_stage == RAW_POINT)
-        up_to_field = 8;
+        up_to_field = 11;
     else if (fill_fields_up_to_stage == RANGE_IMAGE_GENERATION)
         up_to_field = 15;
     else if (fill_fields_up_to_stage == GROUND_POINT_SEGMENTATION)
@@ -212,11 +212,11 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
     iterators.iter_gpi_out = {msg, "globally_unique_point_index"};
     iterators.iter_time_sec_out = {msg, "time_sec"};
     iterators.iter_time_nsec_out = {msg, "time_nsec"};
-    if (fill_fields_up_to_stage == RAW_POINT)
-        return iterators;
     iterators.iter_d_out = {msg, "distance"};
     iterators.iter_a_out = {msg, "azimuth_angle"};
     iterators.iter_ia_out = {msg, "inclination_angle"};
+    if (fill_fields_up_to_stage == RAW_POINT)
+        return iterators;
     iterators.iter_ca_out = {msg, "continuous_azimuth_angle"};
     iterators.iter_gc_out = {msg, "global_column_index"};
     iterators.iter_lc_out = {msg, "local_column_index"};
@@ -260,13 +260,13 @@ void addPointToMessage(PointCloud2Iterators& container,
     *(*container.iter_gpi_out + data_index_message) = static_cast<double>(point.globally_unique_point_index); // (*)
     *(*container.iter_time_sec_out + data_index_message) = stamp.sec;
     *(*container.iter_time_nsec_out + data_index_message) = stamp.nsec;
+    *(*container.iter_d_out + data_index_message) = point.distance;
+    *(*container.iter_a_out + data_index_message) = point.azimuth_angle;
+    *(*container.iter_ia_out + data_index_message) = point.inclination_angle;
     if (fill_fields_up_to_stage == RAW_POINT)
         return;
 
     // range image generation
-    *(*container.iter_d_out + data_index_message) = point.distance;
-    *(*container.iter_a_out + data_index_message) = point.azimuth_angle;
-    *(*container.iter_ia_out + data_index_message) = point.inclination_angle;
     *(*container.iter_ca_out + data_index_message) = point.continuous_azimuth_angle;
     *(*container.iter_gc_out + data_index_message) = static_cast<double>(point.global_column_index); // (*)
     *(*container.iter_lc_out + data_index_message) = point.local_column_index;
@@ -305,6 +305,9 @@ void addRawPointToMessage(PointCloud2Iterators& container, int data_index_messag
     *(*container.iter_f_out + data_index_message) = static_cast<double>(point.firing_index); // (*)
     *(*container.iter_i_out + data_index_message) = point.intensity;
     *(*container.iter_gpi_out + data_index_message) = static_cast<double>(point.globally_unique_point_index); // (*)
+    *(*container.iter_d_out + data_index_message) = point.distance;
+    *(*container.iter_a_out + data_index_message) = point.azimuth_angle;
+    *(*container.iter_ia_out + data_index_message) = point.inclination_angle;
 
     ros::Time t;
     t.fromNSec(point.stamp);

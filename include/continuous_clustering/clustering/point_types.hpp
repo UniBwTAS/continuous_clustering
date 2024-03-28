@@ -12,9 +12,12 @@ namespace continuous_clustering
 
 struct RawPoint
 {
-    float x{};
-    float y{};
-    float z{};
+    float x{std::nanf("")};
+    float y{std::nanf("")};
+    float z{std::nanf("")};
+    float distance{std::nanf("")};          // optional: avoids to recalculate it during range image generation
+    float azimuth_angle{std::nanf("")};     // optional: avoids to recalculate it during range image generation
+    float inclination_angle{std::nanf("")}; // optional: avoids to recalculate it during range image generation
     uint64_t firing_index{};
     uint8_t intensity{};
     uint64_t stamp{};
@@ -64,8 +67,8 @@ class RangeImageIndex
 
   public:
     uint16_t row_index{0};
-    int64_t column_index{0};
-    int local_column_index{0};
+    int64_t column_index{-1};
+    int local_column_index{-1};
 };
 
 struct Point

@@ -11,15 +11,6 @@
 namespace continuous_clustering
 {
 
-class BadStartConditionException : public std::runtime_error
-{
-  public:
-    explicit BadStartConditionException()
-        : std::runtime_error("The first firing intersects negative x-axis. This means that the range image was filled "
-                             "incorrectly. Please clear the range image and start with a firing that does not "
-                             "intersect negative x-axis."){};
-};
-
 class ContinuousRangeImage
 {
   public:
@@ -61,6 +52,9 @@ class ContinuousRangeImage
         // calculate constant used below
         int columns_of_half_rotation = num_columns_per_rotation / 2;
 
+        // special handling when range image is not initialized yet
+        bool range_image_initialized = previous_column_index_of_rearmost_laser >= 0;
+
         // ensure that there is the same number of points in the firing as number of rows in the continuous range image
         assert(firing->points.size() == num_rows);
 
@@ -70,11 +64,10 @@ class ContinuousRangeImage
             // obtain point
             const RawPoint& p = firing->points[row_index];
 
-            // ignore NaN points
-            if (std::isnan(p.x))
-                continue;
-
-            float azimuth_angle = std::atan2(static_cast<float>(p.y), static_cast<float>(p.x));
+            // calculate some required values if not already available
+            float distance = std::isnan(p.distance) ? std::sqrt(p.x * p.x + p.y * p.y + p.z * p.z) : p.distance;
+            float azimuth_angle = std::isnan(p.azimuth_angle) ? std::atan2(p.y, p.x) : p.azimuth_angle;
+            float inclination_angle = std::isnan(p.inclination_angle) ? std::asin(p.z / distance) : p.inclination_angle;
 
             // calculate azimuth angle which starts at negative X-axis with 0 and increases with ongoing lidar rotation
             // to 2 pi, which is more intuitive and important for fast array index calculation (atan2 goes from -pi -> 0
@@ -88,91 +81,111 @@ class ContinuousRangeImage
             int64_t rotation_index = previous_rotation_index_of_rearmost_laser;
             int64_t column_index = rotation_index * num_columns_per_rotation + column_index_within_rotation;
 
-            // if firing intersects negative x-axis w.r.t. previous firing we have to correct rotation_index and
-            // column_index
-            int column_index_within_rotation_of_previous_rearmost_laser =
-                static_cast<int>(previous_column_index_of_rearmost_laser % num_columns_per_rotation);
-            int column_diff = column_index_within_rotation - column_index_within_rotation_of_previous_rearmost_laser;
-            if (column_diff < -columns_of_half_rotation)
+            // If firing intersects negative x-axis, we have to correct rotation_index and column_index.
+            // We detect this when the current point is more than half a rotation away from the previous rearmost laser,
+            // as we assume that a firing's angular extent is much less than half a rotation.
+            if (range_image_initialized || column_index_of_rearmost_laser >= 0)
             {
-                rotation_index++;
-                column_index += num_columns_per_rotation; // add one rotation
+                int64_t column_diff = range_image_initialized ? column_index - previous_column_index_of_rearmost_laser :
+                                                                column_index - column_index_of_rearmost_laser;
+                if (column_diff < -columns_of_half_rotation)
+                {
+                    // This point is more than half a rotation earlier than previous rearmost laser.
+                    // This is impossible, so this point must already belong to the next rotation index.
+                    rotation_index++;
+                    column_index += num_columns_per_rotation; // add one rotation
+                }
+                else if (column_diff > columns_of_half_rotation)
+                {
+                    // As we calculate everything relative to the rearmost laser of the previous firing, this should not
+                    // happen. It only happens in two edge cases:
+                    // 1. When the very first firing inserted into the range image exactly intersects negative x-axis
+                    // and the range image is initialized with a point, which is after this x-axis. In this case the
+                    // points which are before this x-axis get rotation index of -1 and also a negative column index.
+                    // 2. Unfortunately the column index of the rearmost laser is not always monotonically increasing.
+                    // We are not 100% sure why this happens. Probably when there are missing returns for the rearmost
+                    // lasers. So the column index of this point is behind the column index of the previous
+                    // rearmost laser AND also now belongs to the previous rotation index. This happens in very rare
+                    // cases.
+                    rotation_index--;
+                    column_index -= num_columns_per_rotation; // subtract one rotation
+
+                    // For case 1. we set the rearmost column index artificially to 0. This is useful because there are
+                    // sometimes gaps (empty columns) between the points of a firing. This results to the problem that
+                    // the column index of the rearmost laser is slightly larger than 0 but get smaller when the lasers
+                    // with had initially rotation index -1 also pass the negative x-axis.
+                    if (column_index_of_rearmost_laser < num_columns_per_rotation)
+                        column_index_of_rearmost_laser = 0;
+                }
             }
-            else if (previous_column_index_of_rearmost_laser > 0 && column_diff > columns_of_half_rotation)
-            {
-                // In very rare cases this can happen because the minimum azimuth of rearmost laser can be smaller than
-                // that of previous firing.
-                // This gets only tricky when previous_column_index_of_rearmost_laser % num_columns == 0 and
-                // azimuth of rearmost laser in current firing is smaller than previous one.
-                // So we have to subtract one rotation.
-                rotation_index--;
-                column_index -= num_columns_per_rotation; // subtract one rotation
-            }
+
+            // Currently, we do not allow negative column indices (maybe we support this in the future).
+            if (column_index < 0)
+                continue;
 
             // get point
             int local_column_index = toLocalColumnIndex(column_index);
-            Point* point = &getPoint(row_index, local_column_index);
+            Point* cell = &getPoint(row_index, local_column_index);
 
             // calculate continuous azimuth angle (even if we move it to the next cell, this value remains the same)
             double continuous_azimuth_angle =
                 (2 * M_PI) * static_cast<double>(rotation_index) + increasing_azimuth_angle;
 
             // in case this cell is already occupied, try next column
-            auto distance = std::sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
-            if (!std::isnan(point->distance) && !std::isnan(distance))
+            if (!std::isnan(cell->distance) && !std::isnan(distance))
             {
                 int next_local_column_index = local_column_index + 1;
                 if (next_local_column_index >= max_columns_ring_buffer)
                     next_local_column_index -= max_columns_ring_buffer;
-                Point* next_point = &getPoint(row_index, next_local_column_index);
-                if (std::isnan(next_point->distance))
+                Point* next_cell = &getPoint(row_index, next_local_column_index);
+                if (std::isnan(next_cell->distance))
                 {
-                    point = next_point;
+                    cell = next_cell;
                     local_column_index = next_local_column_index;
                     column_index++;
                 }
             }
 
             // avoid that a valid cell (non-nan) is overwritten by a nan or more distant value
-            if ((!std::isnan(point->distance) && (std::isnan(distance)) || distance >= point->distance))
+            if (!std::isnan(cell->distance) && (std::isnan(distance) || distance >= cell->distance))
                 continue;
 
             // do not insert into columns that were considered to be finished
             bool point_in_already_published_column = false;
-            if (previous_column_index_of_rearmost_laser >= 0 && column_index < previous_column_index_of_rearmost_laser)
+            if (range_image_initialized && column_index < previous_column_index_of_rearmost_laser)
             {
                 point_in_already_published_column = true;
                 std::cout << "Ignore point of firing because it would be inserted into an already published column. "
                              "Wanted to insert at "
                           << column_index << ", but rearmost laser in previous firing was already at "
-                          << previous_column_index_of_foremost_laser << " (row index: " << row_index << ")"
+                          << previous_column_index_of_rearmost_laser << " (row index: " << row_index << ")"
                           << std::endl;
             }
 
             // fill point data
             if (!point_in_already_published_column)
             {
-                point->xyz.x = static_cast<float>(p.x);
-                point->xyz.y = static_cast<float>(p.y);
-                point->xyz.z = static_cast<float>(p.z);
-                point->firing_index = p.firing_index;
-                point->intensity = p.intensity;
-                point->stamp = p.stamp;
-                point->distance = distance;
-                point->azimuth_angle = azimuth_angle;
-                point->inclination_angle = std::asin(static_cast<float>(p.z) / point->distance);
-                point->continuous_azimuth_angle = continuous_azimuth_angle; // omitted cells will be filled again later
-                point->global_column_index = column_index;                  // omitted cells will be filled again later
-                point->local_column_index = local_column_index;
-                point->row_index = row_index;
-                point->globally_unique_point_index = p.globally_unique_point_index;
+                cell->xyz.x = p.x;
+                cell->xyz.y = p.y;
+                cell->xyz.z = p.z;
+                cell->firing_index = p.firing_index;
+                cell->intensity = p.intensity;
+                cell->stamp = p.stamp;
+                cell->distance = distance;
+                cell->azimuth_angle = azimuth_angle;
+                cell->inclination_angle = inclination_angle;
+                cell->continuous_azimuth_angle = continuous_azimuth_angle; // omitted cells will be filled again later
+                cell->global_column_index = column_index;                  // omitted cells will be filled again later
+                cell->local_column_index = local_column_index;
+                cell->row_index = row_index;
+                cell->globally_unique_point_index = p.globally_unique_point_index;
 
                 // keep track of min & max time stamps in range image columns
-                Point* top_row_point = &getPoint(0, local_column_index);
-                if (p.stamp > top_row_point->column_stamp_max)
-                    top_row_point->column_stamp_max = p.stamp;
-                if (p.stamp < top_row_point->column_stamp_min)
-                    top_row_point->column_stamp_min = p.stamp;
+                Point& top_row_point = getPoint(0, local_column_index);
+                if (p.stamp > top_row_point.column_stamp_max)
+                    top_row_point.column_stamp_max = p.stamp;
+                if (p.stamp < top_row_point.column_stamp_min)
+                    top_row_point.column_stamp_min = p.stamp;
             }
 
             // keep track of global column index of rearmost & foremost laser
@@ -185,12 +198,6 @@ class ContinuousRangeImage
         // there was no valid point in this firing do nothing
         if (column_index_of_rearmost_laser < 0)
             return;
-
-        // if the azimuth range of the firing covers more than 180 degrees, this means that the firing intersects with
-        // negative x-axis (this means that the range image was incorrectly filled -> throw exception to signal that
-        // range image must be cleared)
-        if ((column_index_of_foremost_laser - column_index_of_rearmost_laser) > columns_of_half_rotation)
-            throw BadStartConditionException(); // TODO: automatically handle error
 
         // store the global column indices of the rearmost and foremost lasers for the next firing
         if (column_index_of_rearmost_laser > previous_column_index_of_rearmost_laser)
@@ -261,7 +268,10 @@ class ContinuousRangeImage
 
         // calculate the column's stamp
         Point& point = getPoint(0, local_column_index);
-        point.column_stamp_middle = (point.column_stamp_min >> 1) + (point.column_stamp_max >> 1);
+        if (point.column_stamp_min != std::numeric_limits<uint64_t>::max())
+            point.column_stamp_middle = (point.column_stamp_min >> 1) + (point.column_stamp_max >> 1);
+        else
+            point.column_stamp_middle = 0;
     }
 
     inline void ensureClearedCell(const Point& point, int64_t column_index) const
@@ -330,8 +340,8 @@ class ContinuousRangeImage
     {
         auto it = minimum_required_start_column_indices.find(minimum_required_start_column_index);
         if (it == minimum_required_start_column_indices.end() || it->second < 1)
-            throw std::runtime_error(
-                "There is no minimum required start column index with this value. This is invalid.");
+            throw std::runtime_error("There is no minimum required start column index with this value: " +
+                                     std::to_string(minimum_required_start_column_index) + ". This is invalid.");
         it->second--;
         if (it->second == 0)
             minimum_required_start_column_indices.erase(it);
@@ -368,7 +378,17 @@ class ContinuousRangeImage
 
     inline int toLocalColumnIndex(int64_t column_index) const
     {
-        return static_cast<int>(column_index % max_columns_ring_buffer);
+        // make modulo same as in python to support negative column indices, e.g. -1 % 5 = 4, -5 & 5 = 0, and -6 % 5 = 4
+        // int64_t a = column_index % max_columns_ring_buffer;
+        // if (a < 0)
+        //     a += max_columns_ring_buffer;
+        // return static_cast<int>(a);
+        return static_cast<int>(column_index % max_columns_ring_buffer); // currently, we do not use neg. col. indices
+    }
+
+    inline uint64_t getColumnStamp(int local_column_index) const
+    {
+        return getPoint(0, local_column_index).column_stamp_middle;
     }
 
     inline Point& getPoint(int row_index, int local_column_index)
@@ -403,7 +423,7 @@ class ContinuousRangeImage
     bool interpolate_inclination_angles_for_nan_cells{true};
     std::vector<float> inclination_angles_between_lasers;
 
-    // multi thread column clearance
+    // multi threaded column clearance
     std::map<int64_t, int> minimum_required_start_column_indices{};
     std::unique_ptr<std::mutex> minimum_required_start_column_index_mutex;
     std::function<void(int64_t, int64_t)> finished_column_callback;
@@ -413,7 +433,7 @@ class ContinuousRangeImage
     int64_t end_column_index{-1};
 
     // keep track of previous global column indices of the first and last laser in a firing
-    int64_t previous_column_index_of_rearmost_laser{0};
+    int64_t previous_column_index_of_rearmost_laser{-1};
     int64_t previous_column_index_of_foremost_laser{-1};
 };
 } // namespace continuous_clustering
