@@ -29,7 +29,7 @@ clusterToPointCloud(const std::vector<Point>& cluster_points, uint64_t stamp_clu
     return msg;
 }
 
-sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousClustering& clustering,
+sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousRangeImage& range_image,
                                                int64_t from_global_column_index,
                                                int64_t to_global_column_index,
                                                const std::string& frame_id,
@@ -42,7 +42,7 @@ sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousClustering& clust
     sensor_msgs::PointCloud2Ptr msg(new sensor_msgs::PointCloud2);
     msg->header.frame_id = frame_id;
     msg->width = num_columns_to_publish;
-    msg->height = clustering.range_image.num_rows;
+    msg->height = range_image.num_rows;
 
     PointCloud2Iterators container = prepareMessageAndCreateIterators(*msg, fill_fields_up_to_stage);
 
@@ -52,10 +52,10 @@ sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousClustering& clust
     for (int message_column_index = 0; message_column_index < msg->width; ++message_column_index)
     {
         int ring_buffer_local_column_index =
-            clustering.range_image.toLocalColumnIndex(from_global_column_index + message_column_index);
-        for (int row_index = 0; row_index < clustering.range_image.num_rows; ++row_index)
+            range_image.toLocalColumnIndex(from_global_column_index + message_column_index);
+        for (int row_index = 0; row_index < range_image.num_rows; ++row_index)
         {
-            const Point& point = clustering.range_image.getPoint(row_index, ring_buffer_local_column_index);
+            const Point& point = range_image.getPoint(row_index, ring_buffer_local_column_index);
             int data_index_message = row_index * static_cast<int>(msg->width) + message_column_index;
             addPointToMessage(container, data_index_message, point, fill_fields_up_to_stage);
 
@@ -108,7 +108,7 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
     msg.is_bigendian = false;
     msg.is_dense = false;
 
-    int up_to_field = 25;
+    int up_to_field = 26;
     if (fill_fields_up_to_stage == RAW_POINT)
         up_to_field = 11;
     else if (fill_fields_up_to_stage == RANGE_IMAGE_GENERATION)
@@ -169,10 +169,10 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
                                          "row_index",
                                          1,
                                          sensor_msgs::PointField::UINT16,
-                                         "ground_point_label",
+                                         "debug_label",
                                          1,
                                          sensor_msgs::PointField::UINT8,
-                                         "debug_ground_point_label",
+                                         "ground_point_label",
                                          1,
                                          sensor_msgs::PointField::UINT8,
                                          "height_over_ground",
@@ -223,8 +223,8 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
     iterators.iter_r_out = {msg, "row_index"};
     if (fill_fields_up_to_stage == RANGE_IMAGE_GENERATION)
         return iterators;
+    iterators.iter_dbg_label_out = {msg, "debug_label"};
     iterators.iter_gp_label_out = {msg, "ground_point_label"};
-    iterators.iter_dbg_gp_label_out = {msg, "debug_ground_point_label"};
     iterators.iter_height_over_ground_out = {msg, "height_over_ground"};
     iterators.iter_ignore_for_clustering_out = {msg, "ignore_for_clustering"};
     if (fill_fields_up_to_stage == GROUND_POINT_SEGMENTATION)
@@ -274,9 +274,9 @@ void addPointToMessage(PointCloud2Iterators& container,
     if (fill_fields_up_to_stage == RANGE_IMAGE_GENERATION)
         return;
 
-    // ground point segmentation
+    // ground point segmentation (incl. point filtering)
+    *(*container.iter_dbg_label_out + data_index_message) = point.debug_label;
     *(*container.iter_gp_label_out + data_index_message) = point.ground_point_label;
-    *(*container.iter_dbg_gp_label_out + data_index_message) = point.debug_ground_point_label;
     *(*container.iter_height_over_ground_out + data_index_message) = point.height_over_ground;
     *(*container.iter_ignore_for_clustering_out + data_index_message) = point.is_ignored ? BLUE : ORANGE;
     if (fill_fields_up_to_stage == GROUND_POINT_SEGMENTATION)
@@ -419,9 +419,7 @@ void publish_clock(ros::Publisher& pub, uint64_t stamp)
     pub.publish(msg);
 }
 
-void publish_ego_robot_bounding_box(uint64_t stamp,
-                                    ros::Publisher& pub,
-                                    const ContinuousGroundSegmentationConfiguration& config)
+void publish_ego_robot_bounding_box(uint64_t stamp, ros::Publisher& pub, const EgoVehicleBoundingBox& box)
 {
     if (pub.getNumSubscribers() == 0)
         return;
@@ -437,14 +435,14 @@ void publish_ego_robot_bounding_box(uint64_t stamp,
     msg.color.g = 1;
     msg.color.b = 1;
     msg.color.a = 0.4;
-    msg.scale.x = std::abs(config.length_ref_to_rear_end_) + std::abs(config.length_ref_to_front_end_);
-    msg.scale.y = std::abs(config.width_ref_to_right_mirror_) + std::abs(config.width_ref_to_left_mirror_);
-    msg.scale.z = std::abs(config.height_ref_to_ground_) + std::abs(config.height_ref_to_maximum_);
+    msg.scale.x = std::abs(box.length_ref_to_back) + std::abs(box.length_ref_to_front);
+    msg.scale.y = std::abs(box.width_ref_to_right) + std::abs(box.width_ref_to_left);
+    msg.scale.z = std::abs(box.height_ref_to_bottom) + std::abs(box.height_ref_to_top);
 
     // calculate center of bounding box relative to velodyne sensor
-    msg.pose.position.x = config.length_ref_to_rear_end_ + msg.scale.x / 2;
-    msg.pose.position.y = config.width_ref_to_right_mirror_ + msg.scale.y / 2;
-    msg.pose.position.z = config.height_ref_to_ground_ + msg.scale.z / 2;
+    msg.pose.position.x = box.length_ref_to_back + msg.scale.x / 2;
+    msg.pose.position.y = box.width_ref_to_right + msg.scale.y / 2;
+    msg.pose.position.z = box.height_ref_to_bottom + msg.scale.z / 2;
 
     // approximately same orientation as velodyne
     msg.pose.orientation.w = 1;

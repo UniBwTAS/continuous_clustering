@@ -5,12 +5,21 @@
 #include <sensor_msgs/point_cloud2_iterator.h>
 #include <tf2_ros/transform_broadcaster.h>
 
-#include <continuous_clustering/clustering/continuous_clustering.hpp>
+#include <continuous_clustering/clustering/continuous_range_image.hpp>
+#include <continuous_clustering/clustering/pipeline_nodes/ground_point_segmentation.hpp>
 #include <continuous_clustering/clustering/point_types.hpp>
 #include <continuous_clustering/evaluation/kitti_evaluation.hpp>
 
 namespace continuous_clustering
 {
+
+enum ProcessingStage
+{
+    RAW_POINT,
+    RANGE_IMAGE_GENERATION,
+    GROUND_POINT_SEGMENTATION,
+    CONTINUOUS_CLUSTERING,
+};
 
 struct PointCloud2Iterators
 {
@@ -37,9 +46,9 @@ struct PointCloud2Iterators
     std::optional<sensor_msgs::PointCloud2Iterator<uint16_t>> iter_lc_out;
     std::optional<sensor_msgs::PointCloud2Iterator<uint16_t>> iter_r_out;
 
-    // ground point segmentation
+    // ground point segmentation (incl. point filtering)
+    std::optional<sensor_msgs::PointCloud2Iterator<uint8_t>> iter_dbg_label_out;
     std::optional<sensor_msgs::PointCloud2Iterator<uint8_t>> iter_gp_label_out;
-    std::optional<sensor_msgs::PointCloud2Iterator<uint8_t>> iter_dbg_gp_label_out;
     std::optional<sensor_msgs::PointCloud2Iterator<float>> iter_height_over_ground_out;
     std::optional<sensor_msgs::PointCloud2Iterator<uint8_t>> iter_ignore_for_clustering_out;
 
@@ -53,11 +62,10 @@ struct PointCloud2Iterators
     std::optional<sensor_msgs::PointCloud2Iterator<double>> iter_id;      // (*)
 };
 
-sensor_msgs::PointCloud2Ptr clusterToPointCloud(const std::vector<Point>& cluster_points,
-                                                uint64_t stamp_cluster,
-                                                const std::string& frame_id);
+sensor_msgs::PointCloud2Ptr
+clusterToPointCloud(const std::vector<Point>& cluster_points, uint64_t stamp_cluster, const std::string& frame_id);
 
-sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousClustering& clustering,
+sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousRangeImage& range_image,
                                                int64_t from_global_column_index,
                                                int64_t to_global_column_index,
                                                const std::string& frame_id,
@@ -78,9 +86,7 @@ sensor_msgs::PointCloud2Ptr evaluationToPointCloud(const std::vector<KittiSegmen
 
 void publish_tf(tf2_ros::TransformBroadcaster& pub, const Eigen::Isometry3d& odom_from_velodyne, uint64_t stamp);
 void publish_clock(ros::Publisher& pub, uint64_t stamp);
-void publish_ego_robot_bounding_box(uint64_t stamp,
-                                    ros::Publisher& pub,
-                                    const ContinuousGroundSegmentationConfiguration& config);
+void publish_ego_robot_bounding_box(uint64_t stamp, ros::Publisher& pub, const EgoVehicleBoundingBox& box);
 } // namespace continuous_clustering
 
 #endif

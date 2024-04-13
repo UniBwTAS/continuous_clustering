@@ -36,6 +36,7 @@
     <arg name="namespace" default="perception/detections/lidar_$(arg sensor_position)/cluster" doc="namespace"/>
 
     <!-- range image parameters -->
+    <arg name="num_rows" doc="number of rows of range image; should be the number of lasers"/>
     <arg name="num_columns" doc="number of columns of range image; should be the number of firings per rotations"/>
     <arg name="wait_for_tf" default="true" doc="whether to wait for appropriate TF or just use the latest available"/>
     <arg name="interpolate_inclination_angle_for_nan_cells" default="true" doc="use artificial inclination angles"/>
@@ -81,6 +82,7 @@
             <param name="is_single_threaded" value="$(arg is_single_threaded)"/>
 
             <!-- range image -->
+            <param name="num_rows" value="$(arg num_rows)"/>
             <param name="num_columns" value="$(arg num_columns)"/>
             <param name="wait_for_tf" value="$(arg wait_for_tf)"/>
             <param name="interpolate_inclination_angle_for_nan_cells"

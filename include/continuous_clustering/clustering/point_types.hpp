@@ -10,6 +10,8 @@
 namespace continuous_clustering
 {
 
+// todo: split this header
+
 struct RawPoint
 {
     float x{std::nanf("")};
@@ -39,7 +41,6 @@ enum
     GP_GROUND = GREEN,        // ground point: ground
     GP_OBSTACLE = RED,        // ground point: unknown
     GP_EGO_VEHICLE = MAGENTA, // ground point: point on ego vehicle
-    GP_FOG = LIGHTGRAY,       // ground point: classified as fog
 };
 
 class RangeImageIndex
@@ -73,7 +74,7 @@ class RangeImageIndex
 
 struct Point
 {
-    // range image generation / general
+    // range image generation / general (todo: split raw & range img)
     Point3D xyz{std::nanf(""), std::nanf(""), std::nanf("")};
     uint64_t firing_index{0};
     uint8_t intensity{0};
@@ -90,13 +91,13 @@ struct Point
     uint64_t column_stamp_max{0};                                    // time stamp of the latest point in this column
     uint64_t globally_unique_point_index{static_cast<uint64_t>(-1)};
 
-    // ground point segmentation
+    // ground point segmentation (incl. point filtering stage)
+    uint8_t debug_label{WHITE};
     uint8_t ground_point_label{GP_UNKNOWN};
     float height_over_ground{std::nanf("")};
-    uint8_t debug_ground_point_label{WHITE};
 
     // clustering
-    bool is_ignored{false};
+    bool is_ignored{false};  // todo: move/split this field (used already in earlier stages)
     double finished_at_continuous_azimuth_angle{0.f};
     std::list<RangeImageIndex> child_points{};
     std::set<RangeImageIndex> associated_trees{};

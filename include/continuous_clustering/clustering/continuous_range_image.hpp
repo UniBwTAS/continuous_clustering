@@ -25,7 +25,7 @@ class ContinuousRangeImage
           azimuth_range_of_single_column(static_cast<float>((2 * M_PI)) / static_cast<float>(num_columns_per_rotation)),
           sensor_is_rotating_clockwise(sensor_is_rotating_clockwise),
           interpolate_inclination_angles_for_nan_cells(interpolate_inclination_angles_for_nan_cells),
-          minimum_required_start_column_index_mutex(std::make_unique<std::mutex>())
+          minimum_required_start_column_index_mutex(std::make_optional<std::mutex>())
     {
         range_image.resize(max_columns_ring_buffer * num_rows, Point());
 
@@ -236,7 +236,7 @@ class ContinuousRangeImage
             // obtain point
             Point& point = getPoint(row_index, local_column_index);
 
-            // check if there is a problem with the ring buffer, i.e. if cell was cleared in time
+            // check if there is a problem with the ring buffer, i.e. if cell was not cleared in time
             ensureClearedCell(point, column_index);
 
             // fill local/global column index (missing for omitted / NaN cells)
@@ -353,10 +353,17 @@ class ContinuousRangeImage
         removeMinimumRequiredStartColumnIndexNonGuarded(minimum_required_start_column_index);
     }
 
-    inline void clearFinishedColumns(int64_t current_column_index,
-                                     const std::vector<int64_t>& outdated_minimum_required_column_indices)
+    inline std::mutex& getMutex()
     {
-        std::lock_guard<std::mutex> lock_guard(*minimum_required_start_column_index_mutex);
+        return *minimum_required_start_column_index_mutex;
+    }
+
+    inline void getColumnsRangeToClear(int64_t current_column_index,
+                                       const std::vector<int64_t>& outdated_minimum_required_column_indices,
+                                       int64_t& clear_range_column_index_start,
+                                       int64_t& clear_range_column_index_end)
+    {
+        minimum_required_start_column_index_mutex->lock();
         for (int64_t c : outdated_minimum_required_column_indices)
             removeMinimumRequiredStartColumnIndexNonGuarded(c);
         int64_t minimum_required_start_column_index = minimum_required_start_column_indices.empty() ?
@@ -366,14 +373,15 @@ class ContinuousRangeImage
             throw std::runtime_error("This shouldn't happen, ring buffer is not allowed to increase at the front: " +
                                      std::to_string(minimum_required_start_column_index) + ", " +
                                      std::to_string(start_column_index));
-        if (finished_column_callback)
-            finished_column_callback(start_column_index, minimum_required_start_column_index - 1);
-        clearColumns(start_column_index, minimum_required_start_column_index - 1);
-        start_column_index = minimum_required_start_column_index;
+        clear_range_column_index_start = start_column_index;
+        clear_range_column_index_end = minimum_required_start_column_index - 1;
     }
-    void setFinishedColumnCallback(std::function<void(int64_t, int64_t)> cb)
+
+    inline void advanceStartOfRingBuffer(int64_t processed_column_index_start, int64_t processed_column_index_end)
     {
-        finished_column_callback = std::move(cb);
+        clearColumns(processed_column_index_start, processed_column_index_end);
+        start_column_index = processed_column_index_end + 1;
+        minimum_required_start_column_index_mutex->unlock();
     }
 
     inline int toLocalColumnIndex(int64_t column_index) const
@@ -425,11 +433,10 @@ class ContinuousRangeImage
 
     // multi threaded column clearance
     std::map<int64_t, int> minimum_required_start_column_indices{};
-    std::unique_ptr<std::mutex> minimum_required_start_column_index_mutex;
-    std::function<void(int64_t, int64_t)> finished_column_callback;
+    std::optional<std::mutex> minimum_required_start_column_index_mutex;
 
     // monotonically "indefinitely" increasing start and end indices of continuous range image
-    int64_t start_column_index{-1}; // starts at the rearmost laser' column index of first firing
+    int64_t start_column_index{-1};
     int64_t end_column_index{-1};
 
     // keep track of previous global column indices of the first and last laser in a firing

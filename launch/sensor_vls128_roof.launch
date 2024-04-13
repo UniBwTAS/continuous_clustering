@@ -19,6 +19,7 @@
     <arg name="point_cloud_topic" default="/sensor/lidar/$(arg sensor_model)_$(arg sensor_position)/velodyne_points"/>
 
     <!-- range image parameters -->
+    <arg name="num_rows" default="128"/>
     <arg name="num_columns" default="1700"/>
 
     <!-- clustering -->

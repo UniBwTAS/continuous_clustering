@@ -25,17 +25,13 @@ if ("$ENV{ROS_VERSION}" STREQUAL "1")
     generate_dynamic_reconfigure_options(cfg/ContinuousClustering.cfg)
     catkin_package(
             INCLUDE_DIRS include
-            LIBRARIES continuous_clustering kitti_loader kitti_evaluation continuous_clustering_ros
+            LIBRARIES kitti_loader kitti_evaluation continuous_clustering_ros
             CATKIN_DEPENDS roscpp sensor_msgs grid_map_msgs dynamic_reconfigure velodyne_pointcloud ouster_ros
             DEPENDS PCL EIGEN3
     )
 endif ()
 
 include_directories(include ${EIGEN3_INCLUDE_DIRS})
-
-# core continuous clustering library
-add_library(continuous_clustering src/clustering/continuous_clustering.cpp)
-target_link_libraries(continuous_clustering pthread)
 
 # library to load kitti odometry dataset
 add_library(kitti_loader src/evaluation/kitti_loader.cpp)
@@ -53,30 +49,29 @@ target_link_libraries(gt_label_generator_tool
         )
 
 # a tool which is able to run clustering directly on kitti dataset (raw files) instead of rosbag (and runs evaluation)
-add_executable(kitti_demo src/tools/kitti_demo.cpp)
-target_link_libraries(kitti_demo
-        continuous_clustering
-        kitti_loader
-        kitti_evaluation
-        )
+# add_executable(kitti_demo src/tools/kitti_demo.cpp)
+# target_link_libraries(kitti_demo
+#         continuous_clustering
+#         kitti_loader
+#         kitti_evaluation
+#         )
 
 if (${COMPILE_WITH_ROS})
     include_directories(${catkin_INCLUDE_DIRS})
 
     # helper functions to publish clustering result to ROS
     add_library(continuous_clustering_ros src/ros/ros_utils.cpp)
-    target_link_libraries(continuous_clustering ${catkin_LIBRARIES})
+    target_link_libraries(continuous_clustering_ros ${catkin_LIBRARIES})
 
     # a ROS node (wrapper), which subscribes to raw sensor data and publishes the clustering result
     add_executable(continuous_clustering_node src/ros/continuous_clustering_node.cpp)
     target_link_libraries(continuous_clustering_node
             ${catkin_LIBRARIES}
-            continuous_clustering
             continuous_clustering_ros
             )
     add_dependencies(continuous_clustering_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
     # link tools against ROS-specific libraries
     target_link_libraries(gt_label_generator_tool ${catkin_LIBRARIES})
-    target_link_libraries(kitti_demo ${catkin_LIBRARIES} continuous_clustering_ros)
+    # target_link_libraries(kitti_demo ${catkin_LIBRARIES} continuous_clustering_ros)
 endif ()
