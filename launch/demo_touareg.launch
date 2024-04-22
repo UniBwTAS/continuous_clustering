@@ -21,14 +21,14 @@
              if="$(arg use_vls128_roof)">
         <arg name="use_rviz" value="false"/>
     </include>
-    <include file="$(find continuous_clustering)/launch/sensor_os32_left.launch" pass_all_args="true"
+    <!--<include file="$(find continuous_clustering)/launch/sensor_os32_left.launch" pass_all_args="true"
              if="$(arg use_os32_left)">
         <arg name="use_rviz" value="false"/>
     </include>
     <include file="$(find continuous_clustering)/launch/sensor_os32_right.launch" pass_all_args="true"
              if="$(arg use_os32_right)">
         <arg name="use_rviz" value="false"/>
-    </include>
+    </include>-->
 
     <!-- start rviz -->
     <node name="rviz" pkg="rviz" type="rviz"

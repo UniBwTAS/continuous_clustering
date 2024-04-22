@@ -1,5 +1,5 @@
-#ifndef CONTINUOUS_CLUSTERING_OUSTER_INPUT_HPP
-#define CONTINUOUS_CLUSTERING_OUSTER_INPUT_HPP
+#ifndef CONTINUOUS_CLUSTERING_OUSTER_DRIVER_HPP
+#define CONTINUOUS_CLUSTERING_OUSTER_DRIVER_HPP
 
 // prevent clang-format from altering the location of "ouster_ros/ros.h", the
 // header file needs to be the first include due to PCL_NO_PRECOMPILE flag
@@ -13,7 +13,7 @@
 
 #include <ouster_ros/PacketMsg.h>
 
-#include <continuous_clustering/ros/ros_sensor_input.hpp>
+#include <continuous_clustering/clustering/pipeline_nodes/driver.hpp>
 
 namespace continuous_clustering
 {
@@ -45,10 +45,10 @@ struct parse_field_col
     }
 };
 
-class OusterInput : public RosSensorInput<ouster_ros::PacketMsg>
+class OusterDriver : public Driver<ouster_ros::PacketMsg::ConstPtr>
 {
   public:
-    OusterInput(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private) : RosSensorInput(nh, nh_private)
+    explicit OusterDriver(const ros::NodeHandle& nh_private, uint8_t num_threads = 1) : Driver(num_threads)
     {
         std::string ouster_metadata_path;
         if (!nh_private.getParam("ouster_metadata_path", ouster_metadata_path))
@@ -97,18 +97,18 @@ class OusterInput : public RosSensorInput<ouster_ros::PacketMsg>
 
     void reset() override
     {
-        RosSensorInput::reset();
+        Driver::reset();
         interrupt_message = true;
     }
 
   protected:
-    void onRawDataArrived(const ouster_ros::PacketMsg::ConstPtr& m) override
+    void processJob(ouster_ros::PacketMsg::ConstPtr&& job) override
     {
-        const uint8_t* packet_buf = m->buf.data();
+        const uint8_t* packet_buf = job->buf.data();
 
         // const uint16_t f_id = pf->frame_id(packet_buf);
 
-        uint64_t packet_receive_time = ros::Time::now().toNSec();
+        int64_t packet_receive_time = ros::Time::now().toNSec();
 
         // parse measurement blocks
         for (int icol = 0; icol < pf->columns_per_packet; icol++)

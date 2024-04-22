@@ -29,7 +29,7 @@ template<class InputType>
 class Association : public PipelineNode<InputType, AssociationResult>
 {
   public:
-    explicit Association(uint8_t num_treads = 1) : PipelineNode<InputType, AssociationResult>(num_treads, "A"){};
+    explicit Association(uint8_t num_threads = 1) : PipelineNode<InputType, AssociationResult>(num_threads, "A"){};
 
     void processJob(InputType&& job)
     {
@@ -246,10 +246,11 @@ class Association : public PipelineNode<InputType, AssociationResult>
         return (point.xyz - point_other.xyz).lengthSquared() < max_distance_squared;
     }
 
-    void setConfig(const AssociationConfig& c)
+    bool setConfig(const AssociationConfig& c)
     {
         config = c;
         max_distance_squared = c.max_distance * c.max_distance;
+        return false;
     }
 
   private:

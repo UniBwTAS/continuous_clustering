@@ -4,7 +4,7 @@
 
     <!-- lidar sensor -->
     <arg name="sensor_manufacturer" default="generic_points"/>
-    <arg name="sensor_model" default="kitti"/>
+    <arg name="sensor_model" default="generic_points"/>
     <arg name="sensor_position" default="roof"/>
     <arg name="sensor_frame" default="velo_link"/>
     <arg name="sensor_raw_data_topic" default="/kitti/velo/pointcloud"/>

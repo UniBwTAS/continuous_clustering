@@ -5,8 +5,12 @@
 #include <sensor_msgs/point_cloud2_iterator.h>
 #include <tf2_ros/transform_broadcaster.h>
 
+#include <continuous_clustering/ContinuousClusteringConfig.h>
 #include <continuous_clustering/clustering/continuous_range_image.hpp>
+#include <continuous_clustering/clustering/pipeline_nodes/association.hpp>
 #include <continuous_clustering/clustering/pipeline_nodes/ground_point_segmentation.hpp>
+#include <continuous_clustering/clustering/pipeline_nodes/point_collection.hpp>
+#include <continuous_clustering/clustering/pipeline_nodes/point_filtering.hpp>
 #include <continuous_clustering/clustering/point_types.hpp>
 #include <continuous_clustering/evaluation/kitti_evaluation.hpp>
 
@@ -63,7 +67,7 @@ struct PointCloud2Iterators
 };
 
 sensor_msgs::PointCloud2Ptr
-clusterToPointCloud(const std::vector<Point>& cluster_points, uint64_t stamp_cluster, const std::string& frame_id);
+clusterToPointCloud(const std::vector<Point>& cluster_points, int64_t stamp_cluster, const std::string& frame_id);
 
 sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousRangeImage& range_image,
                                                int64_t from_global_column_index,
@@ -84,9 +88,17 @@ void addRawPointToMessage(PointCloud2Iterators& container, int data_index_messag
 
 sensor_msgs::PointCloud2Ptr evaluationToPointCloud(const std::vector<KittiSegmentationEvaluationPoint>& point_cloud);
 
-void publish_tf(tf2_ros::TransformBroadcaster& pub, const Eigen::Isometry3d& odom_from_velodyne, uint64_t stamp);
-void publish_clock(ros::Publisher& pub, uint64_t stamp);
-void publish_ego_robot_bounding_box(uint64_t stamp, ros::Publisher& pub, const EgoVehicleBoundingBox& box);
+void publish_tf(tf2_ros::TransformBroadcaster& pub, const Eigen::Isometry3d& odom_from_velodyne, int64_t stamp);
+void publish_clock(ros::Publisher& pub, int64_t stamp);
+void publish_ego_robot_bounding_box(int64_t stamp, ros::Publisher& pub, const EgoVehicleBoundingBox& box);
+
+// ROS config to continuous clustering config
+PointFilteringConfig toPointFilteringConfig(const ContinuousClusteringConfig& ros_config);
+GroundPointSegmentationConfig toGroundPointSegmentationConfig(const ContinuousClusteringConfig& ros_config,
+                                                              const EgoVehicleBoundingBox& ego_bounding_box);
+AssociationConfig toAssociationConfig(const ContinuousClusteringConfig& ros_config);
+PointCollectionConfig toPointCollectionConfig(const ContinuousClusteringConfig& ros_config);
+EgoVehicleBoundingBox readEgoBoundingBoxFromParameterServer(const ros::NodeHandle& nh);
 } // namespace continuous_clustering
 
 #endif

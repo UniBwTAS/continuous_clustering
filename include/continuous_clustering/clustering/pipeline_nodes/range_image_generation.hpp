@@ -16,8 +16,8 @@ template<class InputType>
 class RangeImageGeneration : public PipelineNode<InputType, RangeImageGenerationResult>
 {
   public:
-    explicit RangeImageGeneration(uint8_t num_treads = 1)
-        : PipelineNode<InputType, RangeImageGenerationResult>(num_treads, "R"){};
+    explicit RangeImageGeneration(uint8_t num_threads = 1)
+        : PipelineNode<InputType, RangeImageGenerationResult>(num_threads, "R"){};
 
     void processJob(InputType&& job)
     {

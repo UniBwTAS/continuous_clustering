@@ -16,37 +16,37 @@ struct PointCollectionResult
     int64_t column_index;
 
     std::vector<int64_t> outdated_minimum_required_column_indices;
-    std::vector<std::pair<std::shared_ptr<std::vector<Point>>, uint64_t>> clusters_with_stamp;
+    std::vector<std::pair<std::shared_ptr<std::vector<Point>>, int64_t>> clusters_with_stamp;
 };
 
 template<class InputType>
 class PointCollection : public PipelineNode<InputType, PointCollectionResult>
 {
   public:
-    explicit PointCollection(uint8_t num_treads = 3)
-        : PipelineNode<InputType, PointCollectionResult>(num_treads, "C"){};
+    explicit PointCollection(uint8_t num_threads = 3)
+        : PipelineNode<InputType, PointCollectionResult>(num_threads, "C"){};
 
     void processJob(InputType&& job)
     {
         // keep track of minimum stamp for this message
-        uint64_t min_stamp_for_this_msg = std::numeric_limits<uint64_t>::max();
+        int64_t min_stamp_for_this_msg = std::numeric_limits<int64_t>::max();
 
         // todo
         std::vector<int64_t> outdated_minimum_required_column_indices;
         outdated_minimum_required_column_indices.push_back(job.column_index);
 
-        std::vector<std::pair<std::shared_ptr<std::vector<Point>>, uint64_t>> clusters_with_stamp;
+        std::vector<std::pair<std::shared_ptr<std::vector<Point>>, int64_t>> clusters_with_stamp;
 
         auto it_trees_per_finished_cluster = job.trees_per_finished_cluster.begin();
-        for (uint64_t cluster_id : job.cluster_ids)
+        for (int64_t cluster_id : job.cluster_ids)
         {
             // prepare vector
             auto cluster_points = std::make_shared<std::vector<Point>>();
             cluster_points->reserve(20000); // todo
 
             // collect minimum and maximum stamp for this cluster
-            uint64_t min_stamp_for_this_cluster = std::numeric_limits<uint64_t>::max();
-            uint64_t max_stamp_for_this_cluster = 0;
+            int64_t min_stamp_for_this_cluster = std::numeric_limits<int64_t>::max();
+            int64_t max_stamp_for_this_cluster = 0;
 
             // collect all of its child points
             std::list<RangeImageIndex> points_to_visit_for_this_tree;
@@ -83,7 +83,7 @@ class PointCollection : public PipelineNode<InputType, PointCollectionResult>
             // publish points (TODO: make threshold configurable)
             if (cluster_points->size() > 20)
             {
-                uint64_t stamp_cluster =
+                int64_t stamp_cluster =
                     config.use_last_point_for_cluster_stamp ?
                         max_stamp_for_this_cluster :
                         min_stamp_for_this_cluster + (max_stamp_for_this_cluster - min_stamp_for_this_cluster) / 2;
@@ -102,9 +102,10 @@ class PointCollection : public PipelineNode<InputType, PointCollectionResult>
         this->passJobToNextNode(next_job);
     }
 
-    void setConfig(const PointCollectionConfig& c)
+    bool setConfig(const PointCollectionConfig& c)
     {
         config = c;
+        return false;
     }
 
   private:

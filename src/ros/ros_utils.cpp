@@ -4,12 +4,15 @@
 #include <visualization_msgs/Marker.h>
 
 #include <continuous_clustering/ros/ros_utils.hpp>
+#include "continuous_clustering/clustering/pipeline_nodes/association.hpp"
+#include "continuous_clustering/clustering/pipeline_nodes/point_collection.hpp"
+#include "continuous_clustering/clustering/pipeline_nodes/point_filtering.hpp"
 
 namespace continuous_clustering
 {
 
 sensor_msgs::PointCloud2Ptr
-clusterToPointCloud(const std::vector<Point>& cluster_points, uint64_t stamp_cluster, const std::string& frame_id)
+clusterToPointCloud(const std::vector<Point>& cluster_points, int64_t stamp_cluster, const std::string& frame_id)
 {
     sensor_msgs::PointCloud2Ptr msg(new sensor_msgs::PointCloud2);
     msg->header.stamp.fromNSec(stamp_cluster);
@@ -47,7 +50,7 @@ sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousRangeImage& range
     PointCloud2Iterators container = prepareMessageAndCreateIterators(*msg, fill_fields_up_to_stage);
 
     // keep track of minimum point stamp in this message
-    uint64_t minimum_point_stamp = std::numeric_limits<uint64_t>::max();
+    int64_t minimum_point_stamp = std::numeric_limits<int64_t>::max();
 
     for (int message_column_index = 0; message_column_index < msg->width; ++message_column_index)
     {
@@ -64,7 +67,7 @@ sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousRangeImage& range
         }
     }
 
-    if (minimum_point_stamp != std::numeric_limits<uint64_t>::max())
+    if (minimum_point_stamp != std::numeric_limits<int64_t>::max())
         msg->header.stamp.fromNSec(minimum_point_stamp);
     /*else
         ROS_WARN_STREAM("This column had no timestamps. Unable to publish message with timestamp. Local Column Index: "
@@ -83,7 +86,7 @@ sensor_msgs::PointCloud2Ptr firingToPointCloud(const RawPoints::ConstPtr& firing
     PointCloud2Iterators container = prepareMessageAndCreateIterators(*msg, RAW_POINT);
 
     // keep track of minimum point stamp in this message
-    uint64_t minimum_point_stamp = std::numeric_limits<uint64_t>::max();
+    int64_t minimum_point_stamp = std::numeric_limits<int64_t>::max();
 
     int data_index_message = 0;
     for (const RawPoint& point : firing->points)
@@ -96,7 +99,7 @@ sensor_msgs::PointCloud2Ptr firingToPointCloud(const RawPoints::ConstPtr& firing
         data_index_message++;
     }
 
-    if (minimum_point_stamp != std::numeric_limits<uint64_t>::max())
+    if (minimum_point_stamp != std::numeric_limits<int64_t>::max())
         msg->header.stamp = ros::Time().fromNSec(minimum_point_stamp);
 
     return msg;
@@ -400,7 +403,7 @@ sensor_msgs::PointCloud2Ptr evaluationToPointCloud(const std::vector<KittiSegmen
     return msg;
 }
 
-void publish_tf(tf2_ros::TransformBroadcaster& pub, const Eigen::Isometry3d& odom_from_velodyne, uint64_t stamp)
+void publish_tf(tf2_ros::TransformBroadcaster& pub, const Eigen::Isometry3d& odom_from_velodyne, int64_t stamp)
 {
     auto msg = tf2::eigenToTransform(odom_from_velodyne);
     msg.header.stamp.fromNSec(stamp);
@@ -409,7 +412,7 @@ void publish_tf(tf2_ros::TransformBroadcaster& pub, const Eigen::Isometry3d& odo
     pub.sendTransform(msg);
 }
 
-void publish_clock(ros::Publisher& pub, uint64_t stamp)
+void publish_clock(ros::Publisher& pub, int64_t stamp)
 {
     if (pub.getNumSubscribers() == 0)
         return;
@@ -419,7 +422,7 @@ void publish_clock(ros::Publisher& pub, uint64_t stamp)
     pub.publish(msg);
 }
 
-void publish_ego_robot_bounding_box(uint64_t stamp, ros::Publisher& pub, const EgoVehicleBoundingBox& box)
+void publish_ego_robot_bounding_box(int64_t stamp, ros::Publisher& pub, const EgoVehicleBoundingBox& box)
 {
     if (pub.getNumSubscribers() == 0)
         return;
@@ -451,6 +454,91 @@ void publish_ego_robot_bounding_box(uint64_t stamp, ros::Publisher& pub, const E
     msg.frame_locked = true;
 
     pub.publish(msg);
+}
+
+EgoVehicleBoundingBox readEgoBoundingBoxFromParameterServer(const ros::NodeHandle& nh)
+{
+    EgoVehicleBoundingBox ego_bounding_box;
+    bool success = true;
+
+    // get name of ego vehicle
+    std::string ego_name;
+    success &= nh.getParam("/vehicles/ego", ego_name);
+
+    // get parameters
+    success &=
+        nh.getParam("/vehicles/" + ego_name + "/geometric/height_ref_to_maximum", ego_bounding_box.height_ref_to_top);
+    success &=
+        nh.getParam("/vehicles/" + ego_name + "/geometric/height_ref_to_ground", ego_bounding_box.height_ref_to_bottom);
+    success &= nh.getParam("/vehicles/" + ego_name + "/geometric/length_ref_to_front_end",
+                           ego_bounding_box.length_ref_to_front);
+    success &=
+        nh.getParam("/vehicles/" + ego_name + "/geometric/length_ref_to_rear_end", ego_bounding_box.length_ref_to_back);
+    success &= nh.getParam("/vehicles/" + ego_name + "/geometric/width_ref_to_left_mirror",
+                           ego_bounding_box.width_ref_to_left);
+    success &= nh.getParam("/vehicles/" + ego_name + "/geometric/width_ref_to_right_mirror",
+                           ego_bounding_box.width_ref_to_right);
+
+    // raise error if something went wrong
+    if (!success)
+        throw std::runtime_error("Not all vehicle parameters are available");
+
+    return ego_bounding_box;
+}
+
+PointFilteringConfig toPointFilteringConfig(const ContinuousClusteringConfig& ros_config)
+{
+    PointFilteringConfig config;
+    config.ignore_points_in_chessboard_pattern = ros_config.ignore_points_in_chessboard_pattern;
+    config.ignore_points_with_too_big_inclination_angle_diff =
+        ros_config.ignore_points_with_too_big_inclination_angle_diff;
+    config.max_distance = static_cast<float>(ros_config.max_distance);
+    config.min_distance_from_sensor_origin = static_cast<float>(ros_config.min_distance_from_sensor_origin); // todo
+    config.fog_filtering_enabled = ros_config.fog_filtering_enabled;
+    config.fog_filtering_intensity_below = ros_config.fog_filtering_intensity_below;
+    config.fog_filtering_distance_below = static_cast<float>(ros_config.fog_filtering_distance_below);
+    config.fog_filtering_inclination_above = static_cast<float>(ros_config.fog_filtering_inclination_above);
+    return config;
+}
+
+GroundPointSegmentationConfig toGroundPointSegmentationConfig(const ContinuousClusteringConfig& ros_config,
+                                                              const EgoVehicleBoundingBox& ego_bounding_box)
+{
+    GroundPointSegmentationConfig config;
+    config.ego_bounding_box = ego_bounding_box;
+    config.max_slope = static_cast<float>(ros_config.max_slope);
+    config.first_ring_as_ground_max_allowed_z_diff =
+        static_cast<float>(ros_config.first_ring_as_ground_max_allowed_z_diff);
+    config.first_ring_as_ground_min_allowed_z_diff =
+        static_cast<float>(ros_config.first_ring_as_ground_min_allowed_z_diff);
+    config.last_ground_point_slope_higher_than = static_cast<float>(ros_config.last_ground_point_slope_higher_than);
+    config.last_ground_point_distance_smaller_than =
+        static_cast<float>(ros_config.last_ground_point_distance_smaller_than);
+    config.ground_because_close_to_last_certain_ground_max_z_diff =
+        static_cast<float>(ros_config.ground_because_close_to_last_certain_ground_max_z_diff);
+    config.ground_because_close_to_last_certain_ground_max_dist_diff =
+        static_cast<float>(ros_config.ground_because_close_to_last_certain_ground_max_dist_diff);
+    config.obstacle_because_next_certain_obstacle_max_dist_diff =
+        static_cast<float>(ros_config.obstacle_because_next_certain_obstacle_max_dist_diff);
+    return config;
+}
+
+AssociationConfig toAssociationConfig(const ContinuousClusteringConfig& ros_config)
+{
+    AssociationConfig config;
+    config.max_distance = static_cast<float>(ros_config.max_distance);
+    config.max_steps_in_row = ros_config.max_steps_in_row;
+    config.max_steps_in_column = ros_config.max_steps_in_column;
+    config.stop_after_association_enabled = ros_config.stop_after_association_enabled;
+    config.stop_after_association_min_steps = ros_config.stop_after_association_min_steps;
+    return config;
+}
+
+PointCollectionConfig toPointCollectionConfig(const ContinuousClusteringConfig& ros_config)
+{
+    PointCollectionConfig config;
+    config.use_last_point_for_cluster_stamp = ros_config.use_last_point_for_cluster_stamp;
+    return config;
 }
 
 } // namespace continuous_clustering

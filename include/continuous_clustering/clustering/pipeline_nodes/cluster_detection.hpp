@@ -10,7 +10,7 @@ struct ClusterDetectionResult
 {
     int64_t column_index;
 
-    std::list<uint64_t> cluster_ids;
+    std::list<int64_t> cluster_ids;
     std::list<std::list<RangeImageIndex>> trees_per_finished_cluster;
 };
 
@@ -18,8 +18,8 @@ template<class InputType>
 class ClusterDetection : public PipelineNode<InputType, ClusterDetectionResult>
 {
   public:
-    explicit ClusterDetection(uint8_t num_treads = 1)
-        : PipelineNode<InputType, ClusterDetectionResult>(num_treads, "D"){};
+    explicit ClusterDetection(uint8_t num_threads = 1)
+        : PipelineNode<InputType, ClusterDetectionResult>(num_threads, "D"){};
 
     void processJob(InputType&& job)
     {
@@ -28,7 +28,7 @@ class ClusterDetection : public PipelineNode<InputType, ClusterDetectionResult>
 
         // keep track of point trees per finished cluster
         std::list<std::list<RangeImageIndex>> trees_per_finished_cluster;
-        std::list<uint64_t> finished_cluster_ids;
+        std::list<int64_t> finished_cluster_ids;
 
         // run breath-first search (BFS) on each unpublished point tree. If a BFS from a specific starting node
         // completes without finding an unfinished point tree, then these point trees form a finished cluster.
@@ -152,7 +152,7 @@ class ClusterDetection : public PipelineNode<InputType, ClusterDetectionResult>
 
   private:
     std::list<RangeImageIndex> unfinished_point_trees_;
-    uint64_t cluster_counter_{1};
+    int64_t cluster_counter_{1};
 };
 
 } // namespace continuous_clustering

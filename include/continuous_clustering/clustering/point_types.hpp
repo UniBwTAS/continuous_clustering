@@ -20,15 +20,15 @@ struct RawPoint
     float distance{std::nanf("")};          // optional: avoids to recalculate it during range image generation
     float azimuth_angle{std::nanf("")};     // optional: avoids to recalculate it during range image generation
     float inclination_angle{std::nanf("")}; // optional: avoids to recalculate it during range image generation
-    uint64_t firing_index{};
+    int64_t firing_index{};
     uint8_t intensity{};
-    uint64_t stamp{};
-    uint64_t globally_unique_point_index{}; // used for evaluation in order to be able to obtain corresponding GT label
+    int64_t stamp{};
+    int64_t globally_unique_point_index{}; // used for evaluation in order to be able to obtain corresponding GT label
 };
 
 struct RawPoints
 {
-    uint64_t stamp;
+    int64_t stamp;
     std::vector<RawPoint> points;
 
     typedef std::shared_ptr<RawPoints> Ptr;
@@ -76,7 +76,7 @@ struct Point
 {
     // range image generation / general (todo: split raw & range img)
     Point3D xyz{std::nanf(""), std::nanf(""), std::nanf("")};
-    uint64_t firing_index{0};
+    int64_t firing_index{0};
     uint8_t intensity{0};
     float distance{std::nanf("")};
     float azimuth_angle{std::nanf("")};
@@ -85,11 +85,11 @@ struct Point
     int64_t global_column_index{-1};
     int local_column_index{-1};
     int row_index{-1};
-    uint64_t stamp{0};               // exact time stamp
-    uint64_t column_stamp_middle{0}; // column time stamp (middle between min & max time stamp; only filled in top row)
-    uint64_t column_stamp_min{std::numeric_limits<uint64_t>::max()}; // time stamp of the oldest point in this column
-    uint64_t column_stamp_max{0};                                    // time stamp of the latest point in this column
-    uint64_t globally_unique_point_index{static_cast<uint64_t>(-1)};
+    int64_t stamp{0};               // exact time stamp
+    int64_t column_stamp_middle{0}; // column time stamp (middle between min & max time stamp; only filled in top row)
+    int64_t column_stamp_min{std::numeric_limits<int64_t>::max()}; // time stamp of the oldest point in this column
+    int64_t column_stamp_max{0};                                    // time stamp of the latest point in this column
+    int64_t globally_unique_point_index{static_cast<int64_t>(-1)};
 
     // ground point segmentation (incl. point filtering stage)
     uint8_t debug_label{WHITE};
@@ -104,8 +104,8 @@ struct Point
     RangeImageIndex tree_root_{0, -1, -1};
     uint32_t tree_num_points{0};
     uint32_t cluster_width{0};
-    uint64_t tree_id{0};
-    uint64_t id{0};
+    int64_t tree_id{0};
+    int64_t id{0};
     double visited_at_continuous_azimuth_angle{-1.};
     bool belongs_to_finished_cluster{false};
     int number_of_visited_neighbors{0};

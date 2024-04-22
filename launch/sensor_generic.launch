@@ -9,8 +9,8 @@
     <arg name="is_single_threaded" default="false"/>
 
     <!-- lidar sensor -->
-    <arg name="sensor_manufacturer" doc="available options: velodyne, ouster, kitti"/>
-    <arg name="sensor_model" doc="arbitrary: e.g. vls128, hdl64, hdl32, os32, kitti ..."/>
+    <arg name="sensor_manufacturer" doc="available options: velodyne, ouster, generic_points"/>
+    <arg name="sensor_model" doc="arbitrary: e.g. vls128, hdl64, hdl32, os32, generic_points ..."/>
     <arg name="sensor_position" doc="arbitrary: e.g. roof, left, right"/>
     <arg name="sensor_frame" doc="the ROS frame id of the velodyne sensor"/>
     <arg name="sensor_raw_data_topic" doc="input topic for raw data"/>

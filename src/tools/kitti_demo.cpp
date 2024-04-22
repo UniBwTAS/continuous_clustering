@@ -77,7 +77,7 @@ class ROSInterface
         }
     };
 
-    void publishCluster(const std::vector<Point>& cluster_points, uint64_t stamp_cluster)
+    void publishCluster(const std::vector<Point>& cluster_points, int64_t stamp_cluster)
     {
         if (pub_cluster.getNumSubscribers() == 0)
             return;
@@ -126,7 +126,7 @@ class DummyInterface
                        ProcessingStage stage,
                        const ContinuousClustering& clustering){};
     void
-    publishCluster(const std::vector<Point>& cluster_points, int num_rows_in_range_image, uint64_t stamp_cluster){};
+    publishCluster(const std::vector<Point>& cluster_points, int num_rows_in_range_image, int64_t stamp_cluster){};
     void publishFiringAndClockAndTF(const RawPoints::Ptr& firing,
                                     const Eigen::Isometry3d& odom_from_velodyne,
                                     bool publish_firing){};
@@ -141,8 +141,8 @@ class KittiDemo
 {
   private:
     static inline RawPoints::Ptr makePseudoFiringFromRangeImageColumn(const std::vector<KittiPoint>& range_image,
-                                                                      uint64_t start_stamp,
-                                                                      uint64_t end_stamp,
+                                                                      int64_t start_stamp,
+                                                                      int64_t end_stamp,
                                                                       int column_index,
                                                                       int sequence_index,
                                                                       int frame_index)
@@ -152,7 +152,7 @@ class KittiDemo
         // calculate approximate timestamp of this firing
         double elapsed_ratio = static_cast<double>(column_index) / (KittiLoader::RANGE_IMAGE_WIDTH - 1);
         double elapsed_time = static_cast<double>(end_stamp - start_stamp) * elapsed_ratio;
-        firing->stamp = start_stamp + static_cast<uint64_t>(elapsed_time);
+        firing->stamp = start_stamp + static_cast<int64_t>(elapsed_time);
 
         // fill points
         firing->points.resize(KittiLoader::RANGE_IMAGE_HEIGHT);
@@ -171,8 +171,8 @@ class KittiDemo
             // encode sequence, frame, and point index in pointcloud into one value in order to be able to obtain the
             // corresponding ground truth label for this point (also other subscribers in other nodes etc.)
             firing->points[row_index].globally_unique_point_index =
-                (static_cast<uint64_t>(sequence_index) << 48) | (static_cast<uint64_t>(frame_index) << 32) |
-                static_cast<uint64_t>(kitti_point.original_kitti_index);
+                (static_cast<int64_t>(sequence_index) << 48) | (static_cast<int64_t>(frame_index) << 32) |
+                static_cast<int64_t>(kitti_point.original_kitti_index);
         }
 
         return firing;
@@ -212,7 +212,7 @@ class KittiDemo
                 const Point& point = clustering.range_image.getPoint(row_index, ring_buffer_local_column_index);
 
                 // check if cell in range image contains point
-                if (point.globally_unique_point_index != static_cast<uint64_t>(-1))
+                if (point.globally_unique_point_index != static_cast<int64_t>(-1))
                 {
                     // get meta info from current point
                     uint16_t sequence_index = (point.globally_unique_point_index >> 48) & 0xFFFF;
@@ -267,8 +267,8 @@ class KittiDemo
 
             // load velodyne timestamps
             auto timestamps_velodyne_middle = KittiLoader::loadTimestamps(sequence_folder / Path{"times.txt"}, true);
-            std::vector<uint64_t> timestamps_velodyne_start;
-            std::vector<uint64_t> timestamps_velodyne_end;
+            std::vector<int64_t> timestamps_velodyne_start;
+            std::vector<int64_t> timestamps_velodyne_end;
             KittiLoader::getStartEndTimestampsVelodyne(
                 timestamps_velodyne_middle, timestamps_velodyne_start, timestamps_velodyne_end);
 
@@ -324,7 +324,7 @@ class KittiDemo
                 });
 
             clustering.setFinishedClusterCallback(
-                [&](const std::vector<Point>& cluster_points, uint64_t stamp_cluster)
+                [&](const std::vector<Point>& cluster_points, int64_t stamp_cluster)
                 {
                     if (enable_publishers)
                         middleware.publishCluster(cluster_points, stamp_cluster);

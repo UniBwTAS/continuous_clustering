@@ -14,13 +14,11 @@ struct DriverResult
     RawPoints::ConstPtr firing;
 };
 
-class Driver : PipelineNode<int, DriverResult> // int is just some dummy
+template<class InputType>
+class Driver : public PipelineNode<InputType, DriverResult> // todo: public inherit -> protected working?
 {
   public:
-    explicit Driver(uint8_t num_treads = 1) : PipelineNode<int, DriverResult>(num_treads, "D"){};
-
-    virtual void subscribe() = 0;
-    // virtual size_t dataCount() = 0;
+    explicit Driver(uint8_t num_threads = 1) : PipelineNode<InputType, DriverResult>(num_threads, "D"){};
 
     void reset() override
     {
@@ -32,7 +30,7 @@ class Driver : PipelineNode<int, DriverResult> // int is just some dummy
     void publishCurrentFiringAndPrepareNewFiring()
     {
         current_firing->stamp = min_stamp + (max_stamp - min_stamp) / 2;
-        passJobToNextNode({current_firing});
+        this->passJobToNextNode({current_firing});
         firing_index++;
         prepareNewFiring();
     }
@@ -40,14 +38,14 @@ class Driver : PipelineNode<int, DriverResult> // int is just some dummy
     void prepareNewFiring()
     {
         // reset min and max stamp
-        min_stamp = std::numeric_limits<uint64_t>::max();
+        min_stamp = std::numeric_limits<int64_t>::max();
         max_stamp = 0;
 
         current_firing.reset(new RawPoints());
         current_firing->points.resize(num_lasers, RawPoint());
     }
 
-    inline void keepTrackOfMinAndMaxStamp(uint64_t point_stamp)
+    inline void keepTrackOfMinAndMaxStamp(int64_t point_stamp)
     {
         if (point_stamp < min_stamp)
             min_stamp = point_stamp;
@@ -59,9 +57,9 @@ class Driver : PipelineNode<int, DriverResult> // int is just some dummy
     RawPoints::Ptr current_firing;
     int num_lasers{};
     std::vector<float> inclination_angles{};
-    uint64_t firing_index{0};
-    uint64_t min_stamp{0};
-    uint64_t max_stamp{0};
+    int64_t firing_index{0};
+    int64_t min_stamp{0};
+    int64_t max_stamp{0};
 };
 
 } // namespace continuous_clustering

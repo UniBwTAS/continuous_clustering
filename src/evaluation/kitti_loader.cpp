@@ -175,23 +175,23 @@ std::vector<KittiPoint> KittiLoader::generateRangeImage(const std::vector<KittiP
 }
 
 void KittiLoader::undoEgoMotionCorrection(std::vector<KittiPoint>& corrected_points,
-                                          uint64_t rotation_start_stamp,
-                                          uint64_t rotation_end_stamp,
+                                          int64_t rotation_start_stamp,
+                                          int64_t rotation_end_stamp,
                                           const Eigen::Isometry3d& odom_from_velodyne_at_middle_of_rotation,
                                           const std::vector<StampedPose>& odom_from_velodyne)
 {
     // constant
-    uint64_t bin_resolution = 1000000; // 1ms
+    int64_t bin_resolution = 1000000; // 1ms
 
     // create lookup table for transforms with above resolution
-    uint64_t duration = rotation_end_stamp - rotation_start_stamp;
+    int64_t duration = rotation_end_stamp - rotation_start_stamp;
     int num_bins = std::ceil(static_cast<double>(duration) / static_cast<double>(bin_resolution));
     std::vector<Eigen::Isometry3d> velodyne_from_velodyne(num_bins);
     for (int bin_index = 0; bin_index < num_bins; bin_index++)
     {
         // first transform point to odom from velodyne at the middle of the rotation and then transform it back to
         // velodyne frame at the point's stamp
-        uint64_t stamp_at_bin = rotation_start_stamp + bin_index * bin_resolution + (bin_resolution / 2);
+        int64_t stamp_at_bin = rotation_start_stamp + bin_index * bin_resolution + (bin_resolution / 2);
         velodyne_from_velodyne[bin_index] =
             interpolate(odom_from_velodyne, stamp_at_bin).pose.inverse() * odom_from_velodyne_at_middle_of_rotation;
     }
@@ -294,12 +294,12 @@ std::vector<StampedPose> KittiLoader::makeTransformsRelativeToFirstTransform(con
     return relative_transforms;
 }
 
-StampedPose KittiLoader::interpolate(const std::vector<StampedPose>& transforms, uint64_t stamp)
+StampedPose KittiLoader::interpolate(const std::vector<StampedPose>& transforms, int64_t stamp)
 {
     auto it_pose_after = std::lower_bound(transforms.begin(),
                                           transforms.end(),
                                           stamp,
-                                          [](const StampedPose& pose, uint64_t stamp) { return pose.stamp < stamp; });
+                                          [](const StampedPose& pose, int64_t stamp) { return pose.stamp < stamp; });
     if (it_pose_after == transforms.end())
         return {stamp, (it_pose_after - 1)->pose};
     else if (it_pose_after == transforms.begin())
@@ -328,7 +328,7 @@ StampedPose KittiLoader::interpolate(const std::vector<StampedPose>& transforms,
 }
 
 std::vector<StampedPose> KittiLoader::getAllDynamicTransforms(const Path& path_poses_file,
-                                                              const std::vector<uint64_t>& timestamps,
+                                                              const std::vector<int64_t>& timestamps,
                                                               const Eigen::Isometry3d& tf_cam0_from_x)
 {
     std::ifstream is(path_poses_file);
@@ -461,10 +461,10 @@ Eigen::Isometry3d KittiLoader::loadStaticTransformCameraFromVelodyne(const Path&
     return loadStaticTransform(Path{calibration_folder} / Path{"calib_velo_to_cam.txt"});
 }
 
-std::vector<uint64_t> KittiLoader::loadTimestampsRaw(const Path& timestamp_path)
+std::vector<int64_t> KittiLoader::loadTimestampsRaw(const Path& timestamp_path)
 {
     std::ifstream is(timestamp_path);
-    std::vector<uint64_t> timestamps;
+    std::vector<int64_t> timestamps;
 
     if (is.is_open())
     {
@@ -491,7 +491,7 @@ std::vector<uint64_t> KittiLoader::loadTimestampsRaw(const Path& timestamp_path)
             // add fractional seconds
             if (time_and_fractional_seconds[1].length() != 9)
                 throw std::runtime_error("Fractional seconds are not in nanosecond resolution: " + line);
-            uint64_t nanoseconds = t * 1000000000UL + std::stoul(time_and_fractional_seconds[1]);
+            int64_t nanoseconds = t * 1000000000UL + std::stoul(time_and_fractional_seconds[1]);
             timestamps.push_back(nanoseconds);
         }
     }
@@ -501,12 +501,12 @@ std::vector<uint64_t> KittiLoader::loadTimestampsRaw(const Path& timestamp_path)
     return timestamps;
 }
 
-std::vector<uint64_t> KittiLoader::loadTimestamps(const Path& timestamp_path, bool make_fake_absolute)
+std::vector<int64_t> KittiLoader::loadTimestamps(const Path& timestamp_path, bool make_fake_absolute)
 {
     std::ifstream is(timestamp_path);
-    std::vector<uint64_t> timestamps;
+    std::vector<int64_t> timestamps;
 
-    uint64_t fake_start_stamp = 0;
+    int64_t fake_start_stamp = 0;
     if (make_fake_absolute)
     {
         auto since_epoch = std::chrono::system_clock::now().time_since_epoch();
@@ -519,7 +519,7 @@ std::vector<uint64_t> KittiLoader::loadTimestamps(const Path& timestamp_path, bo
         while (std::getline(is, line))
         {
             double dt = std::stod(line);
-            timestamps.push_back(fake_start_stamp + static_cast<uint64_t>(dt * 1000000000UL));
+            timestamps.push_back(fake_start_stamp + static_cast<int64_t>(dt * 1000000000UL));
         }
     }
     else
@@ -528,9 +528,9 @@ std::vector<uint64_t> KittiLoader::loadTimestamps(const Path& timestamp_path, bo
     return timestamps;
 }
 
-void KittiLoader::getStartEndTimestampsVelodyne(const std::vector<uint64_t>& timestamps_middle,
-                                                std::vector<uint64_t>& timestamps_start,
-                                                std::vector<uint64_t>& timestamps_end)
+void KittiLoader::getStartEndTimestampsVelodyne(const std::vector<int64_t>& timestamps_middle,
+                                                std::vector<int64_t>& timestamps_start,
+                                                std::vector<int64_t>& timestamps_end)
 {
     timestamps_start.clear();
     timestamps_start.resize(timestamps_middle.size());

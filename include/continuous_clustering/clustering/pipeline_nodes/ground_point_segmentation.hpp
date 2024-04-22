@@ -47,8 +47,8 @@ template<class InputType>
 class GroundPointSegmentation : public PipelineNode<InputType, GroundPointSegmentationResult>
 {
   public:
-    explicit GroundPointSegmentation(uint8_t num_treads = 1)
-        : PipelineNode<InputType, GroundPointSegmentationResult>(num_treads, "G"){};
+    explicit GroundPointSegmentation(uint8_t num_threads = 1)
+        : PipelineNode<InputType, GroundPointSegmentationResult>(num_threads, "G"){};
 
     void processJob(InputType&& job)
     {
@@ -223,9 +223,10 @@ class GroundPointSegmentation : public PipelineNode<InputType, GroundPointSegmen
         this->passJobToNextNode({job.column_index});
     }
 
-    void setConfig(const GroundPointSegmentationConfig& c)
+    bool setConfig(const GroundPointSegmentationConfig& c)
     {
         config = c;
+        return false;
     }
 
     GroundPointSegmentationConfig& getConfig()

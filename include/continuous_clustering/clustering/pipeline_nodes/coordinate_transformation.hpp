@@ -26,8 +26,8 @@ template<class InputType>
 class CoordinateTransformation : public PipelineNode<InputType, CoordinateTransformationResult>
 {
   public:
-    explicit CoordinateTransformation(uint8_t num_treads = 1)
-        : PipelineNode<InputType, CoordinateTransformationResult>(num_treads, "T"){};
+    explicit CoordinateTransformation(uint8_t num_threads = 1)
+        : PipelineNode<InputType, CoordinateTransformationResult>(num_threads, "T"){};
 
     void processJob(InputType&& job)
     {
@@ -44,7 +44,7 @@ class CoordinateTransformation : public PipelineNode<InputType, CoordinateTransf
             int local_column_index = this->range_image->toLocalColumnIndex(column_index);
 
             // get timestamp for this column
-            uint64_t column_stamp = this->range_image->getColumnStamp(local_column_index);
+            int64_t column_stamp = this->range_image->getColumnStamp(local_column_index);
             if (column_stamp == 0)
             {
                 column_indices_waiting_for_transform.pop();
@@ -82,7 +82,7 @@ class CoordinateTransformation : public PipelineNode<InputType, CoordinateTransf
         }
     }
 
-    void setRequestTransformOdomFromSensorCallback(std::function<Eigen::Isometry3d(uint64_t, TransformStatus&)> cb)
+    void setRequestTransformOdomFromSensorCallback(std::function<Eigen::Isometry3d(int64_t, TransformStatus&)> cb)
     {
         request_transform_odom_from_sensor_callback_ = std::move(cb);
     }
@@ -93,7 +93,7 @@ class CoordinateTransformation : public PipelineNode<InputType, CoordinateTransf
     }
 
   private:
-    std::function<Eigen::Isometry3d(uint64_t, TransformStatus&)> request_transform_odom_from_sensor_callback_;
+    std::function<Eigen::Isometry3d(int64_t, TransformStatus&)> request_transform_odom_from_sensor_callback_;
     std::queue<int64_t> column_indices_waiting_for_transform{};
 };
 

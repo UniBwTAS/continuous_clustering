@@ -46,7 +46,7 @@ struct KittiPoint
 // oxts
 struct Oxts
 {
-    uint64_t stamp;
+    int64_t stamp;
     double lat;
     double lon;
     double alt;
@@ -74,7 +74,7 @@ struct CameraCalibration
 // transforms
 struct StampedPose
 {
-    uint64_t stamp;
+    int64_t stamp;
     Eigen::Isometry3d pose;
 };
 
@@ -119,8 +119,8 @@ class KittiLoader
     std::vector<KittiPoint> generateRangeImage(const std::vector<KittiPoint>& unorganized_points,
                                                bool shift_cell_if_already_occupied = true);
     void undoEgoMotionCorrection(std::vector<KittiPoint>& corrected_points,
-                                 uint64_t rotation_start_stamp,
-                                 uint64_t rotation_end_stamp,
+                                 int64_t rotation_start_stamp,
+                                 int64_t rotation_end_stamp,
                                  const Eigen::Isometry3d& odom_from_velodyne_at_middle_of_rotation,
                                  const std::vector<StampedPose>& odom_from_velodyne);
 
@@ -133,10 +133,10 @@ class KittiLoader
                             int last_frame,
                             const Eigen::Isometry3d& tf_oxford_from_x = Eigen::Isometry3d::Identity());
     std::vector<StampedPose> makeTransformsRelativeToFirstTransform(const std::vector<StampedPose>& transforms);
-    StampedPose interpolate(const std::vector<StampedPose>& transforms, uint64_t stamp);
+    StampedPose interpolate(const std::vector<StampedPose>& transforms, int64_t stamp);
     std::vector<StampedPose>
     getAllDynamicTransforms(const Path& path_poses_file,
-                            const std::vector<uint64_t>& timestamps = {},
+                            const std::vector<int64_t>& timestamps = {},
                             const Eigen::Isometry3d& tf_cam0_from_x = Eigen::Isometry3d::Identity());
     void getStaticTransformAndProjectionMatrices(const Path& path_calib_file,
                                                  Eigen::Isometry3d& tf_cam0_from_velodyne,
@@ -151,11 +151,11 @@ class KittiLoader
     Eigen::Isometry3d loadStaticTransformCameraFromVelodyne(const Path& calibration_folder);
 
     // Timing
-    static std::vector<uint64_t> loadTimestampsRaw(const Path& timestamp_path);
-    static std::vector<uint64_t> loadTimestamps(const Path& timestamp_path, bool make_fake_absolute);
-    static void getStartEndTimestampsVelodyne(const std::vector<uint64_t>& timestamps_middle,
-                                              std::vector<uint64_t>& timestamps_start,
-                                              std::vector<uint64_t>& timestamps_end);
+    static std::vector<int64_t> loadTimestampsRaw(const Path& timestamp_path);
+    static std::vector<int64_t> loadTimestamps(const Path& timestamp_path, bool make_fake_absolute);
+    static void getStartEndTimestampsVelodyne(const std::vector<int64_t>& timestamps_middle,
+                                              std::vector<int64_t>& timestamps_start,
+                                              std::vector<int64_t>& timestamps_end);
 
     // Meta Data
     static std::map<int, RawSequenceSubset> getKittiOdometrySequenceToKittiRawMapping();

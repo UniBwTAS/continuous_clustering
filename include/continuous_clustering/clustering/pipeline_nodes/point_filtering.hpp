@@ -37,7 +37,7 @@ template<class InputType>
 class PointFiltering : public PipelineNode<InputType, PointFilteringResult>
 {
   public:
-    explicit PointFiltering(uint8_t num_treads = 1) : PipelineNode<InputType, PointFilteringResult>(num_treads, "F"){};
+    explicit PointFiltering(uint8_t num_threads = 1) : PipelineNode<InputType, PointFilteringResult>(num_threads, "F"){};
 
     void processJob(InputType&& job)
     {
@@ -102,9 +102,10 @@ class PointFiltering : public PipelineNode<InputType, PointFilteringResult>
         this->passJobToNextNode({job.column_index});
     }
 
-    void setConfig(const PointFilteringConfig& c)
+    bool setConfig(const PointFilteringConfig& c)
     {
         config = c;
+        return false;
     }
 
   private:

@@ -367,7 +367,7 @@ part (UDP Packet -> Euclidean Point Positions). Currently, we support following 
 
 - Our clustering subscribes to these UDP packets and can use the middleware-agnostic library
   from [ros-drivers/velodyne](https://github.com/ros-drivers/velodyne) to decode packets to euclidean points
-    - See source code at: [velodyne_input.hpp](include/continuous_clustering/ros/velodyne_input.hpp)
+    - See source code at: [velodyne_input.hpp](include/continuous_clustering/ros/velodyne_driver.hpp)
 
 ## 2. Ouster
 
@@ -379,7 +379,7 @@ part (UDP Packet -> Euclidean Point Positions). Currently, we support following 
   from [ouster-lidar/ouster-ros](https://github.com/ouster-lidar/ouster-ros)
 - Our clustering subscribes to Ouster's UDP packets (ROS Message type: `ouster_ros/PacketMsg`) and can use the library
   from [ouster-lidar/ouster-ros](https://github.com/ouster-lidar/ouster-ros) to decode packets to euclidean points
-    - See source code at: [ouster_input.hpp](include/continuous_clustering/ros/ouster_input.hpp)
+    - See source code at: [ouster_input.hpp](include/continuous_clustering/ros/ouster_driver.hpp)
 
 ## 3. Generic Points
 

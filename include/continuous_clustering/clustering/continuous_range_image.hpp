@@ -268,7 +268,7 @@ class ContinuousRangeImage
 
         // calculate the column's stamp
         Point& point = getPoint(0, local_column_index);
-        if (point.column_stamp_min != std::numeric_limits<uint64_t>::max())
+        if (point.column_stamp_min != std::numeric_limits<int64_t>::max())
             point.column_stamp_middle = (point.column_stamp_min >> 1) + (point.column_stamp_max >> 1);
         else
             point.column_stamp_middle = 0;
@@ -394,7 +394,7 @@ class ContinuousRangeImage
         return static_cast<int>(column_index % max_columns_ring_buffer); // currently, we do not use neg. col. indices
     }
 
-    inline uint64_t getColumnStamp(int local_column_index) const
+    inline int64_t getColumnStamp(int local_column_index) const
     {
         return getPoint(0, local_column_index).column_stamp_middle;
     }
