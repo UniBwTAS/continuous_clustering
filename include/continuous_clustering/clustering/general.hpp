@@ -79,7 +79,7 @@ inline Point2D operator/(const Point2D& p, float s)
     return {p.x / s, p.y / s};
 }
 
-struct Point3D
+struct __attribute__((__packed__)) Point3D
 {
     Point3D() : x(0), y(0), z(0){};
     Point3D(float x, float y, float z) : x(x), y(y), z(z){};

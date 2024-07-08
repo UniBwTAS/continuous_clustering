@@ -57,7 +57,7 @@
 
         <!-- Continuous Clustering Node/Nodelet -->
         <node name="continuous_clustering" pkg="continuous_clustering" type="continuous_clustering_node"
-              output="screen" respawn="True">
+              output="screen" respawn="False">
 
             <!-- velodyne specific parameters/re-mappings -->
             <param name="model" value="$(arg velodyne_model)" if="$(arg is_velodyne)"/>

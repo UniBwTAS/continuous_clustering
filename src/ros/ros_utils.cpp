@@ -119,7 +119,7 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
     else if (fill_fields_up_to_stage == GROUND_POINT_SEGMENTATION)
         up_to_field = 19;
     else if (fill_fields_up_to_stage == CONTINUOUS_CLUSTERING)
-        up_to_field = 26;
+        up_to_field = 22;
 
     // Some point fields below should be actually UINT64. Unfortunately, this type is not available for a PointCloud2
     // message: http://docs.ros.org/en/melodic/api/sensor_msgs/html/msg/PointField.html. Therefore, we use FLOAT64 which
@@ -186,22 +186,10 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
                                          sensor_msgs::PointField::UINT8,
                                          "finished_at_continuous_azimuth_angle",
                                          1,
-                                         sensor_msgs::PointField::FLOAT64,
-                                         "num_child_points",
-                                         1,
                                          sensor_msgs::PointField::UINT16,
-                                         "tree_root_row_index",
-                                         1,
-                                         sensor_msgs::PointField::UINT16,
-                                         "tree_root_column_index",
-                                         1,
-                                         sensor_msgs::PointField::FLOAT64, // (*)
                                          "number_of_visited_neighbors",
                                          1,
                                          sensor_msgs::PointField::UINT32,
-                                         "tree_id",
-                                         1,
-                                         sensor_msgs::PointField::FLOAT64, // (*)
                                          "id",
                                          1,
                                          sensor_msgs::PointField::FLOAT64); // (*)
@@ -233,11 +221,7 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
     if (fill_fields_up_to_stage == GROUND_POINT_SEGMENTATION)
         return iterators;
     iterators.iter_finished_at_azimuth_angle = {msg, "finished_at_continuous_azimuth_angle"};
-    iterators.iter_num_child_points = {msg, "num_child_points"};
-    iterators.iter_tree_root_row_index = {msg, "tree_root_row_index"};
-    iterators.iter_tree_root_column_index = {msg, "tree_root_column_index"};
     iterators.iter_number_of_visited_neighbors = {msg, "number_of_visited_neighbors"};
-    iterators.iter_tree_id = {msg, "tree_id"};
     iterators.iter_id = {msg, "id"};
     return iterators;
 }
@@ -272,9 +256,9 @@ void addPointToMessage(PointCloud2Iterators& container,
     *(*container.iter_a_out + data_index_message) = point.azimuth_angle;
     *(*container.iter_ia_out + data_index_message) = point.inclination_angle;
     *(*container.iter_ca_out + data_index_message) = point.continuous_azimuth_angle;
-    *(*container.iter_gc_out + data_index_message) = static_cast<double>(point.global_column_index); // (*)
-    *(*container.iter_lc_out + data_index_message) = point.local_column_index;
-    *(*container.iter_r_out + data_index_message) = point.row_index;
+    *(*container.iter_gc_out + data_index_message) = static_cast<double>(point.index.column_index); // (*)
+    *(*container.iter_lc_out + data_index_message) = point.index.local_column_index;
+    *(*container.iter_r_out + data_index_message) = point.index.row_index;
     if (fill_fields_up_to_stage == RANGE_IMAGE_GENERATION)
         return;
 
@@ -288,12 +272,7 @@ void addPointToMessage(PointCloud2Iterators& container,
 
     // continuous clustering
     *(*container.iter_finished_at_azimuth_angle + data_index_message) = point.finished_at_continuous_azimuth_angle;
-    *(*container.iter_num_child_points + data_index_message) = point.child_points.size();
-    *(*container.iter_tree_root_row_index + data_index_message) = point.tree_root_.row_index;
-    *(*container.iter_tree_root_column_index + data_index_message) =
-        static_cast<double>(point.tree_root_.column_index); // (*)
     *(*container.iter_number_of_visited_neighbors + data_index_message) = point.number_of_visited_neighbors;
-    *(*container.iter_tree_id + data_index_message) = static_cast<double>(point.tree_id); // (*)
     *(*container.iter_id + data_index_message) = static_cast<double>(point.id);           // (*)
 }
 

@@ -103,14 +103,24 @@ class RangeImageIndex
         return row_index != other.row_index || column_index != other.column_index;
     }
 
-
     bool operator<(const RangeImageIndex& other) const
     {
         return row_index < other.row_index || (row_index == other.row_index && column_index < other.column_index);
     }
 
+    int64_t flatten(uint16_t num_rows) const
+    {
+        return column_index * num_rows + row_index;
+    }
+
+    int64_t flatten_local(uint16_t num_rows) const
+    {
+        return local_column_index * num_rows + row_index;
+    }
+
   public:
-    int64_t column_index{0};
+    int64_t column_index{-1};
+    uint16_t local_column_index{0};
     uint16_t row_index{0};
 };
 
@@ -133,9 +143,7 @@ struct Point
     float azimuth_angle{std::nanf("")};
     float inclination_angle{std::nanf("")};
     double continuous_azimuth_angle{std::nan("")};
-    int64_t global_column_index{-1};
-    int local_column_index{-1};
-    int row_index{-1};
+    RangeImageIndex index{0, -1};
     uint64_t stamp{0};
     uint64_t globally_unique_point_index{static_cast<uint64_t>(-1)};
 
@@ -144,19 +152,20 @@ struct Point
     float height_over_ground{std::nanf("")};
     uint8_t debug_ground_point_label{WHITE};
 
-    // clustering
+    // clustering (union find)
+    Point* tree_parent{nullptr};
+    uint16_t tree_rank{0};
+    Point* next_vertex_in_cluster{nullptr}; // addition to regular "union find" for print
+
+    // clustering (additional fields extending union find)
     bool is_ignored{false};
-    double finished_at_continuous_azimuth_angle{0.f};
-    std::list<RangeImageIndex> child_points{};
-    // std::unordered_set<RangeImageIndex, RangeImageIndexHash> associated_trees{};
-    std::set<RangeImageIndex> associated_trees{};
-    RangeImageIndex tree_root_{0, -1};
-    uint32_t tree_num_points{0};
-    uint32_t cluster_width{0};
-    uint64_t tree_id{0};
+    double finished_at_continuous_azimuth_angle{0.0};
+    int64_t cluster_start_global_column_index{-1};
+    int64_t cluster_end_global_column_index{-1};
+    bool is_potential_cluster_root{false};
     uint64_t id{0};
-    double visited_at_continuous_azimuth_angle{-1.};
-    bool belongs_to_finished_cluster{false};
+
+    // debugging
     int number_of_visited_neighbors{0};
 };
 
@@ -190,8 +199,7 @@ struct PublishingJob
     int64_t ring_buffer_current_global_column_index;
     int64_t ring_buffer_min_required_global_column_index;
 
-    std::list<uint64_t> cluster_ids;
-    std::list<std::list<RangeImageIndex>> trees_per_finished_cluster;
+    std::list<Point*> cluster_roots;
 };
 
 class ContinuousClustering
@@ -233,13 +241,18 @@ class ContinuousClustering
 
     // continuous clustering
     inline bool checkClusteringCondition(const Point& point, const Point& point_other) const;
-    inline void associatePointToPointTree(Point& point, Point& point_other, float max_angle_diff);
-    inline void associatePointTreeToPointTree(const Point& point, const Point& point_other);
-    inline void traverseFieldOfView(Point& point, float max_angle_diff, int ring_buffer_first_local_column_index);
+    inline bool traverseFieldOfView(Point& point, float max_angle_diff, int ring_buffer_first_local_column_index);
     inline void associatePointsInColumn(AssociationJob&& job);
-    inline void findFinishedTreesAndAssignSameId(TreeCombinationJob&& job);
     inline void collectPointsForCusterAndPublish(PublishingJob&& job);
     inline void clearColumns(int64_t from_global_column_index, int64_t to_global_column_index);
+
+  public: // TODO: UF
+    // union find
+    inline void make_set(Point* point, float max_angle_diff);
+    inline Point* find_set(Point* point);
+    inline void link_set(Point* point, Point* point_other);
+    inline bool union_set(Point* point, Point* point_other);
+    inline void print_set(Point* point, std::vector<Point>& v);
 
   public:
     // range image (implemented as ring buffer)
@@ -268,9 +281,7 @@ class ContinuousClustering
     // continuous clustering (sc)
     float max_distance_squared{0.7 * 0.7};
     int64_t sc_first_unpublished_global_column_index{-1};
-    std::mutex sc_first_unfinished_global_column_index_mutex;
-    std::list<int64_t> sc_minimum_required_global_column_indices;
-    std::list<RangeImageIndex> sc_unfinished_point_trees_;
+    std::list<Point*> sc_potential_cluster_roots_;
     uint64_t sc_cluster_counter_{1};
     std::vector<float> sc_inclination_angles_between_lasers_;
     std::function<void(int64_t, int64_t, bool)> finished_column_callback_;

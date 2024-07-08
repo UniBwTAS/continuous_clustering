@@ -53,11 +53,7 @@ struct PointCloud2Iterators
 
     // continuous clustering
     std::optional<sensor_msgs::PointCloud2Iterator<double>> iter_finished_at_azimuth_angle;
-    std::optional<sensor_msgs::PointCloud2Iterator<uint16_t>> iter_num_child_points;
-    std::optional<sensor_msgs::PointCloud2Iterator<uint16_t>> iter_tree_root_row_index;
-    std::optional<sensor_msgs::PointCloud2Iterator<double>> iter_tree_root_column_index; // (*)
     std::optional<sensor_msgs::PointCloud2Iterator<uint32_t>> iter_number_of_visited_neighbors;
-    std::optional<sensor_msgs::PointCloud2Iterator<double>> iter_tree_id; // (*)
     std::optional<sensor_msgs::PointCloud2Iterator<double>> iter_id;      // (*)
 };
 

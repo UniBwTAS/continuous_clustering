@@ -99,17 +99,17 @@ class ROSInterface
 class DummyInterface
 {
   public:
-    void init(){};
-    void publishEvaluationPointCloud(const std::vector<KittiSegmentationEvaluationPoint>& point_cloud){};
+    void init() {};
+    void publishEvaluationPointCloud(const std::vector<KittiSegmentationEvaluationPoint>& point_cloud) {};
     void publishColumn(int64_t from_global_column_index,
                        int64_t to_global_column_index,
                        bool ground_points_only,
-                       const ContinuousClustering& clustering){};
-    void
-    publishCluster(const std::vector<Point>& cluster_points, int num_rows_in_range_image, uint64_t stamp_cluster){};
+                       const ContinuousClustering& clustering) {};
+    void publishCluster(const std::vector<Point>& cluster_points, int num_rows_in_range_image, uint64_t stamp_cluster) {
+    };
     void publishFiringAndClockAndTF(const RawPoints::Ptr& firing,
                                     const Eigen::Isometry3d& odom_from_velodyne,
-                                    bool publish_firing){};
+                                    bool publish_firing) {};
     static bool ok()
     {
         return true;
@@ -212,7 +212,7 @@ class KittiDemo
                     auto it = map_frame_to_point_cloud.find({sequence_index, frame_index});
                     KittiSegmentationEvaluationPoint& evaluation_point = it->second[kitti_point_index];
                     evaluation_point.is_ground_point = (point.ground_point_label == GP_GROUND);
-                    evaluation_point.detection_label = point.id;
+                    evaluation_point.detection_label = clustering.num_rows_;
                     evaluation_point.has_corresponding_point_in_detection_point_cloud = true;
                 }
             }
