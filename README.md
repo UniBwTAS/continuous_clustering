@@ -80,7 +80,7 @@ There are often no speed limits on the German Highway. So it is not uncommon to 
 much higher. A latency of e.g. 200ms leads to positional errors of `(180 / 3.6) m/s * 0.2s = 10m`. This shows the need
 to keep latencies at a minimum.
 
-[![Video GIF](https://user-images.githubusercontent.com/74038190/235294007-de441046-823e-4eff-89bf-d4df52858b65.gif)](https://www.youtube.com/watch?v=DZKuAQBngNE&t=98s)
+[![Video GIF](https://user-images.githubusercontent.com/74038190/235294007-de441046-823e-4eff-89bf-d4df52858b65.gif)](https://www.youtube.com/watch?v=ex4qcR2bkWs&t=98s)
 
 # Run it yourself:
 
