@@ -25,14 +25,13 @@ based low-latency instance segmentation.
 ## If you find our work useful in your research please consider citing our paper:
 
 ```
-@misc{reich2023low,
-      title={Low Latency Instance Segmentation by Continuous Clustering for Rotating LiDAR Sensors}, 
-      author={Andreas Reich and Hans-Joachim Wuensche},
-      year={2023},
-      eprint={2311.13976},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV}
-}
+@inproceedings{reich_2024_low,
+  author={Andreas Reich and Mirko Maehlisch},
+  booktitle={2024 IEEE Intelligent Vehicles Symposium (IV)}, 
+  title={{Low Latency Instance Segmentation by Continuous Clustering for LiDAR Sensors}}, 
+  year={2024},
+  pages={1871-1877},
+  doi={10.1109/IV55156.2024.10588831}}
 ```
 
 Get PDF [here](https://arxiv.org/abs/2311.13976).
