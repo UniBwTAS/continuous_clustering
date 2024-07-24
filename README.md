@@ -8,19 +8,7 @@
 
 ## Abstract:
 
-Low-latency instance segmentation of LiDAR point clouds is crucial in real-world applications because it serves as an
-initial and frequently-used building block in a robot's perception pipeline, where every task adds further delay.
-Particularly in dynamic environments, this total delay can result in significant positional offsets of dynamic objects,
-as seen in highway scenarios. To address this issue, we employ continuous clustering of obstacle points in order to
-obtain an instance-segmented point cloud. Unlike most existing approaches, which use a full revolution of the LiDAR
-sensor, we process the data stream in a continuous and seamless fashion. More specifically, each column of a range image
-is processed as soon it is available. Obstacle points are clustered to existing instances in real-time and it is checked
-at a high-frequency which instances are completed and are ready to be published. An additional advantage is that no
-problematic discontinuities between the points of the start and the end of a scan are observed. In this work we describe
-the two-layered data structure and the corresponding algorithm for continuous clustering, which is able to cluster the
-incoming data in real time. We explain the importance of a large perceptive field of view. Furthermore, we describe and
-evaluate important architectural design choices, which could be relevant to design an architecture for deep learning
-based low-latency instance segmentation.
+Low-latency instance segmentation of LiDAR point clouds is crucial in real-world applications because it serves as an initial and frequently-used building block in a robot’s perception pipeline, where every task adds further delay. Particularly in dynamic environments, this total delay can result in significant positional offsets of dynamic objects, as seen in highway scenarios. To address this issue, we employ a new technique, which we call continuous clustering. Unlike most existing clustering approaches, which use a full revolution of the LiDAR sensor, we process the data stream in a continuous and seamless fashion. Our approach does not rely on the concept of complete or partial sensor rotations with multiple discrete range images; instead, it views the range image as a single and infinitely horizontally growing entity. Each new column of this continuous range image is processed as soon it is available. Obstacle points are clustered to existing instances in real-time and it is checked at a high-frequency which instances are completed in order to publish them without waiting for the completion of the revolution or some other integration period. In the case of rotating sensors, no problematic discontinuities between the points of the end and the start of a scan are observed. In this work we describe the two-layered data structure and the corresponding algorithm for continuous clustering. It is able to achieve an average latency of just 5 ms with respect to the latest timestamp of all points in the cluster.
 
 ## If you find our work useful in your research please consider citing our paper:
 
