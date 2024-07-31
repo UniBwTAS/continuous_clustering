@@ -1,4 +1,4 @@
-# Low Latency Instance Segmentation by Continuous Clustering for Rotating LiDAR Sensors
+# Low Latency Instance Segmentation by Continuous Clustering for LiDAR Sensors
 
 [![Basic Build Workflow](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/basic-build-ci.yaml/badge.svg?branch=master)](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/basic-build-ci.yaml)
 [![Publish Docker image](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/publish-docker-image.yaml/badge.svg)](https://github.com/UniBwTAS/continuous_clustering/actions/workflows/publish-docker-image.yaml)
