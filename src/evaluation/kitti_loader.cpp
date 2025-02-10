@@ -122,7 +122,7 @@ std::vector<KittiPoint> KittiLoader::generateRangeImage(const std::vector<KittiP
         // get column index
         auto column_index = static_cast<int>((M_PI - cur_azimuth) / column_width);
 
-        // sometimes cur_azimuth is exactly -180 because point's x coordinate is exactly 0 -> column_index == num_cols
+        // sometimes cur_azimuth is exactly -180 because point's x coordinate is exactly 0 -> column_index == num_columns
         if (column_index == RANGE_IMAGE_WIDTH)
             column_index--;
 

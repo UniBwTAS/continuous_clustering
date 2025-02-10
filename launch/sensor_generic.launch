@@ -38,7 +38,7 @@
     <!-- range image parameters -->
     <arg name="num_columns" doc="number of columns of range image; should be the number of firings per rotations"/>
     <arg name="wait_for_tf" default="true" doc="whether to wait for appropriate TF or just use the latest available"/>
-    <arg name="supplement_inclination_angle_for_nan_cells" default="true" doc="use artificial inclination angles"/>
+    <arg name="supplement_inclination_angle_for_nan_cells" default="true" doc="use artificial elevation angles"/>
 
     <!-- ground point segmentation parameters -->
     <arg name="use_terrain" default="False" doc="whether to use terrain (currently not supported!)"/>

@@ -32,12 +32,12 @@ sensor_msgs::PointCloud2Ptr clusterToPointCloud(const std::vector<Point>& cluste
 }
 
 sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousClustering& clustering,
-                                               int64_t from_global_column_index,
-                                               int64_t to_global_column_index,
+                                               int64_t from_monot_col_idx,
+                                               int64_t to_monot_col_idx,
                                                const std::string& frame_id,
                                                ProcessingStage fill_fields_up_to_stage)
 {
-    int num_columns_to_publish = static_cast<int>(to_global_column_index - from_global_column_index) + 1;
+    int num_columns_to_publish = static_cast<int>(to_monot_col_idx - from_monot_col_idx) + 1;
     if (num_columns_to_publish <= 0)
         return nullptr;
 
@@ -53,17 +53,17 @@ sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousClustering& clust
 
     for (int message_column_index = 0; message_column_index < msg->width; ++message_column_index)
     {
-        int ring_buffer_local_column_index =
-            static_cast<int>((from_global_column_index + message_column_index) % clustering.ring_buffer_max_columns);
+        int ring_buffer_col_idx =
+            static_cast<int>((from_monot_col_idx + message_column_index) % clustering.ring_buffer_max_columns);
         for (int row_index = 0; row_index < clustering.num_rows_; ++row_index)
         {
             const Point& point =
-                clustering.range_image_[ring_buffer_local_column_index * clustering.num_rows_ + row_index];
+                clustering.range_image_[ring_buffer_col_idx * clustering.num_rows_ + row_index];
             int data_index_message = row_index * static_cast<int>(msg->width) + message_column_index;
             addPointToMessage(container, data_index_message, point, clustering.num_rows_, fill_fields_up_to_stage);
 
-            if (point.stamp != 0 && point.stamp < minimum_point_stamp)
-                minimum_point_stamp = point.stamp;
+            if (point.stamp_ns != 0 && point.stamp_ns < minimum_point_stamp)
+                minimum_point_stamp = point.stamp_ns;
         }
     }
 
@@ -71,7 +71,7 @@ sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousClustering& clust
         msg->header.stamp.fromNSec(minimum_point_stamp);
     /*else
         ROS_WARN_STREAM("This column had no timestamps. Unable to publish message with timestamp. Local Column Index: "
-                        << from_global_column_index % clustering.num_columns_ << ", " << num_columns_to_publish);*/
+                        << from_monot_col_idx % clustering.num_columns_ << ", " << num_columns_to_publish);*/
 
     return msg;
 }
@@ -157,16 +157,16 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
                                          "azimuth_angle",
                                          1,
                                          sensor_msgs::PointField::FLOAT32,
-                                         "inclination_angle",
+                                         "elevation_angle",
                                          1,
                                          sensor_msgs::PointField::FLOAT32,
-                                         "continuous_azimuth_angle",
+                                         "monot_azimuth_angle",
                                          1,
                                          sensor_msgs::PointField::FLOAT64,
-                                         "global_column_index",
+                                         "monot_col_idx",
                                          1,
                                          sensor_msgs::PointField::FLOAT64, // (*)
-                                         "local_column_index",
+                                         "col_idx",
                                          1,
                                          sensor_msgs::PointField::UINT16,
                                          "row_index",
@@ -184,7 +184,7 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
                                          "ignore_for_clustering",
                                          1,
                                          sensor_msgs::PointField::UINT8,
-                                         "finished_at_continuous_azimuth_angle",
+                                         "finished_at_monot_azimuth_angle",
                                          1,
                                          sensor_msgs::PointField::UINT16,
                                          "number_of_visited_neighbors",
@@ -207,10 +207,10 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
         return iterators;
     iterators.iter_d_out = {msg, "distance"};
     iterators.iter_a_out = {msg, "azimuth_angle"};
-    iterators.iter_ia_out = {msg, "inclination_angle"};
-    iterators.iter_ca_out = {msg, "continuous_azimuth_angle"};
-    iterators.iter_gc_out = {msg, "global_column_index"};
-    iterators.iter_lc_out = {msg, "local_column_index"};
+    iterators.iter_ia_out = {msg, "elevation_angle"};
+    iterators.iter_ca_out = {msg, "monot_azimuth_angle"};
+    iterators.iter_gc_out = {msg, "monot_col_idx"};
+    iterators.iter_lc_out = {msg, "col_idx"};
     iterators.iter_r_out = {msg, "row_index"};
     if (fill_fields_up_to_stage == RANGE_IMAGE_GENERATION)
         return iterators;
@@ -220,7 +220,7 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
     iterators.iter_ignore_for_clustering_out = {msg, "ignore_for_clustering"};
     if (fill_fields_up_to_stage == GROUND_POINT_SEGMENTATION)
         return iterators;
-    iterators.iter_finished_at_azimuth_angle = {msg, "finished_at_continuous_azimuth_angle"};
+    iterators.iter_finished_at_azimuth_angle = {msg, "finished_at_monot_azimuth_angle"};
     iterators.iter_number_of_visited_neighbors = {msg, "number_of_visited_neighbors"};
     iterators.iter_id = {msg, "id"};
     return iterators;
@@ -233,7 +233,7 @@ void addPointToMessage(PointCloud2Iterators& container,
                        ProcessingStage fill_fields_up_to_stage)
 {
     ros::Time stamp;
-    stamp.fromNSec(point.stamp);
+    stamp.fromNSec(point.stamp_ns);
 
     // Some point fields below should be actually UINT64. Unfortunately, this type is not available for a PointCloud2
     // message: http://docs.ros.org/en/melodic/api/sensor_msgs/html/msg/PointField.html. Therefore, we use FLOAT64 which
@@ -243,7 +243,7 @@ void addPointToMessage(PointCloud2Iterators& container,
     *(*container.iter_x_out + data_index_message) = point.xyz.x;
     *(*container.iter_y_out + data_index_message) = point.xyz.y;
     *(*container.iter_z_out + data_index_message) = point.xyz.z;
-    *(*container.iter_f_out + data_index_message) = static_cast<double>(point.firing_index); // (*)
+    *(*container.iter_f_out + data_index_message) = static_cast<double>(point.firing_idx); // (*)
     *(*container.iter_i_out + data_index_message) = point.intensity;
     *(*container.iter_gpi_out + data_index_message) = static_cast<double>(point.globally_unique_point_index); // (*)
     *(*container.iter_time_sec_out + data_index_message) = stamp.sec;
@@ -254,11 +254,11 @@ void addPointToMessage(PointCloud2Iterators& container,
     // range image generation
     *(*container.iter_d_out + data_index_message) = point.distance;
     *(*container.iter_a_out + data_index_message) = point.azimuth_angle;
-    *(*container.iter_ia_out + data_index_message) = point.inclination_angle;
-    *(*container.iter_ca_out + data_index_message) = point.continuous_azimuth_angle;
-    *(*container.iter_gc_out + data_index_message) = static_cast<double>(point.index.column_index); // (*)
-    *(*container.iter_lc_out + data_index_message) = point.index.local_column_index;
-    *(*container.iter_r_out + data_index_message) = point.index.row_index;
+    *(*container.iter_ia_out + data_index_message) = point.elevation_angle;
+    *(*container.iter_ca_out + data_index_message) = point.monot_azimuth_angle;
+    *(*container.iter_gc_out + data_index_message) = static_cast<double>(point.monot_col_idx); // (*)
+    *(*container.iter_lc_out + data_index_message) = point.col_idx;
+    *(*container.iter_r_out + data_index_message) = point.row_idx;
     if (fill_fields_up_to_stage == RANGE_IMAGE_GENERATION)
         return;
 
@@ -271,7 +271,7 @@ void addPointToMessage(PointCloud2Iterators& container,
         return;
 
     // continuous clustering
-    *(*container.iter_finished_at_azimuth_angle + data_index_message) = point.finished_at_continuous_azimuth_angle;
+    *(*container.iter_finished_at_azimuth_angle + data_index_message) = point.finished_at_monot_azimuth_angle;
     *(*container.iter_number_of_visited_neighbors + data_index_message) = point.number_of_visited_neighbors;
     *(*container.iter_id + data_index_message) = static_cast<double>(point.id);           // (*)
 }

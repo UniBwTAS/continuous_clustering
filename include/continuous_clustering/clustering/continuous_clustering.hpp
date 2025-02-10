@@ -86,83 +86,42 @@ struct Configuration
     ContinuousClusteringConfiguration clustering{};
 };
 
-class RangeImageIndex
-{
-  public:
-    RangeImageIndex(uint16_t row_index, int64_t column_index) : row_index(row_index), column_index(column_index)
-    {
-    }
-
-    bool operator==(const RangeImageIndex& other) const
-    {
-        return row_index == other.row_index && column_index == other.column_index;
-    }
-
-    bool operator!=(const RangeImageIndex& other) const
-    {
-        return row_index != other.row_index || column_index != other.column_index;
-    }
-
-    bool operator<(const RangeImageIndex& other) const
-    {
-        return row_index < other.row_index || (row_index == other.row_index && column_index < other.column_index);
-    }
-
-    int64_t flatten(uint16_t num_rows) const
-    {
-        return column_index * num_rows + row_index;
-    }
-
-    int64_t flatten_local(uint16_t num_rows) const
-    {
-        return local_column_index * num_rows + row_index;
-    }
-
-  public:
-    int64_t column_index{-1};
-    uint16_t local_column_index{0};
-    uint16_t row_index{0};
-};
-
-class RangeImageIndexHash
-{
-  public:
-    std::size_t operator()(const RangeImageIndex& k) const
-    {
-        return (static_cast<std::size_t>(k.row_index) << 48) ^ k.column_index;
-    }
-};
-
 struct Point
 {
-    // range image generation / general
+    // raw sensor data
     Point3D xyz{std::nanf(""), std::nanf(""), std::nanf("")};
-    uint64_t firing_index{0};
+    uint64_t firing_idx{0};
     uint8_t intensity{0};
     float distance{std::nanf("")};
     float azimuth_angle{std::nanf("")};
-    float inclination_angle{std::nanf("")};
-    double continuous_azimuth_angle{std::nan("")};
-    RangeImageIndex index{0, -1};
-    uint64_t stamp{0};
-    uint64_t globally_unique_point_index{static_cast<uint64_t>(-1)};
+    float elevation_angle{std::nanf("")};
+    uint64_t stamp_ns{0};
+
+    // range image generation
+    uint16_t col_idx{0};
+    uint16_t row_idx{0};
+    double monot_azimuth_angle{std::nan("")};
+    int64_t monot_col_idx{-1};
+    uint64_t globally_unique_point_index{static_cast<uint64_t>(-1)};  // only for evaluation purposes: link to original point index in dataset
 
     // ground point segmentation
     uint8_t ground_point_label{0};
+    bool is_ignored{false}; 
     float height_over_ground{std::nanf("")};
     uint8_t debug_ground_point_label{WHITE};
 
     // clustering (union find)
-    Point* tree_parent{nullptr};
-    uint16_t tree_rank{0};
-    Point* next_vertex_in_cluster{nullptr}; // addition to regular "union find" for print
+    Point* parent{nullptr};
+    uint16_t rank{0};
 
-    // clustering (additional fields extending union find)
-    bool is_ignored{false};
-    double finished_at_continuous_azimuth_angle{0.0};
-    int64_t cluster_start_global_column_index{-1};
-    int64_t cluster_end_global_column_index{-1};
+    // clustering (infinite cluster detection)
+    int64_t clust_start_monot_col_idx{-1};
+    int64_t cluster_end_monot_col_idx{-1};
+
+    // cluster extraction
     bool is_potential_cluster_root{false};
+    double finished_at_monot_azimuth_angle{0.0};
+    Point* next{nullptr}; // addition to regular "union find" for print/collect
     uint64_t id{0};
 
     // debugging
@@ -177,27 +136,19 @@ struct InsertionJob
 
 struct SegmentationJob
 {
-    int64_t ring_buffer_current_global_column_index;
+    int64_t ring_buffer_current_monot_col_idx;
     Eigen::Isometry3d odom_frame_from_sensor_frame;
 };
 
 struct AssociationJob
 {
-    int64_t ring_buffer_current_global_column_index;
-};
-
-struct TreeCombinationJob
-{
-    int64_t ring_buffer_current_global_column_index;
-
-    std::list<RangeImageIndex> new_unfinished_point_trees;
-    double current_minimum_continuous_azimuth_angle;
+    int64_t ring_buffer_current_monot_col_idx;
 };
 
 struct PublishingJob
 {
-    int64_t ring_buffer_current_global_column_index;
-    int64_t ring_buffer_min_required_global_column_index;
+    int64_t ring_buffer_current_monot_col_idx;
+    int64_t ring_buffer_min_required_monot_col_idx;
 
     std::list<Point*> cluster_roots;
 };
@@ -241,10 +192,10 @@ class ContinuousClustering
 
     // continuous clustering
     inline bool checkClusteringCondition(const Point& point, const Point& point_other) const;
-    inline bool traverseFieldOfView(Point& point, float max_angle_diff, int ring_buffer_first_local_column_index);
+    inline bool traverseFieldOfView(Point& point, float max_angle_diff, int ring_buffer_first_col_idx);
     inline void associatePointsInColumn(AssociationJob&& job);
     inline void collectPointsForCusterAndPublish(PublishingJob&& job);
-    inline void clearColumns(int64_t from_global_column_index, int64_t to_global_column_index);
+    inline void clearColumns(int64_t from_monot_col_idx, int64_t to_monot_col_idx);
 
   public: // TODO: UF
     // union find
@@ -260,17 +211,17 @@ class ContinuousClustering
     int num_columns_{};
     int num_rows_{-1};
     std::vector<Point> range_image_{0};
-    int64_t ring_buffer_start_global_column_index{};
-    int64_t ring_buffer_end_global_column_index{};
+    int64_t ring_buffer_start_monot_col_idx{};
+    int64_t ring_buffer_end_monot_col_idx{};
 
   private:
     Configuration config_;
 
     // continuous range image generation (srig)
     float srig_azimuth_width_per_column{};
-    int64_t srig_previous_global_column_index_of_rearmost_laser{0};
-    int64_t srig_previous_global_column_index_of_foremost_laser{0};
-    int64_t srig_first_unfinished_global_column_index{-1};
+    int64_t srig_previous_monot_col_idx_of_rearmost_laser{0};
+    int64_t srig_previous_monot_col_idx_of_foremost_laser{0};
+    int64_t srig_first_unfinished_monot_col_idx{-1};
     Eigen::Vector3d srig_sensor_position{0, 0, 0};
     bool reset_required{false};
 
@@ -280,7 +231,7 @@ class ContinuousClustering
 
     // continuous clustering (sc)
     float max_distance_squared{0.7 * 0.7};
-    int64_t sc_first_unpublished_global_column_index{-1};
+    int64_t sc_first_unpublished_monot_col_idx{-1};
     std::list<Point*> sc_potential_cluster_roots_;
     uint64_t sc_cluster_counter_{1};
     std::vector<float> sc_inclination_angles_between_lasers_;
@@ -291,7 +242,6 @@ class ContinuousClustering
     ThreadPool<InsertionJob> insertion_thread_pool{"I"};
     ThreadPool<SegmentationJob> segmentation_thread_pool{"S"};
     ThreadPool<AssociationJob> association_thread_pool{"A"};
-    ThreadPool<TreeCombinationJob> tree_combination_thread_pool{"C"};
     ThreadPool<PublishingJob> publishing_thread_pool{"P"};
     bool do_sequential_execution{false};
 

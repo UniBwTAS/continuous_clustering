@@ -63,8 +63,8 @@ sensor_msgs::PointCloud2Ptr clusterToPointCloud(const std::vector<Point>& cluste
                                                 const std::string& frame_id);
 
 sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousClustering& clustering,
-                                               int64_t from_global_column_index,
-                                               int64_t to_global_column_index,
+                                               int64_t from_monot_col_idx,
+                                               int64_t to_monot_col_idx,
                                                const std::string& frame_id,
                                                ProcessingStage fill_fields_up_to_stage);
 

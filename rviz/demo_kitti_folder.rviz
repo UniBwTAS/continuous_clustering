@@ -204,7 +204,7 @@ Visualization Manager:
               Queue Size: 1000
               Selectable: true
               Show only:
-                Channel Name: local_column_index
+                Channel Name: col_idx
                 Equal To: 12533
                 Value: false
               Size (Pixels): 3

@@ -42,8 +42,8 @@ class ROSInterface
             pub_evaluation.publish(evaluationToPointCloud(point_cloud));
     }
 
-    void publishColumn(int64_t from_global_column_index,
-                       int64_t to_global_column_index,
+    void publishColumn(int64_t from_monot_col_idx,
+                       int64_t to_monot_col_idx,
                        bool ground_points_only,
                        const ContinuousClustering& clustering)
     {
@@ -52,7 +52,7 @@ class ROSInterface
         ProcessingStage stage = ground_points_only ? GROUND_POINT_SEGMENTATION : CONTINUOUS_CLUSTERING;
         if (pub->getNumSubscribers() > 0)
         {
-            auto msg = columnToPointCloud(clustering, from_global_column_index, to_global_column_index, "odom", stage);
+            auto msg = columnToPointCloud(clustering, from_monot_col_idx, to_monot_col_idx, "odom", stage);
             if (msg)
                 pub->publish(msg);
         }
@@ -101,8 +101,8 @@ class DummyInterface
   public:
     void init() {};
     void publishEvaluationPointCloud(const std::vector<KittiSegmentationEvaluationPoint>& point_cloud) {};
-    void publishColumn(int64_t from_global_column_index,
-                       int64_t to_global_column_index,
+    void publishColumn(int64_t from_monot_col_idx,
+                       int64_t to_monot_col_idx,
                        bool ground_points_only,
                        const ContinuousClustering& clustering) {};
     void publishCluster(const std::vector<Point>& cluster_points, int num_rows_in_range_image, uint64_t stamp_cluster) {
@@ -171,16 +171,16 @@ class KittiDemo
     }
 
     void addColumnAndEvaluateFrameIfCompleted(const ContinuousClustering& clustering,
-                                              int64_t from_global_column_index,
-                                              int64_t to_global_column_index)
+                                              int64_t from_monot_col_idx,
+                                              int64_t to_monot_col_idx)
     {
-        int num_columns_to_publish = static_cast<int>(to_global_column_index - from_global_column_index) + 1;
+        int num_columns_to_publish = static_cast<int>(to_monot_col_idx - from_monot_col_idx) + 1;
 
         // iterate over the points in finished columns
         for (int relative_column_index = 0; relative_column_index < num_columns_to_publish; ++relative_column_index)
         {
             // get local column index from global column index
-            int ring_buffer_local_column_index = static_cast<int>((from_global_column_index + relative_column_index) %
+            int ring_buffer_col_idx = static_cast<int>((from_monot_col_idx + relative_column_index) %
                                                                   clustering.ring_buffer_max_columns);
 
             // variables to check if a frame is finished
@@ -190,7 +190,7 @@ class KittiDemo
             {
                 // get processed point
                 const Point& point =
-                    clustering.range_image_[ring_buffer_local_column_index * clustering.num_rows_ + row_index];
+                    clustering.range_image_[ring_buffer_col_idx * clustering.num_rows_ + row_index];
 
                 // check if cell in range image contains point
                 if (point.globally_unique_point_index != static_cast<uint64_t>(-1))
@@ -295,14 +295,14 @@ class KittiDemo
 
             // add callbacks
             clustering.setFinishedColumnCallback(
-                [&](int64_t from_global_column_index, int64_t to_global_column_index, bool ground_points_only)
+                [&](int64_t from_monot_col_idx, int64_t to_monot_col_idx, bool ground_points_only)
                 {
                     if (enable_publishers)
                         middleware.publishColumn(
-                            from_global_column_index, to_global_column_index, ground_points_only, clustering);
+                            from_monot_col_idx, to_monot_col_idx, ground_points_only, clustering);
                     if (evaluate && !ground_points_only)
                         addColumnAndEvaluateFrameIfCompleted(
-                            clustering, from_global_column_index, to_global_column_index);
+                            clustering, from_monot_col_idx, to_monot_col_idx);
                 });
 
             clustering.setFinishedClusterCallback(
