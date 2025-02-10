@@ -651,7 +651,7 @@ void ContinuousClustering::make_set(Point* point, float max_angle_diff)
 
 Point* ContinuousClustering::find_set(Point* point)
 {
-    // regular union find algorithm
+    // regular union find algorithm with path compression
 
     // find root vertex of current tree
     Point* root = point;
@@ -671,7 +671,7 @@ Point* ContinuousClustering::find_set(Point* point)
 
 void ContinuousClustering::link_set(Point* point, Point* point_other)
 {
-    // regular union find algorithm
+    // regular union find algorithm (with union by rank)
     Point* root_after_union;
     Point* child_after_union;
     if (point->tree_rank > point_other->tree_rank)
@@ -746,7 +746,7 @@ bool ContinuousClustering::traverseFieldOfView(Point& point,
     bool at_least_one_edge = false;
     int required_steps_back = static_cast<int>(std::ceil(max_angle_diff / srig_azimuth_width_per_column));
     required_steps_back = std::min(required_steps_back, config_.clustering.max_steps_in_row);
-    int64_t other_column_index = point.index.local_column_index;
+    int64_t other_local_column_index = point.index.local_column_index;
     for (int num_steps_back = 0; num_steps_back <= required_steps_back; num_steps_back++)
     {
         for (int direction = -1; direction <= 1; direction += 2)
@@ -763,7 +763,7 @@ bool ContinuousClustering::traverseFieldOfView(Point& point,
                    num_steps_vertical <= config_.clustering.max_steps_in_column)
             {
                 // get other point
-                Point& point_other = range_image_[other_column_index * num_rows_ + other_row_index];
+                Point& point_other = range_image_[other_local_column_index * num_rows_ + other_row_index];
 
                 // count number of visited points for analyzing
                 point.number_of_visited_neighbors += 1;
@@ -795,14 +795,14 @@ bool ContinuousClustering::traverseFieldOfView(Point& point,
             break;
 
         // stop searching if we are at the beginning of the ring buffer
-        if (other_column_index == ring_buffer_first_local_column_index)
+        if (other_local_column_index == ring_buffer_first_local_column_index)
             break;
 
-        other_column_index--;
+        other_local_column_index--;
 
         // jump to the end of the ring buffer
-        if (other_column_index < 0)
-            other_column_index += ring_buffer_max_columns;
+        if (other_local_column_index < 0)
+            other_local_column_index += ring_buffer_max_columns;
     }
 
     return at_least_one_edge;
@@ -810,13 +810,19 @@ bool ContinuousClustering::traverseFieldOfView(Point& point,
 
 void ContinuousClustering::associatePointsInColumn(AssociationJob&& job)
 {
+    // clear all columns that are not needed anymore
+    int64_t prev_ring_buffer_start_global_column_index = ring_buffer_start_global_column_index;
+    ring_buffer_start_global_column_index = sc_first_unpublished_global_column_index;
+    clearColumns(prev_ring_buffer_start_global_column_index, ring_buffer_start_global_column_index - 1);
+
     // keep track of the current minimum azimuth angle of the current column
     double current_minimum_continuous_azimuth_angle = std::numeric_limits<double>::max();
 
-    // get local start index of ring buffer start TODO: Ensure that this column is not cleared during this run
+    // get local start index of ring buffer start
     int ring_buffer_first_local_column_index =
         static_cast<int>(sc_first_unpublished_global_column_index % ring_buffer_max_columns);
 
+    // get current local index of ring buffer start
     int ring_buffer_current_local_column_index =
         static_cast<int>(job.ring_buffer_current_global_column_index % ring_buffer_max_columns);
 
@@ -840,10 +846,14 @@ void ContinuousClustering::associatePointsInColumn(AssociationJob&& job)
         make_set(&point, max_angle_diff);
 
         // traverse field of view
-        bool at_least_on_edge = traverseFieldOfView(point, max_angle_diff, ring_buffer_first_local_column_index);
-        if (!at_least_on_edge)
+        bool neighbor_found = traverseFieldOfView(point, max_angle_diff, ring_buffer_first_local_column_index);
+        if (!neighbor_found)
+        {
             point.is_potential_cluster_root = true;
-        sc_potential_cluster_roots_.push_back(&point);
+            sc_potential_cluster_roots_.push_back(&point);
+        } else {
+            point.is_potential_cluster_root = false;
+        }
     }
 
     int64_t minimum_required_global_column_index = std::numeric_limits<int64_t>::max();
@@ -943,9 +953,7 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PublishingJob&& job)
             sc_first_unpublished_global_column_index, job.ring_buffer_min_required_global_column_index - 1, false);
     sc_first_unpublished_global_column_index = job.ring_buffer_min_required_global_column_index;
 
-    int64_t prev_ring_buffer_start_global_column_index = ring_buffer_start_global_column_index;
-    ring_buffer_start_global_column_index = std::max(0l, sc_first_unpublished_global_column_index - num_columns_);
-    clearColumns(prev_ring_buffer_start_global_column_index, ring_buffer_start_global_column_index - 1);
+    // the columns are not cleared here but in the edge generation/association step 
 }
 
 void ContinuousClustering::clearColumns(int64_t from_global_column_index, int64_t to_global_column_index)
