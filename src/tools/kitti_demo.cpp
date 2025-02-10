@@ -58,7 +58,7 @@ class ROSInterface
         }
     };
 
-    void publishCluster(const std::vector<Point>& cluster_points, int num_rows_in_range_image, uint64_t stamp_cluster)
+    void publishCluster(const std::vector<Pixel>& cluster_points, int num_rows_in_range_image, uint64_t stamp_cluster)
     {
         if (pub_cluster.getNumSubscribers() == 0)
             return;
@@ -189,7 +189,7 @@ class KittiDemo
             for (int row_index = 0; row_index < clustering.num_rows_; ++row_index)
             {
                 // get processed point
-                const Point& point =
+                const Pixel& point =
                     clustering.range_image_[ring_buffer_col_idx * clustering.num_rows_ + row_index];
 
                 // check if cell in range image contains point
@@ -279,7 +279,7 @@ class KittiDemo
             Configuration config;
             config.general.is_single_threaded = true;
             config.range_image.num_columns = 2200;
-            config.clustering.ignore_points_in_chessboard_pattern = false;
+            config.clustering.ignore_pixels_in_chessboard_pattern = false;
             config.clustering.max_distance = 0.5;
 
             // ego bounding box (ref is here origin of lidar frame)
@@ -306,7 +306,7 @@ class KittiDemo
                 });
 
             clustering.setFinishedClusterCallback(
-                [&](const std::vector<Point>& cluster_points, uint64_t stamp_cluster)
+                [&](const std::vector<Pixel>& cluster_points, uint64_t stamp_cluster)
                 {
                     if (enable_publishers)
                         middleware.publishCluster(cluster_points, clustering.num_rows_, stamp_cluster);

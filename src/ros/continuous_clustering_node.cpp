@@ -34,7 +34,7 @@ class RosContinuousClustering
         clustering_.setFinishedColumnCallback(
             [this](int64_t from_monot_col_idx, int64_t to_monot_col_idx, bool ground_points_only)
             { onFinishedColumn(from_monot_col_idx, to_monot_col_idx, ground_points_only); });
-        clustering_.setFinishedClusterCallback([this](const std::vector<Point>& cluster_points, uint64_t stamp_cluster)
+        clustering_.setFinishedClusterCallback([this](const std::vector<Pixel>& cluster_points, uint64_t stamp_cluster)
                                                { onFinishedCluster(cluster_points, stamp_cluster); });
 
         // use desired sensor input
@@ -163,7 +163,7 @@ class RosContinuousClustering
         clustering_.addFiring(firing, tf2::transformToEigen(odom_from_sensor));
     }
 
-    void onFinishedCluster(const std::vector<Point>& cluster_points, uint64_t stamp_cluster)
+    void onFinishedCluster(const std::vector<Pixel>& cluster_points, uint64_t stamp_cluster)
     {
         pub_clusters.publish(clusterToPointCloud(cluster_points, clustering_.num_rows_, stamp_cluster, odom_frame));
     }
@@ -225,11 +225,10 @@ class RosContinuousClustering
         config_.clustering.max_steps_in_column = config.max_steps_in_column;
         config_.clustering.stop_after_association_enabled = config.stop_after_association_enabled;
         config_.clustering.stop_after_association_min_steps = config.stop_after_association_min_steps;
-        config_.clustering.ignore_points_in_chessboard_pattern = config.ignore_points_in_chessboard_pattern;
-        config_.clustering.ignore_points_with_too_big_inclination_angle_diff =
-            config.ignore_points_with_too_big_inclination_angle_diff;
+        config_.clustering.ignore_pixels_in_chessboard_pattern = config.ignore_pixels_in_chessboard_pattern;
+        config_.clustering.ignore_pixels_with_too_big_inclination_angle_diff =
+            config.ignore_pixels_with_too_big_inclination_angle_diff;
         config_.clustering.use_last_point_for_cluster_stamp = config.use_last_point_for_cluster_stamp;
-        config_.clustering.cluster_point_trees_every_nth_column = config.cluster_point_trees_every_nth_column;
 
         clustering_.setConfiguration(config_);
     }

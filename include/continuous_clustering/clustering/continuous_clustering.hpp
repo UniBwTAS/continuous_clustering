@@ -72,10 +72,9 @@ struct ContinuousClusteringConfiguration
     int max_steps_in_column{20};
     bool stop_after_association_enabled{true};
     int stop_after_association_min_steps{1};
-    bool ignore_points_in_chessboard_pattern{true};
-    bool ignore_points_with_too_big_inclination_angle_diff{true};
+    bool ignore_pixels_in_chessboard_pattern{true};
+    bool ignore_pixels_with_too_big_inclination_angle_diff{true};
     bool use_last_point_for_cluster_stamp{false};
-    int cluster_point_trees_every_nth_column{1};
 };
 
 struct Configuration
@@ -86,7 +85,7 @@ struct Configuration
     ContinuousClusteringConfiguration clustering{};
 };
 
-struct Point
+struct Pixel
 {
     // raw sensor data
     Point3D xyz{std::nanf(""), std::nanf(""), std::nanf("")};
@@ -111,17 +110,17 @@ struct Point
     uint8_t debug_ground_point_label{WHITE};
 
     // clustering (union find)
-    Point* parent{nullptr};
+    Pixel* parent{nullptr};
     uint16_t rank{0};
 
     // clustering (infinite cluster detection)
     int64_t clust_start_monot_col_idx{-1};
-    int64_t cluster_end_monot_col_idx{-1};
+    int64_t clust_end_monot_col_idx{-1};
 
     // cluster extraction
     bool is_potential_cluster_root{false};
     double finished_at_monot_azimuth_angle{0.0};
-    Point* next{nullptr}; // addition to regular "union find" for print/collect
+    Pixel* next{nullptr}; // addition to regular "union find" for print/collect
     uint64_t id{0};
 
     // debugging
@@ -150,7 +149,7 @@ struct PublishingJob
     int64_t ring_buffer_current_monot_col_idx;
     int64_t ring_buffer_min_required_monot_col_idx;
 
-    std::list<Point*> cluster_roots;
+    std::list<Pixel*> cluster_roots;
 };
 
 class ContinuousClustering
@@ -174,7 +173,7 @@ class ContinuousClustering
 
     // continuous clustering
     void setFinishedColumnCallback(std::function<void(int64_t, int64_t, bool)> cb);
-    void setFinishedClusterCallback(std::function<void(const std::vector<Point>&, uint64_t)> cb);
+    void setFinishedClusterCallback(std::function<void(const std::vector<Pixel>&, uint64_t)> cb);
 
     // debugging
     void recordJobQueueWorkload(size_t num_jobs_sensor_input); // debugging
@@ -191,26 +190,25 @@ class ContinuousClustering
     }
 
     // continuous clustering
-    inline bool checkClusteringCondition(const Point& point, const Point& point_other) const;
-    inline bool traverseFieldOfView(Point& point, float max_angle_diff, int ring_buffer_first_col_idx);
-    inline void associatePointsInColumn(AssociationJob&& job);
+    inline bool checkClusteringCondition(const Pixel& pixel_a, const Pixel& pixel_b) const;
+    inline bool traverseFieldOfView(Pixel& pixel, float max_angle_diff, int ring_buffer_first_col_idx);
+    inline void performUnionFindForColumn(AssociationJob&& job);
     inline void collectPointsForCusterAndPublish(PublishingJob&& job);
     inline void clearColumns(int64_t from_monot_col_idx, int64_t to_monot_col_idx);
 
   public: // TODO: UF
     // union find
-    inline void make_set(Point* point, float max_angle_diff);
-    inline Point* find_set(Point* point);
-    inline void link_set(Point* point, Point* point_other);
-    inline bool union_set(Point* point, Point* point_other);
-    inline void print_set(Point* point, std::vector<Point>& v);
+    inline void make_set(Pixel* pixel, float max_angle_diff);
+    inline Pixel* find_set(Pixel* pixel);
+    inline bool union_set(Pixel* pixel_a, Pixel* pixel_b);
+    inline void print_set(Pixel* pixel, std::vector<Pixel>& v);
 
   public:
     // range image (implemented as ring buffer)
     int ring_buffer_max_columns{0};
     int num_columns_{};
     int num_rows_{-1};
-    std::vector<Point> range_image_{0};
+    std::vector<Pixel> range_image_{0};
     int64_t ring_buffer_start_monot_col_idx{};
     int64_t ring_buffer_end_monot_col_idx{};
 
@@ -232,11 +230,11 @@ class ContinuousClustering
     // continuous clustering (sc)
     float max_distance_squared{0.7 * 0.7};
     int64_t sc_first_unpublished_monot_col_idx{-1};
-    std::list<Point*> sc_potential_cluster_roots_;
+    std::list<Pixel*> sc_potential_cluster_roots_;
     uint64_t sc_cluster_counter_{1};
     std::vector<float> sc_inclination_angles_between_lasers_;
     std::function<void(int64_t, int64_t, bool)> finished_column_callback_;
-    std::function<void(const std::vector<Point>&, uint64_t)> finished_cluster_callback_;
+    std::function<void(const std::vector<Pixel>&, uint64_t)> finished_cluster_callback_;
 
     // multi-threading
     ThreadPool<InsertionJob> insertion_thread_pool{"I"};
