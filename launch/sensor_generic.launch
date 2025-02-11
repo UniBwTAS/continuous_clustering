@@ -36,22 +36,22 @@
     <arg name="namespace" default="perception/detections/lidar_$(arg sensor_position)/cluster" doc="namespace"/>
 
     <!-- range image parameters -->
-    <arg name="num_columns" doc="number of columns of range image; should be the number of firings per rotations"/>
+    <arg name="num_columns_rot" doc="number of columns of range image; should be the number of firings per rotations"/>
     <arg name="wait_for_tf" default="true" doc="whether to wait for appropriate TF or just use the latest available"/>
-    <arg name="supplement_inclination_angle_for_nan_cells" default="true" doc="use artificial elevation angles"/>
+    <arg name="supplement_elevation_angle_for_nan_cells" default="true" doc="use artificial elevation angles"/>
 
     <!-- ground point segmentation parameters -->
     <arg name="use_terrain" default="False" doc="whether to use terrain (currently not supported!)"/>
     <arg name="fog_filtering_enabled" default="False" doc="whether to try to filter points originating from fog"/>
     <arg name="fog_filtering_intensity_below" default="2" doc="this cond. + others to consider as fog point"/>
     <arg name="fog_filtering_distance_below" default="18" doc="this cond. + others to consider as fog point"/>
-    <arg name="fog_filtering_inclination_above" default="-0.06" doc="this cond. + others to consider as fog point"/>
+    <arg name="fog_filtering_elevation_above" default="-0.06" doc="this cond. + others to consider as fog point"/>
 
     <!-- clustering parameters -->
     <arg name="max_distance" default="0.7" doc="the maximum euclidean 3D distance between two points to be clustered"/>
     <arg name="use_last_point_for_cluster_stamp" default="false" doc="use middle or last point for cluster stamp"/>
     <arg name="ignore_points_in_chessboard_pattern" default="true" doc="use this if clustering is too slow"/>
-    <arg name="ignore_points_with_too_big_inclination_angle_diff" default="true" doc="avoids small distant clusters"/>
+    <arg name="ignore_points_with_too_big_elevation_angle_diff" default="true" doc="avoids small distant clusters"/>
 
     <group ns="$(arg namespace)" unless="$(arg rviz_only)">
 
@@ -81,10 +81,10 @@
             <param name="is_single_threaded" value="$(arg is_single_threaded)"/>
 
             <!-- range image -->
-            <param name="num_columns" value="$(arg num_columns)"/>
+            <param name="num_columns_rot" value="$(arg num_columns_rot)"/>
             <param name="wait_for_tf" value="$(arg wait_for_tf)"/>
-            <param name="supplement_inclination_angle_for_nan_cells"
-                   value="$(arg supplement_inclination_angle_for_nan_cells)"/>
+            <param name="supplement_elevation_angle_for_nan_cells"
+                   value="$(arg supplement_elevation_angle_for_nan_cells)"/>
 
             <!-- ground point segmentation -->
             <remap from="terrain" to="/perception/static_environment_model/estimated_terrain/anre"/>
@@ -92,14 +92,14 @@
             <param name="fog_filtering_enabled" value="$(arg fog_filtering_enabled)"/>
             <param name="fog_filtering_intensity_below" value="$(arg fog_filtering_intensity_below)"/>
             <param name="fog_filtering_distance_below" value="$(arg fog_filtering_distance_below)"/>
-            <param name="fog_filtering_inclination_above" value="$(arg fog_filtering_inclination_above)"/>
+            <param name="fog_filtering_elevation_above" value="$(arg fog_filtering_elevation_above)"/>
 
             <!-- clustering -->
             <param name="max_distance" value="$(arg max_distance)"/>
             <param name="use_last_point_for_cluster_stamp" value="$(arg use_last_point_for_cluster_stamp)"/>
             <param name="ignore_points_in_chessboard_pattern" value="$(arg ignore_points_in_chessboard_pattern)"/>
-            <param name="ignore_points_with_too_big_inclination_angle_diff"
-                   value="$(arg ignore_points_with_too_big_inclination_angle_diff)"/>
+            <param name="ignore_points_with_too_big_elevation_angle_diff"
+                   value="$(arg ignore_points_with_too_big_elevation_angle_diff)"/>
         </node>
 
     </group>
@@ -114,6 +114,6 @@
           if="$(arg use_rviz)">
         <env name="NAMESPACE" value="$(arg namespace)"/>
         <env name="FULL_POINT_CLOUD_TOPIC" value="$(arg point_cloud_topic)"/>
-        <env name="RANGE_IMAGE_COLUMNS" value="$(arg num_columns)"/>
+        <env name="RANGE_IMAGE_COLUMNS" value="$(arg num_columns_rot)"/>
     </node>
 </launch>

@@ -11,80 +11,77 @@ ContinuousClustering::ContinuousClustering() = default;
 void ContinuousClustering::reset(int num_rows)
 {
     // recalculate some intermediate values in case the parameters have changed
-    num_columns_ = config_.range_image.num_columns;
     num_rows_ = num_rows;
-    srig_azimuth_width_per_column = static_cast<float>((2 * M_PI)) / static_cast<float>(num_columns_);
-    ring_buffer_max_columns = num_columns_ * 10;
+    num_columns_rot_ = config_.range_image.num_columns_rot;
+    num_columns_ = num_columns_rot_ * 10;
+    azimuth_width_per_column_ = static_cast<float>((2 * M_PI)) / static_cast<float>(num_columns_rot_);
 
     // shutdown workers
-    insertion_thread_pool.shutdown();
-    segmentation_thread_pool.shutdown();
-    association_thread_pool.shutdown();
-    publishing_thread_pool.shutdown();
+    range_image_thread_pool_.shutdown();
+    ground_segmentation_thread_pool_.shutdown();
+    union_find_thread_pool_.shutdown();
+    point_collection_thread_pool_.shutdown();
 
     // init/reset range image (implemented as ring buffer)
-    range_image_.resize(ring_buffer_max_columns * num_rows);
-    clearColumns(0, ring_buffer_max_columns - 1);
-    ring_buffer_start_monot_col_idx = -1; // does not start at zero but at the minimum laser of first firing
-    ring_buffer_end_monot_col_idx = -1;
+    range_image_.resize(num_columns_ * num_rows);
+    clearColumns(0, num_columns_ - 1);
+    ring_buf_start_monot_col_idx_ = -1; // does not start at zero but at the minimum laser of first firing
+    ring_buf_end_monot_col_idx_ = -1;
 
-    // reset members for continuous range image generation (srig)
-    srig_previous_monot_col_idx_of_rearmost_laser = 0;
-    srig_previous_monot_col_idx_of_foremost_laser = -1;
-    srig_first_unfinished_monot_col_idx = -1;
-    reset_required = false;
+    // reset members for continuous range image generation
+    min_incomlete_monot_col_idx_ = 0;
+    reset_required_ = false;
 
     // reset members for continuous ground point segmentation (sgps)
-    sgps_ego_robot_frame_from_sensor_frame_.reset();
+    ego_robot_frame_from_sensor_frame_.reset();
 
-    // reset members for continuous clustering (sc)
-    sc_first_unpublished_monot_col_idx = -1;
-    sc_cluster_counter_ = 1;
-    sc_inclination_angles_between_lasers_.resize(num_rows, std::nanf(""));
-    sc_potential_cluster_roots_.clear();
+    // reset members for continuous clustering
+    min_unfinished_monot_col_idx_ = -1;
+    elevation_angles_between_lasers_.resize(num_rows, std::nanf(""));
+    potential_cluster_roots_.clear();
 
     // re-initialize workers
     int num_treads = config_.general.is_single_threaded ? 0 : 1;
     int num_treads_pub = config_.general.is_single_threaded ? 0 : 1;
-    insertion_thread_pool.init(
+    range_image_thread_pool_.init(
         [this](InsertionJob&& job) { insertFiringIntoRangeImage(std::forward<InsertionJob>(job)); }, num_treads);
-    segmentation_thread_pool.init([this](SegmentationJob&& job)
-                                  { performGroundPointSegmentationForColumn(std::forward<SegmentationJob>(job)); },
-                                  num_treads);
-    association_thread_pool.init(
-        [this](AssociationJob&& job) { performUnionFindForColumn(std::forward<AssociationJob>(job)); }, num_treads);
-    publishing_thread_pool.init([this](PublishingJob&& job)
-                                { collectPointsForCusterAndPublish(std::forward<PublishingJob>(job)); },
-                                num_treads_pub);
+    ground_segmentation_thread_pool_.init(
+        [this](SegmentationJob&& job) { performGroundPointSegmentationForColumn(std::forward<SegmentationJob>(job)); },
+        num_treads);
+    union_find_thread_pool_.init(
+        [this](UnionFindJob&& job) { performUnionFindForColumn(std::forward<UnionFindJob>(job)); }, num_treads);
+    point_collection_thread_pool_.init([this](PointCollectionJob&& job)
+                                       { collectPointsForCusterAndPublish(std::forward<PointCollectionJob>(job)); },
+                                       num_treads_pub);
 }
 
 void ContinuousClustering::setConfiguration(const Configuration& config)
 {
     // some parameter changes need a hard reset
     if (config_.general.is_single_threaded != config.general.is_single_threaded)
-        reset_required = true;
+        reset_required_ = true;
     if (config_.range_image.sensor_is_clockwise != config.range_image.sensor_is_clockwise)
-        reset_required = true;
-    if (config_.range_image.num_columns != config.range_image.num_columns)
-        reset_required = true;
+        reset_required_ = true;
+    if (config_.range_image.num_columns_rot != config.range_image.num_columns_rot)
+        reset_required_ = true;
 
     // save new config
     config_ = config;
 
     // recalculate some values
-    max_distance_squared = config_.clustering.max_distance * config_.clustering.max_distance;
+    max_distance_squared_ = config_.clustering.max_distance * config_.clustering.max_distance;
 }
 
 bool ContinuousClustering::resetRequired() const
 {
-    return reset_required;
+    return reset_required_;
 }
 
 void ContinuousClustering::addFiring(const RawPoints::ConstPtr& firing, const Eigen::Isometry3d& odom_from_sensor)
 {
     if (num_rows_ != firing->points.size())
         throw std::runtime_error("The number of points in a firing has changed. This is probably a bug!");
-    insertion_thread_pool.enqueue({firing, odom_from_sensor});
+    range_image_thread_pool_.enqueue({firing, odom_from_sensor});
 }
 
 void ContinuousClustering::setFinishedColumnCallback(std::function<void(int64_t, int64_t, bool)> cb)
@@ -100,21 +97,23 @@ void ContinuousClustering::setFinishedClusterCallback(std::function<void(const s
 void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
 {
     // save sensor position in odom frame
-    srig_sensor_position = job.odom_frame_from_sensor_frame.translation();
+    sensor_position_ = job.odom_frame_from_sensor_frame.translation();
 
     // sensor position
-    sgps_sensor_position.x = static_cast<float>(srig_sensor_position.x());
-    sgps_sensor_position.y = static_cast<float>(srig_sensor_position.y());
-    sgps_sensor_position.z = static_cast<float>(srig_sensor_position.z());
+    sensor_position_point_.x = static_cast<float>(sensor_position_.x());
+    sensor_position_point_.y = static_cast<float>(sensor_position_.y());
+    sensor_position_point_.z = static_cast<float>(sensor_position_.z());
 
     // keep track of the global column indices of the foremost and rearmost laser (w.r.t. azimuth angle clockwise =
     // rotation direction of lidar sensor) in this firing
     int64_t monot_col_idx_of_foremost_laser = -1;
     int64_t monot_col_idx_of_rearmost_laser = -1;
 
-    // rotation index
-    int64_t previous_rotation_index_of_rearmost_laser =
-        srig_previous_monot_col_idx_of_rearmost_laser / num_columns_;
+    // rotation index (not the same for all points if firing intersects with negative x-axis)
+    int64_t approximate_rotation_index = min_incomlete_monot_col_idx_ / num_columns_rot_;
+
+    // for rotation index correction (large jump means that the firing intersects negative x-axis)
+    int cols_of_half_rotation = num_columns_rot_ / 2;
 
     // process firing from top to bottom
     for (int row_idx = 0; row_idx < job.firing->points.size(); row_idx++)
@@ -130,63 +129,60 @@ void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
         Eigen::Vector3d p_odom = job.odom_frame_from_sensor_frame * p;
 
         // get point relative to sensor origin
-        Eigen::Vector3d p_odom_rel = p_odom - srig_sensor_position;
+        Eigen::Vector3d p_odom_rel = p_odom - sensor_position_;
 
         // calculate azimuth angle
-        // float azimuth_angle = std::atan2(static_cast<float>(p_odom_rel.y()), static_cast<float>(p_odom_rel.x()));
         float azimuth_angle = std::atan2(static_cast<float>(p.y()), static_cast<float>(p.x()));
 
         // calculate azimuth angle which starts at negative X-axis with 0 and increases with ongoing lidar rotation
-        // to 2 pi, which is more intuitive and important for fast array index calculation
+        // to 2*pi, which is more intuitive and important for fast array index calculation
         float increasing_azimuth_angle = config_.range_image.sensor_is_clockwise ?
                                              -azimuth_angle + static_cast<float>(M_PI) :
                                              azimuth_angle + static_cast<float>(M_PI);
 
-        // global column index
-        int column_index_within_rotation = static_cast<int>(increasing_azimuth_angle / srig_azimuth_width_per_column);
-        int64_t monot_col_idx =
-            previous_rotation_index_of_rearmost_laser * num_columns_ + column_index_within_rotation;
+        // calculate column index within rotation
+        int column_index_within_rotation = static_cast<int>(increasing_azimuth_angle / azimuth_width_per_column_);
 
-        // check if we hit negative x-axis with w.r.t. previous firing
-        int column_index_within_rotation_of_previous_rearmost_laser =
-            static_cast<int>(srig_previous_monot_col_idx_of_rearmost_laser % num_columns_);
-        int column_diff = column_index_within_rotation - column_index_within_rotation_of_previous_rearmost_laser;
-        int cols_of_half_rotation = num_columns_ / 2;
-        int rotation_index_offset = 0;
+        // correct rotation index in case the firing intersects negative x-axis with w.r.t. previous firing
+        int64_t rotation_index = approximate_rotation_index;
+
+        // this is done by detecting jumps of more than a half rotation
+        int ref_column_index_within_rotation = static_cast<int>(min_incomlete_monot_col_idx_ % num_columns_rot_);
+        int column_diff = column_index_within_rotation - ref_column_index_within_rotation;
         if (column_diff < -cols_of_half_rotation)
         {
-            monot_col_idx += num_columns_; // add one rotation
-            rotation_index_offset = 1;
+            // negative jump of more than a half rotation -> this point belongs already to the next rotation
+            rotation_index += 1;
         }
-        else if (srig_previous_monot_col_idx_of_rearmost_laser > 0 && column_diff > cols_of_half_rotation)
+        else if (min_incomlete_monot_col_idx_ > 0 && column_diff > cols_of_half_rotation)
         {
+            // positive jump of more than a half rotation -> this point belongs to the previous rotation:
             // In very rare cases this can happen because the minimum azimuth of rearmost laser can be smaller than
-            // that of previous firing (most probably due to ego motion correction).
-            // This gets only tricky when srig_previous_monot_col_idx_of_rearmost_laser % num_columns == 0 and
-            // azimuth of rearmost laser in current firing is smaller than previous one.
-            // So we have to subtract one rotation.
-            monot_col_idx -= num_columns_; // subtract one rotation
-            rotation_index_offset = -1;
+            // that of previous firing. Logically this should be impossible as the sensor never rotates backwards.
+            // However, for some reason it still happens. Maybe due to rounding/numerical errors or due to ego motion
+            // correction?
+            rotation_index -= 1;
         }
 
-        // local column index
-        int col_idx = static_cast<int>(monot_col_idx % ring_buffer_max_columns);
+        // monotonic column index
+        int64_t monot_col_idx = rotation_index * num_columns_rot_ + column_index_within_rotation;
+
+        // calculate regular column index
+        int col_idx = static_cast<int>(monot_col_idx % num_columns_);
 
         // get correct pixel
         Pixel* pixel = &range_image_[col_idx * num_rows_ + row_idx]; // column major order
 
         // calculate continuous azimuth angle (even if we move it to the next cell, this value remains the same)
-        double monot_azimuth_angle =
-            (2 * M_PI) * static_cast<double>(previous_rotation_index_of_rearmost_laser + rotation_index_offset) +
-            increasing_azimuth_angle;
+        double monot_azimuth_angle = (2 * M_PI) * static_cast<double>(rotation_index) + increasing_azimuth_angle;
 
         // in case this cell is already occupied, try next column
         auto distance = static_cast<float>(p_odom_rel.norm());
         if (!std::isnan(pixel->distance) && !std::isnan(distance))
         {
             int next_col_idx = col_idx + 1;
-            if (next_col_idx >= ring_buffer_max_columns)
-                next_col_idx -= ring_buffer_max_columns;
+            if (next_col_idx >= num_columns_)
+                next_col_idx -= num_columns_;
             Pixel* next_pixel = &range_image_[next_col_idx * num_rows_ + row_idx];
             if (std::isnan(next_pixel->distance))
             {
@@ -202,13 +198,12 @@ void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
 
         // do not insert into cols that were passed to the next processing step
         bool laser_too_far_behind = false;
-        if (srig_first_unfinished_monot_col_idx >= 0 &&
-            monot_col_idx < srig_first_unfinished_monot_col_idx)
+        if (min_incomlete_monot_col_idx_ >= 0 && monot_col_idx < min_incomlete_monot_col_idx_)
         {
             /*ROS_WARN_STREAM("Ignore point of firing because it would be inserted into an already published column. "
                             "Wanted to insert at "
                             << monot_col_idx << ", but first unfinished global column index is already at "
-                            << srig_first_unfinished_monot_col_idx << " (row index: " << row_index << ")");*/
+                            << min_incomlete_monot_col_idx_ << " (row index: " << row_index << ")");*/
 
             laser_too_far_behind = true;
         }
@@ -228,7 +223,7 @@ void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
             pixel->monot_azimuth_angle = monot_azimuth_angle; // omitted cells will be filled again later
             pixel->col_idx = col_idx;
             pixel->row_idx = row_idx;
-            pixel->monot_col_idx = monot_col_idx;            // omitted cells will be filled again later
+            pixel->monot_col_idx = monot_col_idx; // omitted cells will be filled again later
             pixel->globally_unique_point_index = raw_point.globally_unique_point_index;
         }
 
@@ -239,62 +234,49 @@ void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
             monot_col_idx_of_foremost_laser = monot_col_idx;
     }
 
-    // if for this firing a minimum/maximum column index was found then use it as the new one
-    if (monot_col_idx_of_rearmost_laser >= 0 && monot_col_idx_of_foremost_laser >= 0)
-    {
-        // if the azimuth range of the firing covers more than 180 degrees, this means that the firing is
-        // intersected with negative x-axis (this means that the range image was incorrectly filled -> reset)
-        if ((monot_col_idx_of_foremost_laser - monot_col_idx_of_rearmost_laser) > num_columns_ / 2)
-        {
-            std::cout << "Very first firing after reset intersects with negative x-axis: " +
-                             std::to_string(monot_col_idx_of_rearmost_laser) + ", " +
-                             std::to_string(monot_col_idx_of_foremost_laser) + ", " +
-                             std::to_string(srig_previous_monot_col_idx_of_rearmost_laser) +
-                             ". This is invalid. Reset continuous clustering on next message.";
-            reset_required = true;
-            return;
-        }
-
-        if (monot_col_idx_of_rearmost_laser > srig_previous_monot_col_idx_of_rearmost_laser)
-            srig_previous_monot_col_idx_of_rearmost_laser = monot_col_idx_of_rearmost_laser;
-        if (monot_col_idx_of_foremost_laser > srig_previous_monot_col_idx_of_foremost_laser)
-            srig_previous_monot_col_idx_of_foremost_laser = monot_col_idx_of_foremost_laser;
-    }
-
-    // there is no information about minimum and maximum global column index
-    if (srig_previous_monot_col_idx_of_foremost_laser < 0)
+    // if there were no valid points in this firing, interrupt here
+    if (monot_col_idx_of_rearmost_laser < 0)
         return;
 
-    // initialize start of ring buffer
-    if (ring_buffer_start_monot_col_idx == -1)
+    // if the azimuth range of the firing covers more than 180 degrees, this means that the firing is
+    // intersected with negative x-axis (this means that the range image was incorrectly filled -> reset)
+    if ((monot_col_idx_of_foremost_laser - monot_col_idx_of_rearmost_laser) > cols_of_half_rotation)
     {
-        ring_buffer_start_monot_col_idx = srig_previous_monot_col_idx_of_rearmost_laser;
-        sc_first_unpublished_monot_col_idx = srig_previous_monot_col_idx_of_rearmost_laser;
+        std::cout << "Very first firing after reset intersects with negative x-axis: " +
+                         std::to_string(monot_col_idx_of_rearmost_laser) + ", " +
+                         std::to_string(monot_col_idx_of_foremost_laser) + ", " +
+                         std::to_string(min_incomlete_monot_col_idx_) +
+                         ". This is invalid. Reset continuous clustering on next message.";
+        reset_required_ = true;
+        return;
+    }
+
+    // initialize start of ring buffer
+    if (ring_buf_start_monot_col_idx_ == -1)
+    {
+        ring_buf_start_monot_col_idx_ = monot_col_idx_of_rearmost_laser;
+        min_unfinished_monot_col_idx_ = monot_col_idx_of_rearmost_laser;
+        min_incomlete_monot_col_idx_ = monot_col_idx_of_rearmost_laser;
     }
 
     // update end of ring buffer (maximum global column index ever seen)
-    if (srig_previous_monot_col_idx_of_foremost_laser > ring_buffer_end_monot_col_idx)
-        ring_buffer_end_monot_col_idx = srig_previous_monot_col_idx_of_foremost_laser;
-
-    // start publishing at index of last laser of very first firing
-    if (srig_first_unfinished_monot_col_idx == -1)
-        srig_first_unfinished_monot_col_idx = srig_previous_monot_col_idx_of_rearmost_laser;
+    if (monot_col_idx_of_foremost_laser > ring_buf_end_monot_col_idx_)
+        ring_buf_end_monot_col_idx_ = monot_col_idx_of_foremost_laser;
 
     // iterate over finished but unfinished cols and publish them
-    while (srig_first_unfinished_monot_col_idx < srig_previous_monot_col_idx_of_rearmost_laser)
-        segmentation_thread_pool.enqueue(
-            {srig_first_unfinished_monot_col_idx++, job.odom_frame_from_sensor_frame});
+    while (min_incomlete_monot_col_idx_ < monot_col_idx_of_rearmost_laser)
+        ground_segmentation_thread_pool_.enqueue({min_incomlete_monot_col_idx_++, job.odom_frame_from_sensor_frame});
 }
 
 void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJob&& job)
 {
-    int col_idx = static_cast<int>(job.ring_buffer_current_monot_col_idx % ring_buffer_max_columns);
+    int col_idx = static_cast<int>(job.current_monot_col_idx % num_columns_);
 
-    if (!sgps_ego_robot_frame_from_sensor_frame_)
+    if (!ego_robot_frame_from_sensor_frame_)
         throw std::runtime_error("Transform robot frame from sensor frame was not set yet!");
     Eigen::Isometry3d ego_robot_frame_from_odom_frame =
-        *sgps_ego_robot_frame_from_sensor_frame_ * job.odom_frame_from_sensor_frame.inverse();
-    float height_sensor_to_ground = -static_cast<float>(sgps_ego_robot_frame_from_sensor_frame_->translation().z()) +
+        *ego_robot_frame_from_sensor_frame_ * job.odom_frame_from_sensor_frame.inverse();
+    float height_sensor_to_ground = -static_cast<float>(ego_robot_frame_from_sensor_frame_->translation().z()) +
                                     config_.ground_segmentation.height_ref_to_ground_;
 
     // iterate rows from bottom to top and find ground points
@@ -304,7 +286,7 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
     Point3D ground_x_meter_behind_position_wrt_sensor = {0, 0, 0};
     Point3D previous_position_wrt_sensor;
     uint8_t previous_label;
-    float inclination_previous_laser = 0; // calculate difference between elevation angles for subsequent steps
+    float elevation_previous_laser = 0; // calculate difference between elevation angles for subsequent steps
 
     for (int row_index = num_rows_ - 1; row_index >= 0; row_index--)
     {
@@ -313,56 +295,53 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
 
         // check if there is a problem with the ring buffer
         int64_t pixel_monot_col_idx_copy = pixel.monot_col_idx;
-        if (pixel_monot_col_idx_copy != job.ring_buffer_current_monot_col_idx &&
-            pixel_monot_col_idx_copy != -1)
+        if (pixel_monot_col_idx_copy != job.current_monot_col_idx && pixel_monot_col_idx_copy != -1)
         {
-            stop_statistics = true;
+            stop_statistics_ = true;
             /*std::string filename = std::tmpnam(nullptr);
             std::cout << "JOB QUEUES (INSERT, SEGMENT, ASSOC, PUB): "
-                      << insertion_thread_pool.getNumberOfUnprocessedJobs() << ", "
-                      << segmentation_thread_pool.getNumberOfUnprocessedJobs() << ", "
-                      << association_thread_pool.getNumberOfUnprocessedJobs() << ", "
-                      << publishing_thread_pool.getNumberOfUnprocessedJobs() << std::endl;
+                      << range_image_thread_pool_.getNumberOfUnprocessedJobs() << ", "
+                      << ground_segmentation_thread_pool_.getNumberOfUnprocessedJobs() << ", "
+                      << union_find_thread_pool_.getNumberOfUnprocessedJobs() << ", "
+                      << point_collection_thread_pool_.getNumberOfUnprocessedJobs() << std::endl;
             std::cout << "Writing statistics to: " << filename << std::endl;
             std::ofstream out(filename);
-            for (auto n : num_pending_jobs)
+            for (auto n : num_pending_jobs_)
                 out << n << ", ";
             out.close();*/
             throw std::runtime_error(
                 "This column is not cleared. Probably this means the ring buffer is full or there "
                 "is some other issue with clearing (not cleared at all or written after clearing): " +
-                std::to_string(pixel_monot_col_idx_copy) + ", " +
-                std::to_string(job.ring_buffer_current_monot_col_idx) + ", " +
-                std::to_string(ring_buffer_max_columns) +
+                std::to_string(pixel_monot_col_idx_copy) + ", " + std::to_string(job.current_monot_col_idx) + ", " +
+                std::to_string(num_columns_) +
                 "; This typically happens when the clustering is not fast enough to handle all the firings. Consider "
                 "to play the sensor data more slowly or to adjust the parameters to make the clustering faster.");
         }
 
         // refill local/global column index because it was not filled for omitted cells
-        pixel.monot_col_idx = job.ring_buffer_current_monot_col_idx;
-        pixel.col_idx = static_cast<int>(job.ring_buffer_current_monot_col_idx % ring_buffer_max_columns);
+        pixel.monot_col_idx = job.current_monot_col_idx;
+        pixel.col_idx = static_cast<int>(job.current_monot_col_idx % num_columns_);
 
         // keep track of (differences between) the elevation angles of the lasers (for later processing steps)
-        float inclination_current_laser = range_image_[col_idx * num_rows_ + row_index].elevation_angle;
-        float diff = inclination_current_laser - inclination_previous_laser;
+        float elevation_current_laser = range_image_[col_idx * num_rows_ + row_index].elevation_angle;
+        float diff = elevation_current_laser - elevation_previous_laser;
         if (!std::isnan(diff))
-            sc_inclination_angles_between_lasers_[row_index] = diff; // last value is useless but we do not use it
-        inclination_previous_laser = inclination_current_laser;
+            elevation_angles_between_lasers_[row_index] = diff; // last value is useless but we do not use it
+        elevation_previous_laser = elevation_current_laser;
 
         // skip NaN's
         if (std::isnan(pixel.distance))
         {
             // use elevation angle from previous column (it is useful to supplement nan cells with an elevation
             // angle in order to be able to break the while loop earlier during association
-            if (config_.range_image.supplement_inclination_angle_for_nan_cells && row_index < num_rows_ - 1)
+            if (config_.range_image.supplement_elevation_angle_for_nan_cells && row_index < num_rows_ - 1)
             {
                 Pixel& pixel_below = range_image_[col_idx * num_rows_ + (row_index + 1)];
-                pixel.elevation_angle =
-                    pixel_below.elevation_angle + sc_inclination_angles_between_lasers_[row_index];
+                pixel.elevation_angle = pixel_below.elevation_angle + elevation_angles_between_lasers_[row_index];
             }
             // recalculate continuous azimuth for omitted/NaN cells (for later processing steps)
-            pixel.monot_azimuth_angle = (static_cast<double>(job.ring_buffer_current_monot_col_idx) + 0.5) *
-                                             srig_azimuth_width_per_column;
+            pixel.monot_azimuth_angle =
+                (static_cast<double>(job.current_monot_col_idx) + 0.5) * azimuth_width_per_column_;
             continue;
         }
 
@@ -370,7 +349,7 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
         if (config_.ground_segmentation.fog_filtering_enabled &&
             pixel.intensity < config_.ground_segmentation.fog_filtering_intensity_below &&
             pixel.distance < config_.ground_segmentation.fog_filtering_distance_below &&
-            pixel.elevation_angle > config_.ground_segmentation.fog_filtering_inclination_above)
+            pixel.elevation_angle > config_.ground_segmentation.fog_filtering_elevation_above)
         {
             pixel.ground_point_label = GP_FOG;
             pixel.debug_ground_point_label = LIGHTGRAY;
@@ -396,7 +375,7 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
             continue;
         }
 
-        Point3D current_position_wrt_sensor = current_position - sgps_sensor_position;
+        Point3D current_position_wrt_sensor = current_position - sensor_position_point_;
 
         // special handling first point outside the ego bounding box
         if (!first_point_found)
@@ -508,7 +487,7 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
             while (prev_row_index < num_rows_)
             {
                 Pixel& cur_pixel = range_image_[col_idx * num_rows_ + prev_row_index];
-                Point2D prev_position_wrt_sensor_2d = to2dInAzimuthPlane(cur_pixel.xyz - sgps_sensor_position);
+                Point2D prev_position_wrt_sensor_2d = to2dInAzimuthPlane(cur_pixel.xyz - sensor_position_point_);
                 if (cur_pixel.debug_ground_point_label == YELLOW ||
                     (cur_pixel.ground_point_label == GP_GROUND &&
                      std::abs((current_position_wrt_sensor_2d - prev_position_wrt_sensor_2d).x) <
@@ -587,9 +566,8 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
         }
 
         // ignore this pixel if the distance in combination with elevation diff can't be below distance threshold
-        if (config_.clustering.ignore_pixels_with_too_big_inclination_angle_diff && row_index < (num_rows_ - 1) &&
-            std::atan2(config_.clustering.max_distance, pixel.distance) <
-                sc_inclination_angles_between_lasers_[row_index])
+        if (config_.clustering.ignore_pixels_with_too_big_elevation_angle_diff && row_index < (num_rows_ - 1) &&
+            std::atan2(config_.clustering.max_distance, pixel.distance) < elevation_angles_between_lasers_[row_index])
         {
             pixel.is_ignored = true;
             continue;
@@ -609,43 +587,45 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
     }
 
     if (finished_column_callback_)
-        finished_column_callback_(
-            job.ring_buffer_current_monot_col_idx, job.ring_buffer_current_monot_col_idx, true);
+        finished_column_callback_(job.current_monot_col_idx, job.current_monot_col_idx, true);
 
     // lets enqueue the association job for this column to do it in a separate thread
-    association_thread_pool.enqueue({job.ring_buffer_current_monot_col_idx});
+    union_find_thread_pool_.enqueue({job.current_monot_col_idx});
 }
 
 void ContinuousClustering::setTransformRobotFrameFromSensorFrame(const Eigen::Isometry3d& tf)
 {
-    if (!sgps_ego_robot_frame_from_sensor_frame_)
-        sgps_ego_robot_frame_from_sensor_frame_ = std::make_unique<Eigen::Isometry3d>();
-    *sgps_ego_robot_frame_from_sensor_frame_ = tf;
+    if (!ego_robot_frame_from_sensor_frame_)
+        ego_robot_frame_from_sensor_frame_ = std::make_unique<Eigen::Isometry3d>();
+    *ego_robot_frame_from_sensor_frame_ = tf;
 }
 
 bool ContinuousClustering::hasTransformRobotFrameFromSensorFrame()
 {
-    return sgps_ego_robot_frame_from_sensor_frame_ != nullptr;
+    return ego_robot_frame_from_sensor_frame_ != nullptr;
 }
 
 bool ContinuousClustering::checkClusteringCondition(const Pixel& pixel_a, const Pixel& pixel_b) const
 {
-    return (pixel_a.xyz - pixel_b.xyz).lengthSquared() < max_distance_squared;
+    return (pixel_a.xyz - pixel_b.xyz).lengthSquared() < max_distance_squared_;
 }
 
-void ContinuousClustering::make_set(Pixel* pixel, float max_angle_diff)
+void ContinuousClustering::make_set(Pixel* pixel, float min_req_angle_diff)
 {
     // regular union find algorithm
     pixel->parent = pixel;
+    pixel->rank = 0;
 
-    // extension for print after union find
+    // extension for collect after union find
     pixel->next = pixel;
 
-    // extension for range image meta data
-    pixel->finished_at_monot_azimuth_angle = pixel->monot_azimuth_angle + max_angle_diff;
+    // extension for finished cluster extraction
+    pixel->finished_at_monot_azimuth_angle = pixel->monot_azimuth_angle + min_req_angle_diff;
+    pixel->is_potential_cluster_root = false;
+
+    // infinite cluster detection (e.g. in a closed room or tunnel)
     pixel->clust_start_monot_col_idx = pixel->monot_col_idx;
     pixel->clust_end_monot_col_idx = pixel->monot_col_idx;
-    pixel->is_potential_cluster_root = false;
 }
 
 Pixel* ContinuousClustering::find_set(Pixel* pixel)
@@ -657,9 +637,9 @@ Pixel* ContinuousClustering::find_set(Pixel* pixel)
     while (root->parent != root)
         root = root->parent;
 
-    // path compression: again, iterate from leaf to root and 
+    // path compression: again, iterate from leaf to root and
     // re-attach all vertices to the (now known) root
-    while (pixel != pixel->parent)
+    while (pixel->parent != root)
     {
         Pixel* tmp = pixel->parent;
         pixel->parent = root;
@@ -675,20 +655,14 @@ bool ContinuousClustering::union_set(Pixel* pixel_a, Pixel* pixel_b)
     Pixel* root_a = find_set(pixel_a);
     Pixel* root_b = find_set(pixel_b);
     if (root_a == root_b)
-        return true;  // already same cluster -> nothing to do
+        return true; // already same cluster -> nothing to do
 
     // extension for infinite cluster detection
-    int64_t new_start_col_idx = std::min(
-        root_a->clust_start_monot_col_idx,
-        root_b->clust_start_monot_col_idx
-    );
-    int64_t new_end_col_idx = std::max(
-        root_a->clust_end_monot_col_idx,
-        root_b->clust_end_monot_col_idx
-    );
+    int64_t new_start_col_idx = std::min(root_a->clust_start_monot_col_idx, root_b->clust_start_monot_col_idx);
+    int64_t new_end_col_idx = std::max(root_a->clust_end_monot_col_idx, root_b->clust_end_monot_col_idx);
     int new_width = new_end_col_idx - new_start_col_idx + 1;
-    if (new_width >= num_columns_)
-        return false;
+    if (new_width > num_columns_rot_)
+        return false; // clusters not merged (broader than full rotation)
 
     // regular union find algorithm (with union by rank)
     Pixel* root_after_union;
@@ -713,10 +687,8 @@ bool ContinuousClustering::union_set(Pixel* pixel_a, Pixel* pixel_b)
     root_after_union->clust_end_monot_col_idx = new_end_col_idx;
 
     // extension for cluster extraction
-    root_after_union->finished_at_monot_azimuth_angle = std::max(
-        root_a->finished_at_monot_azimuth_angle,
-        root_b->finished_at_monot_azimuth_angle
-    );
+    root_after_union->finished_at_monot_azimuth_angle =
+        std::max(root_a->finished_at_monot_azimuth_angle, root_b->finished_at_monot_azimuth_angle);
     child_after_union->is_potential_cluster_root = false;
 
     // extension for collecting pixels (swap next pointers)
@@ -740,13 +712,11 @@ void ContinuousClustering::print_set(Pixel* pixel, std::vector<Pixel>& v)
     }
 }
 
-bool ContinuousClustering::traverseFieldOfView(Pixel& pixel,
-                                               float max_angle_diff,
-                                               int ring_buffer_first_col_idx)
+bool ContinuousClustering::findEdgesInFieldOfView(Pixel& pixel, float min_req_angle_diff, int ring_buf_first_col_idx)
 {
     // go left each column until azimuth angle difference gets too large
     bool at_least_one_edge = false;
-    int required_steps_back = static_cast<int>(std::ceil(max_angle_diff / srig_azimuth_width_per_column));
+    int required_steps_back = static_cast<int>(std::ceil(min_req_angle_diff / azimuth_width_per_column_));
     required_steps_back = std::min(required_steps_back, config_.clustering.max_steps_in_row);
     int64_t other_col_idx = pixel.col_idx;
     for (int num_steps_back = 0; num_steps_back <= required_steps_back; num_steps_back++)
@@ -759,8 +729,7 @@ bool ContinuousClustering::traverseFieldOfView(Pixel& pixel,
 
             // go up/down each row until the elevation angle difference gets too large
             int num_steps_vertical = direction == 1 || num_steps_back == 0 ? 1 : 0;
-            int other_row_index =
-                direction == 1 || num_steps_back == 0 ? pixel.row_idx + direction : pixel.row_idx;
+            int other_row_index = direction == 1 || num_steps_back == 0 ? pixel.row_idx + direction : pixel.row_idx;
             while (other_row_index >= 0 && other_row_index < num_rows_ &&
                    num_steps_vertical <= config_.clustering.max_steps_in_column)
             {
@@ -771,7 +740,7 @@ bool ContinuousClustering::traverseFieldOfView(Pixel& pixel,
                 pixel.number_of_visited_neighbors += 1;
 
                 // no cluster can be associated because the elevation angle diff gets too large
-                if (std::abs(pixel_other.elevation_angle - pixel.elevation_angle) > max_angle_diff)
+                if (std::abs(pixel_other.elevation_angle - pixel.elevation_angle) > min_req_angle_diff)
                     break;
 
                 // if other pixel is ignored or has already the same tree root then do nothing (*1)
@@ -782,8 +751,8 @@ bool ContinuousClustering::traverseFieldOfView(Pixel& pixel,
                 }
 
                 // stop searching if pixel was already associated and minimum number of cols were processed
-                if (pixel.parent != &pixel && config_.clustering.stop_after_association_enabled &&
-                    num_steps_vertical >= config_.clustering.stop_after_association_min_steps)
+                if (pixel.parent != &pixel && config_.clustering.stop_after_first_edge_enabled &&
+                    num_steps_vertical >= config_.clustering.stop_after_first_edge_min_steps)
                     break;
 
                 other_row_index += direction;
@@ -792,110 +761,121 @@ bool ContinuousClustering::traverseFieldOfView(Pixel& pixel,
         }
 
         // stop searching if pixel was already associated and minimum number of pixels were processed
-        if (pixel.parent != &pixel && config_.clustering.stop_after_association_enabled &&
-            num_steps_back >= config_.clustering.stop_after_association_min_steps)
+        if (pixel.parent != &pixel && config_.clustering.stop_after_first_edge_enabled &&
+            num_steps_back >= config_.clustering.stop_after_first_edge_min_steps)
             break;
 
         // stop searching if we are at the beginning of the ring buffer
-        if (other_col_idx == ring_buffer_first_col_idx)
+        if (other_col_idx == ring_buf_first_col_idx)
             break;
 
         other_col_idx--;
 
         // jump to the end of the ring buffer
         if (other_col_idx < 0)
-            other_col_idx += ring_buffer_max_columns;
+            other_col_idx += num_columns_;
     }
 
     return at_least_one_edge;
 }
 
-void ContinuousClustering::performUnionFindForColumn(AssociationJob&& job)
+void ContinuousClustering::performUnionFindForColumn(UnionFindJob&& job)
 {
-    // clear all cols that are not needed anymore
-    int64_t prev_ring_buffer_start_monot_col_idx = ring_buffer_start_monot_col_idx;
-    ring_buffer_start_monot_col_idx = sc_first_unpublished_monot_col_idx;
-    clearColumns(prev_ring_buffer_start_monot_col_idx, ring_buffer_start_monot_col_idx - 1);
+    // clear all columns that are not needed anymore
+    int64_t prev_ring_buf_start_monot_col_idx = ring_buf_start_monot_col_idx_;
+    ring_buf_start_monot_col_idx_ = min_unfinished_monot_col_idx_;
+    clearColumns(prev_ring_buf_start_monot_col_idx, ring_buf_start_monot_col_idx_ - 1);
 
-    // keep track of the current minimum azimuth angle of the current column
-    double current_minimum_monot_azimuth_angle = std::numeric_limits<double>::max();
+    // keep track of the minimum azimuth angle of all points in the current column
+    double min_monot_azimuth_angle_in_col = std::numeric_limits<double>::max();
 
-    // get local start index of ring buffer start
-    int ring_buffer_first_col_idx =
-        static_cast<int>(sc_first_unpublished_monot_col_idx % ring_buffer_max_columns);
+    // get actual start index of ring buffer start (used lower bound to calculate left edge of FoV window)
+    int ring_buf_first_col_idx = static_cast<int>(min_unfinished_monot_col_idx_ % num_columns_);
 
-    // get current local index of ring buffer start
-    int ring_buffer_current_col_idx =
-        static_cast<int>(job.ring_buffer_current_monot_col_idx % ring_buffer_max_columns);
+    // get actual column index of current column
+    int current_col_idx = static_cast<int>(job.current_monot_col_idx % num_columns_);
 
     for (int row_index = 0; row_index < num_rows_; row_index++)
     {
-        // get current pixel
-        Pixel& pixel = range_image_[ring_buffer_current_col_idx * num_rows_ + row_index];
+        // get current pixel (range image is stored in column-major order)
+        Pixel& pixel = range_image_[current_col_idx * num_rows_ + row_index];
 
         // keep track of the current minimum continuous azimuth angle
-        if (pixel.monot_azimuth_angle < current_minimum_monot_azimuth_angle)
-            current_minimum_monot_azimuth_angle = pixel.monot_azimuth_angle;
+        min_monot_azimuth_angle_in_col = std::min(min_monot_azimuth_angle_in_col, pixel.monot_azimuth_angle);
 
         // check whether pixel should be ignored
         if (pixel.is_ignored)
             continue;
 
-        // calculate minimum possible azimuth angle
-        float max_angle_diff = std::asin(config_.clustering.max_distance / pixel.distance);
+        // calculate minimum required angle diff to consider at which no further pixel can be linked to this pixel
+        float min_req_angle_diff = std::asin(config_.clustering.max_distance / pixel.distance);
 
         // initialize a new cluster containing only this pixel (initialize for union find)
-        make_set(&pixel, max_angle_diff);
+        make_set(&pixel, min_req_angle_diff);
 
         // traverse field of view
-        bool neighbor_found = traverseFieldOfView(pixel, max_angle_diff, ring_buffer_first_col_idx);
+        bool neighbor_found = findEdgesInFieldOfView(pixel, min_req_angle_diff, ring_buf_first_col_idx);
         if (!neighbor_found)
         {
             pixel.is_potential_cluster_root = true;
-            sc_potential_cluster_roots_.push_back(&pixel);
-        } else {
+            potential_cluster_roots_.push_back(&pixel);
+        }
+        else
+        {
             pixel.is_potential_cluster_root = false;
         }
     }
 
+    FinishedClusterExtractionJob next_job;
+    next_job.current_monot_col_idx = job.current_monot_col_idx;
+    next_job.min_monot_azimuth_angle_in_col = min_monot_azimuth_angle_in_col;
+    extractFinishedClusters(
+        std::move(next_job)); // it has to run in the same thread as both access/modify list of potential cluster roots!
+}
+
+void ContinuousClustering::extractFinishedClusters(FinishedClusterExtractionJob&& job)
+{
+    // keep track of the minimum column index of all unfinished clusters
     int64_t minimum_required_monot_col_idx = std::numeric_limits<int64_t>::max();
-    std::list<Pixel*> finished_cluster_roots;
-    auto it = sc_potential_cluster_roots_.begin();
-    while (it != sc_potential_cluster_roots_.end())
+
+    // split into “finished" and "unfinished" clusters
+    std::vector<Pixel*> finished_cluster_roots;
+    std::vector<Pixel*> unfinished_cluster_roots;
+
+    // iterate over potential cluster roots
+    for (Pixel* p : potential_cluster_roots_)
     {
-        Pixel* potential_cluster_root = *it;
+        // discard cluster roots eliminated during union operation
+        if (!p->is_potential_cluster_root)
+            continue;
 
-        bool laser_diodes_far_enough =
-            current_minimum_monot_azimuth_angle > potential_cluster_root->finished_at_monot_azimuth_angle;
-        bool root_eliminated_by_union_set = !potential_cluster_root->is_potential_cluster_root;
-
-        if (laser_diodes_far_enough && !root_eliminated_by_union_set)
-            finished_cluster_roots.push_back(*it);
-
-        if (root_eliminated_by_union_set || laser_diodes_far_enough)
+        // check whether no more points can be added to this cluster
+        if (job.min_monot_azimuth_angle_in_col > p->finished_at_monot_azimuth_angle)
         {
-            it = sc_potential_cluster_roots_.erase(it);
+            finished_cluster_roots.push_back(p);
         }
         else
         {
-            ++it;
-            if (potential_cluster_root->clust_start_monot_col_idx < minimum_required_monot_col_idx)
-                minimum_required_monot_col_idx = potential_cluster_root->clust_start_monot_col_idx;
+            unfinished_cluster_roots.push_back(p);
+            minimum_required_monot_col_idx = std::min(minimum_required_monot_col_idx, p->clust_start_monot_col_idx);
         }
     }
 
-    // if there are no unfinished clusters then set the start index one after current global column index
-    if (minimum_required_monot_col_idx == std::numeric_limits<int64_t>::max())
-        minimum_required_monot_col_idx = job.ring_buffer_current_monot_col_idx + 1;
+    // replace the old list of potential cluster roots
+    potential_cluster_roots_ = unfinished_cluster_roots;
 
-    PublishingJob next_job;
-    next_job.ring_buffer_current_monot_col_idx = job.ring_buffer_current_monot_col_idx;
-    next_job.ring_buffer_min_required_monot_col_idx = minimum_required_monot_col_idx;
+    // if no unfinished clusters, set start index one after current column
+    if (minimum_required_monot_col_idx == std::numeric_limits<int64_t>::max())
+        minimum_required_monot_col_idx = job.current_monot_col_idx + 1;
+
+    PointCollectionJob next_job;
+    next_job.current_monot_col_idx = job.current_monot_col_idx;
+    next_job.min_required_monot_col_idx = minimum_required_monot_col_idx;
     next_job.cluster_roots = std::move(finished_cluster_roots);
-    publishing_thread_pool.enqueue(std::move(next_job));
+    point_collection_thread_pool_.enqueue(std::move(next_job));
 }
 
-void ContinuousClustering::collectPointsForCusterAndPublish(PublishingJob&& job)
+void ContinuousClustering::collectPointsForCusterAndPublish(PointCollectionJob&& job)
 {
     // keep track of minimum stamp for this message
     uint64_t min_stamp_for_this_msg = std::numeric_limits<uint64_t>::max();
@@ -951,11 +931,10 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PublishingJob&& job)
     }
 
     if (finished_column_callback_)
-        finished_column_callback_(
-            sc_first_unpublished_monot_col_idx, job.ring_buffer_min_required_monot_col_idx - 1, false);
-    sc_first_unpublished_monot_col_idx = job.ring_buffer_min_required_monot_col_idx;
+        finished_column_callback_(min_unfinished_monot_col_idx_, job.min_required_monot_col_idx - 1, false);
+    min_unfinished_monot_col_idx_ = job.min_required_monot_col_idx;
 
-    // the cols are not cleared here but in the edge generation/association step 
+    // the cols are not cleared here but in the edge generation/association step
 }
 
 void ContinuousClustering::clearColumns(int64_t from_monot_col_idx, int64_t to_monot_col_idx)
@@ -963,10 +942,9 @@ void ContinuousClustering::clearColumns(int64_t from_monot_col_idx, int64_t to_m
     if (to_monot_col_idx < from_monot_col_idx)
         return;
 
-    for (int64_t monot_col_idx = from_monot_col_idx; monot_col_idx <= to_monot_col_idx;
-         monot_col_idx++)
+    for (int64_t monot_col_idx = from_monot_col_idx; monot_col_idx <= to_monot_col_idx; monot_col_idx++)
     {
-        int col_idx = static_cast<int>(monot_col_idx % ring_buffer_max_columns);
+        int col_idx = static_cast<int>(monot_col_idx % num_columns_);
 
         for (int row_index = 0; row_index < num_rows_; row_index++)
         {
@@ -988,7 +966,7 @@ void ContinuousClustering::clearColumns(int64_t from_monot_col_idx, int64_t to_m
             pixel.col_idx = 0;
             pixel.row_idx = 0;
             pixel.monot_azimuth_angle = std::nan("");
-            pixel.monot_col_idx = -1;            
+            pixel.monot_col_idx = -1;
             pixel.globally_unique_point_index = static_cast<uint64_t>(-1);
 
             // ground point segmentation
@@ -1019,15 +997,15 @@ void ContinuousClustering::clearColumns(int64_t from_monot_col_idx, int64_t to_m
 
 void ContinuousClustering::recordJobQueueWorkload(size_t num_jobs_sensor_input)
 {
-    if (stop_statistics)
+    if (stop_statistics_)
         return;
-    num_pending_jobs.push_back(num_jobs_sensor_input);
-    num_pending_jobs.push_back(insertion_thread_pool.getNumberOfUnprocessedJobs());
-    num_pending_jobs.push_back(segmentation_thread_pool.getNumberOfUnprocessedJobs());
-    num_pending_jobs.push_back(association_thread_pool.getNumberOfUnprocessedJobs());
-    num_pending_jobs.push_back(publishing_thread_pool.getNumberOfUnprocessedJobs());
-    while (num_pending_jobs.size() > 100000 * 5)
-        num_pending_jobs.pop_front();
+    num_pending_jobs_.push_back(num_jobs_sensor_input);
+    num_pending_jobs_.push_back(range_image_thread_pool_.getNumberOfUnprocessedJobs());
+    num_pending_jobs_.push_back(ground_segmentation_thread_pool_.getNumberOfUnprocessedJobs());
+    num_pending_jobs_.push_back(union_find_thread_pool_.getNumberOfUnprocessedJobs());
+    num_pending_jobs_.push_back(point_collection_thread_pool_.getNumberOfUnprocessedJobs());
+    while (num_pending_jobs_.size() > 100000 * 5)
+        num_pending_jobs_.pop_front();
 }
 
 } // namespace continuous_clustering

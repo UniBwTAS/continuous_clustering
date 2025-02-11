@@ -180,8 +180,8 @@ class KittiDemo
         for (int relative_column_index = 0; relative_column_index < num_columns_to_publish; ++relative_column_index)
         {
             // get local column index from global column index
-            int ring_buffer_col_idx = static_cast<int>((from_monot_col_idx + relative_column_index) %
-                                                                  clustering.ring_buffer_max_columns);
+            int ring_buf_col_idx = static_cast<int>((from_monot_col_idx + relative_column_index) %
+                                                                  clustering.num_columns_);
 
             // variables to check if a frame is finished
             bool new_frame = false;
@@ -190,7 +190,7 @@ class KittiDemo
             {
                 // get processed point
                 const Pixel& point =
-                    clustering.range_image_[ring_buffer_col_idx * clustering.num_rows_ + row_index];
+                    clustering.range_image_[ring_buf_col_idx * clustering.num_rows_ + row_index];
 
                 // check if cell in range image contains point
                 if (point.globally_unique_point_index != static_cast<uint64_t>(-1))
@@ -278,7 +278,7 @@ class KittiDemo
             // init some other configs
             Configuration config;
             config.general.is_single_threaded = true;
-            config.range_image.num_columns = 2200;
+            config.range_image.num_columns_rot = 2200;
             config.clustering.ignore_pixels_in_chessboard_pattern = false;
             config.clustering.max_distance = 0.5;
 

@@ -29,8 +29,8 @@ struct GeneralConfiguration
 struct ContinuousRangeImageConfiguration
 {
     bool sensor_is_clockwise{true};
-    int num_columns{1700}; // rows are automatically read from number of points in firing
-    bool supplement_inclination_angle_for_nan_cells{true};
+    int num_columns_rot{1700}; // rows are automatically read from number of points in firing
+    bool supplement_elevation_angle_for_nan_cells{true};
 };
 
 struct ContinuousGroundSegmentationConfiguration
@@ -60,7 +60,7 @@ struct ContinuousGroundSegmentationConfiguration
     bool fog_filtering_enabled{false};
     uint8_t fog_filtering_intensity_below{2};
     float fog_filtering_distance_below{18};
-    float fog_filtering_inclination_above{-0.06};
+    float fog_filtering_elevation_above{-0.06};
 
     // TODO: ego bounding box + frame!
 };
@@ -70,10 +70,10 @@ struct ContinuousClusteringConfiguration
     float max_distance{0.7};
     int max_steps_in_row{20};
     int max_steps_in_column{20};
-    bool stop_after_association_enabled{true};
-    int stop_after_association_min_steps{1};
+    bool stop_after_first_edge_enabled{true};
+    int stop_after_first_edge_min_steps{1};
     bool ignore_pixels_in_chessboard_pattern{true};
-    bool ignore_pixels_with_too_big_inclination_angle_diff{true};
+    bool ignore_pixels_with_too_big_elevation_angle_diff{true};
     bool use_last_point_for_cluster_stamp{false};
 };
 
@@ -101,11 +101,12 @@ struct Pixel
     uint16_t row_idx{0};
     double monot_azimuth_angle{std::nan("")};
     int64_t monot_col_idx{-1};
-    uint64_t globally_unique_point_index{static_cast<uint64_t>(-1)};  // only for evaluation purposes: link to original point index in dataset
+    uint64_t globally_unique_point_index{
+        static_cast<uint64_t>(-1)}; // only for evaluation purposes: link to original point index in dataset
 
     // ground point segmentation
     uint8_t ground_point_label{0};
-    bool is_ignored{false}; 
+    bool is_ignored{false};
     float height_over_ground{std::nanf("")};
     uint8_t debug_ground_point_label{WHITE};
 
@@ -135,21 +136,27 @@ struct InsertionJob
 
 struct SegmentationJob
 {
-    int64_t ring_buffer_current_monot_col_idx;
+    int64_t current_monot_col_idx;
     Eigen::Isometry3d odom_frame_from_sensor_frame;
 };
 
-struct AssociationJob
+struct UnionFindJob
 {
-    int64_t ring_buffer_current_monot_col_idx;
+    int64_t current_monot_col_idx;
 };
 
-struct PublishingJob
+struct FinishedClusterExtractionJob
 {
-    int64_t ring_buffer_current_monot_col_idx;
-    int64_t ring_buffer_min_required_monot_col_idx;
+    int64_t current_monot_col_idx;
+    double min_monot_azimuth_angle_in_col;
+};
 
-    std::list<Pixel*> cluster_roots;
+struct PointCollectionJob
+{
+    int64_t current_monot_col_idx;
+    int64_t min_required_monot_col_idx;
+
+    std::vector<Pixel*> cluster_roots;
 };
 
 class ContinuousClustering
@@ -191,12 +198,13 @@ class ContinuousClustering
 
     // continuous clustering
     inline bool checkClusteringCondition(const Pixel& pixel_a, const Pixel& pixel_b) const;
-    inline bool traverseFieldOfView(Pixel& pixel, float max_angle_diff, int ring_buffer_first_col_idx);
-    inline void performUnionFindForColumn(AssociationJob&& job);
-    inline void collectPointsForCusterAndPublish(PublishingJob&& job);
+    inline bool findEdgesInFieldOfView(Pixel& pixel, float max_angle_diff, int ring_buf_first_col_idx);
+    inline void performUnionFindForColumn(UnionFindJob&& job);
+    inline void extractFinishedClusters(FinishedClusterExtractionJob&& job);
+    inline void collectPointsForCusterAndPublish(PointCollectionJob&& job);
     inline void clearColumns(int64_t from_monot_col_idx, int64_t to_monot_col_idx);
 
-  public: // TODO: UF
+  public:
     // union find
     inline void make_set(Pixel* pixel, float max_angle_diff);
     inline Pixel* find_set(Pixel* pixel);
@@ -204,48 +212,45 @@ class ContinuousClustering
     inline void print_set(Pixel* pixel, std::vector<Pixel>& v);
 
   public:
-    // range image (implemented as ring buffer)
-    int ring_buffer_max_columns{0};
-    int num_columns_{};
-    int num_rows_{-1};
+    // continuous range image generation
     std::vector<Pixel> range_image_{0};
-    int64_t ring_buffer_start_monot_col_idx{};
-    int64_t ring_buffer_end_monot_col_idx{};
+    int num_rows_{-1};
+    int num_columns_{0};
+    int num_columns_rot_{};
+    float azimuth_width_per_column_{};
+    int64_t ring_buf_start_monot_col_idx_{};
+    int64_t ring_buf_end_monot_col_idx_{};
 
   private:
     Configuration config_;
 
-    // continuous range image generation (srig)
-    float srig_azimuth_width_per_column{};
-    int64_t srig_previous_monot_col_idx_of_rearmost_laser{0};
-    int64_t srig_previous_monot_col_idx_of_foremost_laser{0};
-    int64_t srig_first_unfinished_monot_col_idx{-1};
-    Eigen::Vector3d srig_sensor_position{0, 0, 0};
-    bool reset_required{false};
+    // continuous range image generation
+    int64_t min_incomlete_monot_col_idx_{0};
+    int64_t min_unfinished_monot_col_idx_{-1};
+    Eigen::Vector3d sensor_position_{0, 0, 0};
+    bool reset_required_{false};
 
-    // continuous ground point segmentation (sgps)
-    Point3D sgps_sensor_position{0, 0, 0};
-    std::unique_ptr<Eigen::Isometry3d> sgps_ego_robot_frame_from_sensor_frame_;
+    // continuous ground point segmentation
+    Point3D sensor_position_point_{0, 0, 0};
+    std::unique_ptr<Eigen::Isometry3d> ego_robot_frame_from_sensor_frame_;
 
-    // continuous clustering (sc)
-    float max_distance_squared{0.7 * 0.7};
-    int64_t sc_first_unpublished_monot_col_idx{-1};
-    std::list<Pixel*> sc_potential_cluster_roots_;
-    uint64_t sc_cluster_counter_{1};
-    std::vector<float> sc_inclination_angles_between_lasers_;
+    // clustering (union find & cluster extraction & point collection)
+    float max_distance_squared_{0.7 * 0.7};
+    std::vector<float> elevation_angles_between_lasers_;
+    std::vector<Pixel*> potential_cluster_roots_;
     std::function<void(int64_t, int64_t, bool)> finished_column_callback_;
     std::function<void(const std::vector<Pixel>&, uint64_t)> finished_cluster_callback_;
 
     // multi-threading
-    ThreadPool<InsertionJob> insertion_thread_pool{"I"};
-    ThreadPool<SegmentationJob> segmentation_thread_pool{"S"};
-    ThreadPool<AssociationJob> association_thread_pool{"A"};
-    ThreadPool<PublishingJob> publishing_thread_pool{"P"};
-    bool do_sequential_execution{false};
+    ThreadPool<InsertionJob> range_image_thread_pool_{"R"};
+    ThreadPool<SegmentationJob> ground_segmentation_thread_pool_{"S"};
+    ThreadPool<UnionFindJob> union_find_thread_pool_{"U"};
+    ThreadPool<PointCollectionJob> point_collection_thread_pool_{"C"};
+    bool do_sequential_execution_{false};
 
     // performance statistics
-    bool stop_statistics = false;
-    std::list<size_t> num_pending_jobs;
+    bool stop_statistics_ = false;
+    std::list<size_t> num_pending_jobs_;
 };
 } // namespace continuous_clustering
 

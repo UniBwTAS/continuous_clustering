@@ -53,12 +53,12 @@ sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousClustering& clust
 
     for (int message_column_index = 0; message_column_index < msg->width; ++message_column_index)
     {
-        int ring_buffer_col_idx =
-            static_cast<int>((from_monot_col_idx + message_column_index) % clustering.ring_buffer_max_columns);
+        int ring_buf_col_idx =
+            static_cast<int>((from_monot_col_idx + message_column_index) % clustering.num_columns_);
         for (int row_index = 0; row_index < clustering.num_rows_; ++row_index)
         {
             const Pixel& point =
-                clustering.range_image_[ring_buffer_col_idx * clustering.num_rows_ + row_index];
+                clustering.range_image_[ring_buf_col_idx * clustering.num_rows_ + row_index];
             int data_index_message = row_index * static_cast<int>(msg->width) + message_column_index;
             addPointToMessage(container, data_index_message, point, clustering.num_rows_, fill_fields_up_to_stage);
 
@@ -71,7 +71,7 @@ sensor_msgs::PointCloud2Ptr columnToPointCloud(const ContinuousClustering& clust
         msg->header.stamp.fromNSec(minimum_point_stamp);
     /*else
         ROS_WARN_STREAM("This column had no timestamps. Unable to publish message with timestamp. Local Column Index: "
-                        << from_monot_col_idx % clustering.num_columns_ << ", " << num_columns_to_publish);*/
+                        << from_monot_col_idx % clustering.num_columns_rot_ << ", " << num_columns_to_publish);*/
 
     return msg;
 }

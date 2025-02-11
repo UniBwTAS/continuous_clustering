@@ -14,11 +14,11 @@
     <arg name="ego_robot_frame" default="velo_link"/>
 
     <!-- range image parameters -->
-    <arg name="num_columns" default="2200"/>
+    <arg name="num_columns_rot" default="2200"/>
 
     <!-- clustering parameters -->
     <arg name="ignore_points_in_chessboard_pattern" default="false"/>
-    <arg name="ignore_points_with_too_big_inclination_angle_diff" default="false"/>
+    <arg name="ignore_points_with_too_big_elevation_angle_diff" default="false"/>
 
     <!-- clustering -->
     <include file="$(find continuous_clustering)/launch/sensor_generic.launch" pass_all_args="true"/>

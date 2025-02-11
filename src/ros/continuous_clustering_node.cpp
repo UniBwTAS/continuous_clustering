@@ -190,9 +190,9 @@ class RosContinuousClustering
 
         // config for range image
         config_.range_image.sensor_is_clockwise = config.sensor_is_clockwise;
-        config_.range_image.num_columns = config.num_columns;
-        config_.range_image.supplement_inclination_angle_for_nan_cells =
-            config.supplement_inclination_angle_for_nan_cells;
+        config_.range_image.num_columns_rot = config.num_columns_rot;
+        config_.range_image.supplement_elevation_angle_for_nan_cells =
+            config.supplement_elevation_angle_for_nan_cells;
 
         // config for ground segmentation
         config_.ground_segmentation.max_slope = static_cast<float>(config.max_slope);
@@ -216,18 +216,18 @@ class RosContinuousClustering
         config_.ground_segmentation.fog_filtering_intensity_below = config.fog_filtering_intensity_below;
         config_.ground_segmentation.fog_filtering_distance_below =
             static_cast<float>(config.fog_filtering_distance_below);
-        config_.ground_segmentation.fog_filtering_inclination_above =
-            static_cast<float>(config.fog_filtering_inclination_above);
+        config_.ground_segmentation.fog_filtering_elevation_above =
+            static_cast<float>(config.fog_filtering_elevation_above);
 
         // config for clustering
         config_.clustering.max_distance = static_cast<float>(config.max_distance);
         config_.clustering.max_steps_in_row = config.max_steps_in_row;
         config_.clustering.max_steps_in_column = config.max_steps_in_column;
-        config_.clustering.stop_after_association_enabled = config.stop_after_association_enabled;
-        config_.clustering.stop_after_association_min_steps = config.stop_after_association_min_steps;
+        config_.clustering.stop_after_first_edge_enabled = config.stop_after_first_edge_enabled;
+        config_.clustering.stop_after_first_edge_min_steps = config.stop_after_first_edge_min_steps;
         config_.clustering.ignore_pixels_in_chessboard_pattern = config.ignore_pixels_in_chessboard_pattern;
-        config_.clustering.ignore_pixels_with_too_big_inclination_angle_diff =
-            config.ignore_pixels_with_too_big_inclination_angle_diff;
+        config_.clustering.ignore_pixels_with_too_big_elevation_angle_diff =
+            config.ignore_pixels_with_too_big_elevation_angle_diff;
         config_.clustering.use_last_point_for_cluster_stamp = config.use_last_point_for_cluster_stamp;
 
         clustering_.setConfiguration(config_);
