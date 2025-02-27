@@ -584,6 +584,24 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
                 continue;
             }
         }
+        else if (config_.clustering.ignore_pixels_in_every_second_row)
+        {
+            bool row_even = row_index % 2 == 0;
+            if (row_even)
+            {
+                pixel.is_ignored = true;
+                continue;
+            }
+        }
+        else if (config_.clustering.ignore_pixels_in_every_second_column)
+        {
+            bool column_even = pixel.monot_col_idx % 2 == 0;
+            if (column_even)
+            {
+                pixel.is_ignored = true;
+                continue;
+            }
+        }
     }
 
     if (finished_column_callback_)
@@ -610,7 +628,7 @@ bool ContinuousClustering::checkClusteringCondition(const Pixel& pixel_a, const 
     return (pixel_a.xyz - pixel_b.xyz).lengthSquared() < max_distance_squared_;
 }
 
-void ContinuousClustering::make_set(Pixel* pixel, float min_req_angle_diff)
+void ContinuousClustering::make_set(Pixel* pixel, float half_angular_fov)
 {
     // regular union find algorithm
     pixel->parent = pixel;
@@ -620,7 +638,7 @@ void ContinuousClustering::make_set(Pixel* pixel, float min_req_angle_diff)
     pixel->next = pixel;
 
     // extension for finished cluster extraction
-    pixel->finished_at_monot_azimuth_angle = pixel->monot_azimuth_angle + min_req_angle_diff;
+    pixel->finished_at_monot_azimuth_angle = pixel->monot_azimuth_angle + half_angular_fov;
     pixel->is_potential_cluster_root = false;
 
     // infinite cluster detection (e.g. in a closed room or tunnel)
@@ -712,11 +730,11 @@ void ContinuousClustering::print_set(Pixel* pixel, std::vector<Pixel>& v)
     }
 }
 
-bool ContinuousClustering::findEdgesInFieldOfView(Pixel& pixel, float min_req_angle_diff, int ring_buf_first_col_idx)
+bool ContinuousClustering::findEdgesInFieldOfView(Pixel& pixel, float half_angular_fov, int ring_buf_first_col_idx)
 {
     // go left each column until azimuth angle difference gets too large
     bool at_least_one_edge = false;
-    int required_steps_back = static_cast<int>(std::ceil(min_req_angle_diff / azimuth_width_per_column_));
+    int required_steps_back = static_cast<int>(std::ceil(half_angular_fov / azimuth_width_per_column_));
     required_steps_back = std::min(required_steps_back, config_.clustering.max_steps_in_row);
     int64_t other_col_idx = pixel.col_idx;
     for (int num_steps_back = 0; num_steps_back <= required_steps_back; num_steps_back++)
@@ -740,7 +758,7 @@ bool ContinuousClustering::findEdgesInFieldOfView(Pixel& pixel, float min_req_an
                 pixel.number_of_visited_neighbors += 1;
 
                 // no cluster can be associated because the elevation angle diff gets too large
-                if (std::abs(pixel_other.elevation_angle - pixel.elevation_angle) > min_req_angle_diff)
+                if (std::abs(pixel_other.elevation_angle - pixel.elevation_angle) > half_angular_fov)
                     break;
 
                 // if other pixel is ignored or has already the same tree root then do nothing (*1)
@@ -808,13 +826,13 @@ void ContinuousClustering::performUnionFindForColumn(UnionFindJob&& job)
             continue;
 
         // calculate minimum required angle diff to consider at which no further pixel can be linked to this pixel
-        float min_req_angle_diff = std::asin(config_.clustering.max_distance / pixel.distance);
+        float half_angular_fov = std::asin(config_.clustering.max_distance / pixel.distance);
 
         // initialize a new cluster containing only this pixel (initialize for union find)
-        make_set(&pixel, min_req_angle_diff);
+        make_set(&pixel, half_angular_fov);
 
         // traverse field of view
-        bool neighbor_found = findEdgesInFieldOfView(pixel, min_req_angle_diff, ring_buf_first_col_idx);
+        bool neighbor_found = findEdgesInFieldOfView(pixel, half_angular_fov, ring_buf_first_col_idx);
         if (!neighbor_found)
         {
             pixel.is_potential_cluster_root = true;
@@ -920,7 +938,7 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PointCollectionJob&&
             min_stamp_for_this_msg = min_stamp_for_this_cluster;
 
         // publish pixels (TODO: make threshold configurable)
-        if (pixels_of_cluster.size() > 20 && finished_cluster_callback_)
+        if (finished_cluster_callback_)
         {
             uint64_t stamp_cluster =
                 config_.clustering.use_last_point_for_cluster_stamp ?

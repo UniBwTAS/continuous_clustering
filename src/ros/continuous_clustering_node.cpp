@@ -226,6 +226,8 @@ class RosContinuousClustering
         config_.clustering.stop_after_first_edge_enabled = config.stop_after_first_edge_enabled;
         config_.clustering.stop_after_first_edge_min_steps = config.stop_after_first_edge_min_steps;
         config_.clustering.ignore_pixels_in_chessboard_pattern = config.ignore_pixels_in_chessboard_pattern;
+        config_.clustering.ignore_pixels_in_every_second_row = config.ignore_pixels_in_every_second_row;
+        config_.clustering.ignore_pixels_in_every_second_column = config.ignore_pixels_in_every_second_column;
         config_.clustering.ignore_pixels_with_too_big_elevation_angle_diff =
             config.ignore_pixels_with_too_big_elevation_angle_diff;
         config_.clustering.use_last_point_for_cluster_stamp = config.use_last_point_for_cluster_stamp;

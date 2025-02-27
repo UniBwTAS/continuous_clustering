@@ -73,6 +73,8 @@ struct ContinuousClusteringConfiguration
     bool stop_after_first_edge_enabled{true};
     int stop_after_first_edge_min_steps{1};
     bool ignore_pixels_in_chessboard_pattern{true};
+    bool ignore_pixels_in_every_second_row{false};
+    bool ignore_pixels_in_every_second_column{false};
     bool ignore_pixels_with_too_big_elevation_angle_diff{true};
     bool use_last_point_for_cluster_stamp{false};
 };
