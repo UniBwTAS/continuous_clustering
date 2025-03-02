@@ -754,9 +754,6 @@ void ContinuousClustering::performUnionFindForColumn(UnionFindJob&& job)
     ring_buf_start_monot_col_idx_ = min_unfinished_monot_col_idx_;
     clearColumns(prev_ring_buf_start_monot_col_idx, ring_buf_start_monot_col_idx_ - 1);
 
-    // keep track of the minimum azimuth angle of all points in the current column
-    double min_monot_azimuth_angle_in_col = std::numeric_limits<double>::max();
-
     // get actual start index of ring buffer start (used lower bound to calculate left edge of FoV window)
     int ring_buf_first_col_idx = static_cast<int>(min_unfinished_monot_col_idx_ % num_columns_);
 
@@ -767,9 +764,6 @@ void ContinuousClustering::performUnionFindForColumn(UnionFindJob&& job)
     {
         // get current pixel (range image is stored in column-major order)
         Pixel& pixel = range_image_[current_col_idx * num_rows_ + row_index];
-
-        // keep track of the current minimum continuous azimuth angle
-        min_monot_azimuth_angle_in_col = std::min(min_monot_azimuth_angle_in_col, pixel.monot_azimuth_angle);
 
         // check whether pixel should be ignored
         if (pixel.is_ignored)
@@ -796,7 +790,6 @@ void ContinuousClustering::performUnionFindForColumn(UnionFindJob&& job)
 
     FinishedClusterExtractionJob next_job;
     next_job.current_monot_col_idx = job.current_monot_col_idx;
-    next_job.min_monot_azimuth_angle_in_col = min_monot_azimuth_angle_in_col;
     extractFinishedClusters(
         std::move(next_job)); // it has to run in the same thread as both access/modify list of potential cluster roots!
 }
@@ -810,6 +803,9 @@ void ContinuousClustering::extractFinishedClusters(FinishedClusterExtractionJob&
     std::vector<Pixel*> finished_cluster_roots;
     std::vector<Pixel*> unfinished_cluster_roots;
 
+    // calculate monotonic azimuth angle of current column
+    double monot_azimuth_angle_of_col = job.current_monot_col_idx * static_cast<double>(azimuth_width_per_column_);
+
     // iterate over potential cluster roots
     for (Pixel* p : potential_cluster_roots_)
     {
@@ -818,7 +814,7 @@ void ContinuousClustering::extractFinishedClusters(FinishedClusterExtractionJob&
             continue;
 
         // check whether no more points can be added to this cluster
-        if (job.min_monot_azimuth_angle_in_col > p->finished_at_monot_azimuth_angle)
+        if (monot_azimuth_angle_of_col > p->finished_at_monot_azimuth_angle)
         {
             finished_cluster_roots.push_back(p);
         }

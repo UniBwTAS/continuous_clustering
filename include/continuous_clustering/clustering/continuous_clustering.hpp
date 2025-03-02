@@ -146,7 +146,6 @@ struct UnionFindJob
 struct FinishedClusterExtractionJob
 {
     int64_t current_monot_col_idx;
-    double min_monot_azimuth_angle_in_col;
 };
 
 struct PointCollectionJob
