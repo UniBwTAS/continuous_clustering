@@ -47,10 +47,6 @@ struct ContinuousGroundSegmentationConfiguration
     float ground_because_close_to_last_certain_ground_max_dist_diff{2.0};
     float obstacle_because_next_certain_obstacle_max_dist_diff{0.3};
 
-    // Segmentation by terrain
-    bool use_terrain{false};
-    float terrain_max_allowed_z_diff{0.4};
-
     // Detection of points on the ego robot
     float height_ref_to_maximum_{}, height_ref_to_ground_{};
     float length_ref_to_front_end_{}, length_ref_to_rear_end_{};

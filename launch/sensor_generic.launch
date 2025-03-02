@@ -41,7 +41,6 @@
     <arg name="supplement_elevation_angle_for_nan_cells" default="true" doc="use artificial elevation angles"/>
 
     <!-- ground point segmentation parameters -->
-    <arg name="use_terrain" default="False" doc="whether to use terrain (currently not supported!)"/>
     <arg name="fog_filtering_enabled" default="False" doc="whether to try to filter points originating from fog"/>
     <arg name="fog_filtering_intensity_below" default="2" doc="this cond. + others to consider as fog point"/>
     <arg name="fog_filtering_distance_below" default="18" doc="this cond. + others to consider as fog point"/>
@@ -87,8 +86,6 @@
                    value="$(arg supplement_elevation_angle_for_nan_cells)"/>
 
             <!-- ground point segmentation -->
-            <remap from="terrain" to="/perception/static_environment_model/estimated_terrain/anre"/>
-            <param name="use_terrain" value="$(arg use_terrain)"/>
             <param name="fog_filtering_enabled" value="$(arg fog_filtering_enabled)"/>
             <param name="fog_filtering_intensity_below" value="$(arg fog_filtering_intensity_below)"/>
             <param name="fog_filtering_distance_below" value="$(arg fog_filtering_distance_below)"/>

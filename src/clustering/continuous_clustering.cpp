@@ -125,12 +125,6 @@ void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
         if (std::isnan(p.x()))
             continue;
 
-        // transform point into odom
-        Eigen::Vector3d p_odom = job.odom_frame_from_sensor_frame * p;
-
-        // get point relative to sensor origin
-        Eigen::Vector3d p_odom_rel = p_odom - sensor_position_;
-
         // calculate azimuth angle
         float azimuth_angle = std::atan2(static_cast<float>(p.y()), static_cast<float>(p.x()));
 
@@ -177,7 +171,7 @@ void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
         double monot_azimuth_angle = (2 * M_PI) * static_cast<double>(rotation_index) + increasing_azimuth_angle;
 
         // in case this cell is already occupied, try next column
-        auto distance = static_cast<float>(p_odom_rel.norm());
+        auto distance = static_cast<float>(p.norm());
         if (!std::isnan(pixel->distance) && !std::isnan(distance))
         {
             int next_col_idx = col_idx + 1;
@@ -211,7 +205,11 @@ void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
         // fill pixel data
         if (!laser_too_far_behind)
         {
-            pixel->xyz.x = static_cast<float>(p_odom.x());
+            // transform point into odom
+            Eigen::Vector3d p_odom = job.odom_frame_from_sensor_frame * p;
+
+            // fill pixel data
+            pixel->xyz.x = static_cast<float>(p_odom.x()); // TODO: make transform at a later point in time?
             pixel->xyz.y = static_cast<float>(p_odom.y());
             pixel->xyz.z = static_cast<float>(p_odom.z());
             pixel->firing_idx = raw_point.firing_index;
@@ -219,7 +217,7 @@ void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
             pixel->stamp_ns = raw_point.stamp;
             pixel->distance = distance;
             pixel->azimuth_angle = azimuth_angle;
-            pixel->elevation_angle = std::asin(static_cast<float>(p_odom_rel.z()) / pixel->distance);
+            pixel->elevation_angle = std::asin(static_cast<float>(p.z()) / pixel->distance);
             pixel->monot_azimuth_angle = monot_azimuth_angle; // omitted cells will be filled again later
             pixel->col_idx = col_idx;
             pixel->row_idx = row_idx;
@@ -408,7 +406,6 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
         Point2D previous_to_current = current_position_wrt_sensor_2d - previous_position_wrt_sensor_2d;
         float slope_to_prev = previous_to_current.y / previous_to_current.x;
         bool is_flat_wrt_prev = std::abs(slope_to_prev) < c.max_slope && previous_to_current.x > 0;
-        is_flat_wrt_prev = is_flat_wrt_prev && (!c.use_terrain || previous_to_current.x < 5); // TODO: Magic number
 
         // calculate slope w.r.t. last seen (quite certain) ground point
         Point2D last_ground_position_wrt_sensor_2d = to2dInAzimuthPlane(last_ground_position_wrt_sensor);
@@ -424,55 +421,16 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
         }
         else // try to find remaining ground points
         {
-            if (c.use_terrain)
+            if (first_obstacle_detected && is_flat_wrt_prev && is_flat_wrt_last_ground)
             {
-                /*if (last_terrain_msg_)
-                {
-                    auto& info = last_terrain_msg_->info;
-                    Point3D terrain_min_corner(static_cast<float>(info.pose.position.x - info.length_x / 2),
-                                               static_cast<float>(info.pose.position.y - info.length_y / 2),
-                                               static_cast<float>(info.pose.position.z));
-                    Point3D current_position_in_terrain = current_position - terrain_min_corner;
-                    auto& data = last_terrain_msg_->data[0];
-                    int num_cells_x = static_cast<int>(data.layout.dim[0].size);
-                    int num_cells_y = static_cast<int>(data.layout.dim[1].size);
-                    int idx_x = num_cells_x -
-                                static_cast<int>(
-                                    std::floor(current_position_in_terrain.x / static_cast<float>(info.resolution))) -
-                                1;
-                    int idx_y = num_cells_y -
-                                static_cast<int>(
-                                    std::floor(current_position_in_terrain.y / static_cast<float>(info.resolution))) -
-                                1;
-                    if (idx_x >= 0 && idx_x < num_cells_x && idx_y >= 0 && idx_y < num_cells_y)
-                    {
-                        uint32_t data_idx = idx_y * num_cells_x + idx_x;
-                        if (data_idx >= 0 && data_idx < data.data.size())
-                        {
-                            float relative_height = current_position.z - data.data[data_idx];
-                            if (std::abs(relative_height) < c.terrain_max_allowed_z_diff)
-                            {
-                                point.ground_point_label = GP_GROUND;
-                                point.debug_ground_point_label = BURLYWOOD;
-                            }
-                        }
-                    }
-                }*/
+                pixel.ground_point_label = GP_GROUND;
+                pixel.debug_ground_point_label = YELLOWGREEN;
             }
-            else
+            else if (std::abs(last_ground_to_current.x) < c.ground_because_close_to_last_certain_ground_max_dist_diff &&
+                     std::abs(last_ground_to_current.y) < c.ground_because_close_to_last_certain_ground_max_z_diff)
             {
-                if (first_obstacle_detected && is_flat_wrt_prev && is_flat_wrt_last_ground)
-                {
-                    pixel.ground_point_label = GP_GROUND;
-                    pixel.debug_ground_point_label = YELLOWGREEN;
-                }
-                else if (std::abs(last_ground_to_current.x) <
-                             c.ground_because_close_to_last_certain_ground_max_dist_diff &&
-                         std::abs(last_ground_to_current.y) < c.ground_because_close_to_last_certain_ground_max_z_diff)
-                {
-                    pixel.ground_point_label = GP_GROUND;
-                    pixel.debug_ground_point_label = YELLOW;
-                }
+                pixel.ground_point_label = GP_GROUND;
+                pixel.debug_ground_point_label = YELLOW;
             }
         }
 
@@ -521,14 +479,6 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
             {
                 last_ground_position_wrt_sensor = current_position_wrt_sensor;
             }
-            /*else if (previous_label == YELLOW)
-            {
-                pixel.debug_ground_point_label = CYAN;
-            }
-            else
-            {
-                pixel.debug_ground_point_label = BLACK;
-            }*/
         }
 
         // keep track of previous point

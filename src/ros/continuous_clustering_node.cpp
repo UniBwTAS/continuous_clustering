@@ -179,12 +179,6 @@ class RosContinuousClustering
 
     void callbackReconfigure(ContinuousClusteringConfig& config, uint32_t level)
     {
-        // check parameter changes that need additional handling
-        if (!config_.ground_segmentation.use_terrain && config.use_terrain)
-            sub_terrain = nh_.subscribe("terrain", 1, &RosContinuousClustering::onNewTerrainCallback, this);
-        else if (config_.ground_segmentation.use_terrain && !config.use_terrain)
-            sub_terrain.shutdown();
-
         // general config
         config_.general.is_single_threaded = config.is_single_threaded;
 
@@ -210,8 +204,6 @@ class RosContinuousClustering
             static_cast<float>(config.ground_because_close_to_last_certain_ground_max_dist_diff);
         config_.ground_segmentation.obstacle_because_next_certain_obstacle_max_dist_diff =
             static_cast<float>(config.obstacle_because_next_certain_obstacle_max_dist_diff);
-        config_.ground_segmentation.use_terrain = config.use_terrain;
-        config_.ground_segmentation.terrain_max_allowed_z_diff = static_cast<float>(config.terrain_max_allowed_z_diff);
         config_.ground_segmentation.fog_filtering_enabled = config.fog_filtering_enabled;
         config_.ground_segmentation.fog_filtering_intensity_below = config.fog_filtering_intensity_below;
         config_.ground_segmentation.fog_filtering_distance_below =
@@ -235,12 +227,6 @@ class RosContinuousClustering
         clustering_.setConfiguration(config_);
     }
 
-    void onNewTerrainCallback(const grid_map_msgs::GridMap::ConstPtr& msg)
-    {
-        last_terrain_msg_ = msg;
-        // TODO: Add it!
-    }
-
   private:
     ContinuousClustering clustering_;
 
@@ -252,7 +238,6 @@ class RosContinuousClustering
     ros::NodeHandle nh_;
     RosTransformSynchronizer<RawPoints> tf_synchronizer;
     std::shared_ptr<SensorInput> sensor_input_;
-    ros::Subscriber sub_terrain;
     ros::Publisher pub_raw_firings;
     ros::Publisher pub_ground_point_segmentation;
     ros::Publisher pub_instance_segmentation;
@@ -265,8 +250,6 @@ class RosContinuousClustering
     std::string odom_frame;
     std::string ego_robot_frame;
     bool wait_for_tf{true};
-
-    grid_map_msgs::GridMap::ConstPtr last_terrain_msg_;
 };
 
 } // namespace continuous_clustering
