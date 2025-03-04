@@ -30,7 +30,6 @@ struct ContinuousRangeImageConfiguration
 {
     bool sensor_is_clockwise{true};
     int num_columns_rot{1700}; // rows are automatically read from number of points in firing
-    bool supplement_elevation_angle_for_nan_cells{true};
 };
 
 struct ContinuousGroundSegmentationConfiguration
@@ -116,9 +115,11 @@ struct Pixel
     int64_t clust_start_monot_col_idx{-1};
     int64_t clust_end_monot_col_idx{-1};
 
-    // cluster extraction
+    // finished cluster identification
     bool is_potential_cluster_root{false};
     double finished_at_monot_azimuth_angle{0.0};
+
+    // point collection
     Pixel* next{nullptr}; // addition to regular "union find" for print/collect
     uint64_t id{0};
 
@@ -134,23 +135,18 @@ struct InsertionJob
 
 struct SegmentationJob
 {
-    int64_t current_monot_col_idx;
+    int64_t cur_monot_col_idx;
     Eigen::Isometry3d odom_frame_from_sensor_frame;
 };
 
 struct UnionFindJob
 {
-    int64_t current_monot_col_idx;
-};
-
-struct FinishedClusterExtractionJob
-{
-    int64_t current_monot_col_idx;
+    int64_t cur_monot_col_idx;
 };
 
 struct PointCollectionJob
 {
-    int64_t current_monot_col_idx;
+    int64_t cur_monot_col_idx;
     int64_t min_required_monot_col_idx;
 
     std::vector<Pixel*> cluster_roots;
@@ -195,9 +191,16 @@ class ContinuousClustering
 
     // continuous clustering
     inline bool checkClusteringCondition(const Pixel& pixel_a, const Pixel& pixel_b) const;
-    inline bool findEdgesInFieldOfView(Pixel& pixel, float max_angle_diff, int ring_buf_first_col_idx);
+    void calculateFovBounds(int64_t& fov_start_monot_col_idx,
+                            int16_t& fov_start_row_idx,
+                            int16_t& fov_end_row_idx,
+                            uint16_t cur_row_idx,
+                            int64_t cur_monot_col_idx,
+                            float half_angular_fov,
+                            float cur_elevation_angle);
+    inline bool findEdgesInFieldOfView(Pixel& pixel, float half_angular_fov, int ring_buf_first_col_idx);
     inline void performUnionFindForColumn(UnionFindJob&& job);
-    inline void extractFinishedClusters(FinishedClusterExtractionJob&& job);
+    inline void identifyFinishedClusters(int64_t cur_monot_col_idx);
     inline void collectPointsForCusterAndPublish(PointCollectionJob&& job);
     inline void clearColumns(int64_t from_monot_col_idx, int64_t to_monot_col_idx);
 
@@ -233,7 +236,7 @@ class ContinuousClustering
 
     // clustering (union find & cluster extraction & point collection)
     float max_distance_squared_{0.7 * 0.7};
-    std::vector<float> elevation_angles_between_lasers_;
+    std::vector<float> laser_elevation_angles_;
     std::vector<Pixel*> potential_cluster_roots_;
     std::function<void(int64_t, int64_t, bool)> finished_column_callback_;
     std::function<void(const std::vector<Pixel>&, uint64_t)> finished_cluster_callback_;
