@@ -281,6 +281,7 @@ class KittiDemo
             config.range_image.num_columns_rot = 2200;
             config.clustering.ignore_pixels_in_chessboard_pattern = false;
             config.clustering.max_distance = 0.5;
+            config.clustering.stop_after_first_edge_enabled = false;
 
             // ego bounding box (ref is here origin of lidar frame)
             config.ground_segmentation.height_ref_to_maximum_ = 0.5;

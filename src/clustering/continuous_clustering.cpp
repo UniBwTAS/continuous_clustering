@@ -37,7 +37,7 @@ void ContinuousClustering::reset(int num_rows)
 
     // reset members for continuous clustering
     min_unfinished_monot_col_idx_ = -1;
-    elevation_angles_between_lasers_.resize(num_rows, std::nanf(""));
+    laser_elevation_angles_.resize(num_rows, std::nanf(""));
     potential_cluster_roots_.clear();
 
     // re-initialize workers
@@ -284,7 +284,6 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
     Point3D ground_x_meter_behind_position_wrt_sensor = {0, 0, 0};
     Point3D previous_position_wrt_sensor;
     uint8_t previous_label;
-    float elevation_previous_laser = 0; // calculate difference between elevation angles for subsequent steps
 
     for (int row_index = num_rows_ - 1; row_index >= 0; row_index--)
     {
@@ -322,21 +321,14 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
 
         // keep track of (differences between) the elevation angles of the lasers (for later processing steps)
         float elevation_current_laser = range_image_[col_idx * num_rows_ + row_index].elevation_angle;
-        float diff = elevation_current_laser - elevation_previous_laser;
-        if (!std::isnan(diff))
-            elevation_angles_between_lasers_[row_index] = diff; // last value is useless but we do not use it
-        elevation_previous_laser = elevation_current_laser;
+        if (!std::isnan(elevation_current_laser))
+            laser_elevation_angles_[row_index] = elevation_current_laser;
 
         // skip NaN's
         if (std::isnan(pixel.distance))
         {
-            // use elevation angle from previous column (it is useful to supplement nan cells with an elevation
-            // angle in order to be able to break the while loop earlier during association
-            if (config_.range_image.supplement_elevation_angle_for_nan_cells && row_index < num_rows_ - 1)
-            {
-                Pixel& pixel_below = range_image_[col_idx * num_rows_ + (row_index + 1)];
-                pixel.elevation_angle = pixel_below.elevation_angle + elevation_angles_between_lasers_[row_index];
-            }
+            // fill with data if NaN (TODO: can be deleted?)
+            pixel.elevation_angle = laser_elevation_angles_[row_index];
             // recalculate continuous azimuth for omitted/NaN cells (for later processing steps)
             pixel.monot_azimuth_angle =
                 (static_cast<double>(job.current_monot_col_idx) + 0.5) * azimuth_width_per_column_;
@@ -516,12 +508,13 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
         }
 
         // ignore this pixel if the distance in combination with elevation diff can't be below distance threshold
-        if (config_.clustering.ignore_pixels_with_too_big_elevation_angle_diff && row_index < (num_rows_ - 1) &&
-            std::atan2(config_.clustering.max_distance, pixel.distance) < elevation_angles_between_lasers_[row_index])
-        {
-            pixel.is_ignored = true;
-            continue;
-        }
+        // TODO: reenable this?
+        // if (config_.clustering.ignore_pixels_with_too_big_elevation_angle_diff && row_index < (num_rows_ - 1) &&
+        //     std::atan2(config_.clustering.max_distance, pixel.distance) < laser_elevation_angles_[row_index])
+        // {
+        //     pixel.is_ignored = true;
+        //     continue;
+        // }
 
         // ignore pixels in a chessboard pattern
         if (config_.clustering.ignore_pixels_in_chessboard_pattern)
@@ -680,68 +673,67 @@ void ContinuousClustering::print_set(Pixel* pixel, std::vector<Pixel>& v)
     }
 }
 
+void ContinuousClustering::calculateFovBounds(int64_t& fov_start_monot_col_idx,
+                                              int16_t& fov_start_row_idx,
+                                              int16_t& fov_end_row_idx,
+                                              uint16_t cur_row_idx,
+                                              int64_t cur_monot_col_idx,
+                                              float half_angular_fov,
+                                              float cur_elevation_angle)
+{
+    // left bound
+    int required_steps_back = static_cast<int>(std::ceil(half_angular_fov / azimuth_width_per_column_));
+    fov_start_monot_col_idx = std::max(ring_buf_start_monot_col_idx_, cur_monot_col_idx - required_steps_back);
+
+    // upper bound
+    uint16_t row_idx = cur_row_idx;
+    while (row_idx > 0 && laser_elevation_angles_[row_idx - 1] < cur_elevation_angle + half_angular_fov)
+        row_idx--;
+    fov_start_row_idx = row_idx;
+
+    // lower bound
+    row_idx = cur_row_idx;
+    while (row_idx < num_rows_ - 1 && laser_elevation_angles_[row_idx + 1] > cur_elevation_angle - half_angular_fov)
+        row_idx++;
+    fov_end_row_idx = row_idx;
+}
+
 bool ContinuousClustering::findEdgesInFieldOfView(Pixel& pixel, float half_angular_fov, int ring_buf_first_col_idx)
 {
+    // calculate FoV bounds
+    int64_t fov_start_monot_col_idx;
+    int16_t fov_start_row_idx;
+    int16_t fov_end_row_idx;
+    calculateFovBounds(fov_start_monot_col_idx,
+                       fov_start_row_idx,
+                       fov_end_row_idx,
+                       pixel.row_idx,
+                       pixel.monot_col_idx,
+                       half_angular_fov,
+                       pixel.elevation_angle);
+
     // go left each column until azimuth angle difference gets too large
     bool at_least_one_edge = false;
-    int required_steps_back = static_cast<int>(std::ceil(half_angular_fov / azimuth_width_per_column_));
-    required_steps_back = std::min(required_steps_back, config_.clustering.max_steps_in_row);
-    int64_t other_col_idx = pixel.col_idx;
-    for (int num_steps_back = 0; num_steps_back <= required_steps_back; num_steps_back++)
+    for (int64_t other_monot_col_idx = pixel.monot_col_idx; other_monot_col_idx >= fov_start_monot_col_idx;
+         other_monot_col_idx--)
     {
-        for (int direction = -1; direction <= 1; direction += 2)
+        for (uint16_t other_row_idx = fov_start_row_idx; other_row_idx <= fov_end_row_idx; other_row_idx++)
         {
-            // do not go down in first column (these pixels are not associated to tree yet!)
-            if (direction == 1 && num_steps_back == 0)
+            if(other_monot_col_idx == pixel.monot_col_idx && other_row_idx >= pixel.row_idx)
                 continue;
 
-            // go up/down each row until the elevation angle difference gets too large
-            int num_steps_vertical = direction == 1 || num_steps_back == 0 ? 1 : 0;
-            int other_row_index = direction == 1 || num_steps_back == 0 ? pixel.row_idx + direction : pixel.row_idx;
-            while (other_row_index >= 0 && other_row_index < num_rows_ &&
-                   num_steps_vertical <= config_.clustering.max_steps_in_column)
+            // get other pixel
+            Pixel& pixel_other = range_image_[other_monot_col_idx % num_columns_ * num_rows_ + other_row_idx];
+
+            // count number of visited pixels for analyzing
+            pixel.number_of_visited_neighbors += 1;
+
+            // if other pixel is not ignored and is below the clustering threshold -> associate
+            if (!pixel_other.is_ignored && checkClusteringCondition(pixel, pixel_other))
             {
-                // get other pixel
-                Pixel& pixel_other = range_image_[other_col_idx * num_rows_ + other_row_index];
-
-                // count number of visited pixels for analyzing
-                pixel.number_of_visited_neighbors += 1;
-
-                // no cluster can be associated because the elevation angle diff gets too large
-                if (std::abs(pixel_other.elevation_angle - pixel.elevation_angle) > half_angular_fov)
-                    break;
-
-                // if other pixel is ignored or has already the same tree root then do nothing (*1)
-                if (!pixel_other.is_ignored &&
-                    checkClusteringCondition(pixel, pixel_other)) // TODO: UF make find before clustering condition?
-                {
-                    at_least_one_edge = union_set(&pixel, &pixel_other);
-                }
-
-                // stop searching if pixel was already associated and minimum number of cols were processed
-                if (pixel.parent != &pixel && config_.clustering.stop_after_first_edge_enabled &&
-                    num_steps_vertical >= config_.clustering.stop_after_first_edge_min_steps)
-                    break;
-
-                other_row_index += direction;
-                num_steps_vertical++;
+                at_least_one_edge = union_set(&pixel, &pixel_other);
             }
         }
-
-        // stop searching if pixel was already associated and minimum number of pixels were processed
-        if (pixel.parent != &pixel && config_.clustering.stop_after_first_edge_enabled &&
-            num_steps_back >= config_.clustering.stop_after_first_edge_min_steps)
-            break;
-
-        // stop searching if we are at the beginning of the ring buffer
-        if (other_col_idx == ring_buf_first_col_idx)
-            break;
-
-        other_col_idx--;
-
-        // jump to the end of the ring buffer
-        if (other_col_idx < 0)
-            other_col_idx += num_columns_;
     }
 
     return at_least_one_edge;
@@ -755,7 +747,7 @@ void ContinuousClustering::performUnionFindForColumn(UnionFindJob&& job)
     clearColumns(prev_ring_buf_start_monot_col_idx, ring_buf_start_monot_col_idx_ - 1);
 
     // get actual start index of ring buffer start (used lower bound to calculate left edge of FoV window)
-    int ring_buf_first_col_idx = static_cast<int>(min_unfinished_monot_col_idx_ % num_columns_);
+    int ring_buf_start_col_idx = static_cast<int>(ring_buf_start_monot_col_idx_ % num_columns_);
 
     // get actual column index of current column
     int current_col_idx = static_cast<int>(job.current_monot_col_idx % num_columns_);
@@ -776,7 +768,7 @@ void ContinuousClustering::performUnionFindForColumn(UnionFindJob&& job)
         make_set(&pixel, half_angular_fov);
 
         // traverse field of view
-        bool neighbor_found = findEdgesInFieldOfView(pixel, half_angular_fov, ring_buf_first_col_idx);
+        bool neighbor_found = findEdgesInFieldOfView(pixel, half_angular_fov, ring_buf_start_col_idx);
         if (!neighbor_found)
         {
             pixel.is_potential_cluster_root = true;
