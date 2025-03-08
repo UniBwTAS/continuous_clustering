@@ -149,8 +149,149 @@ struct PointCollectionJob
     int64_t cur_monot_col_idx;
     int64_t min_required_monot_col_idx;
 
-    std::vector<Pixel*> cluster_roots;
+    std::vector<size_t> cluster_root_idxs;
 };
+
+// Structure of Arrays for Range Image - more cache-friendly memory layout
+struct RangeImageSoA
+{
+    // raw sensor data
+    std::vector<float> x; 
+    std::vector<float> y;
+    std::vector<float> z;
+    std::vector<uint64_t> firing_idx;
+    std::vector<uint8_t> intensity;
+    std::vector<float> distance;
+    std::vector<float> azimuth_angle;
+    std::vector<float> elevation_angle;
+    std::vector<uint64_t> stamp_ns;
+
+    // range image generation
+    std::vector<uint16_t> col_idx;
+    std::vector<uint16_t> row_idx;
+    std::vector<double> monot_azimuth_angle;
+    std::vector<int64_t> monot_col_idx;
+    std::vector<uint64_t> globally_unique_point_index;
+
+    // ground point segmentation
+    std::vector<uint8_t> ground_point_label;
+    std::vector<bool> is_ignored;
+    std::vector<float> height_over_ground;
+    std::vector<uint8_t> debug_ground_point_label;
+
+    // clustering (union find)
+    std::vector<size_t> parent_idx;  // Indices instead of pointers
+    std::vector<uint16_t> rank;
+
+    // clustering (infinite cluster detection)
+    std::vector<int64_t> clust_start_monot_col_idx;
+    std::vector<int64_t> clust_end_monot_col_idx;
+
+    // finished cluster identification
+    std::vector<bool> is_potential_cluster_root;
+    std::vector<double> finished_at_monot_azimuth_angle;
+
+    // point collection
+    std::vector<size_t> next_idx;  // Indices instead of pointers
+    std::vector<uint64_t> id;
+
+    // debugging
+    std::vector<int> number_of_visited_neighbors;
+    
+    // Resize all arrays
+    void resize(size_t size) {
+        x.resize(size, std::nanf(""));
+        y.resize(size, std::nanf(""));
+        z.resize(size, std::nanf(""));
+        firing_idx.resize(size);
+        intensity.resize(size);
+        distance.resize(size, std::nanf(""));
+        azimuth_angle.resize(size, std::nanf(""));
+        elevation_angle.resize(size, std::nanf(""));
+        stamp_ns.resize(size);
+        col_idx.resize(size);
+        row_idx.resize(size);
+        monot_azimuth_angle.resize(size, std::nan(""));
+        monot_col_idx.resize(size, -1);
+        globally_unique_point_index.resize(size, static_cast<uint64_t>(-1));
+        ground_point_label.resize(size);
+        is_ignored.resize(size);
+        height_over_ground.resize(size, std::nanf(""));
+        debug_ground_point_label.resize(size, WHITE);
+        parent_idx.resize(size, static_cast<size_t>(-1));  // No parent initially
+        rank.resize(size);
+        clust_start_monot_col_idx.resize(size, -1);
+        clust_end_monot_col_idx.resize(size, -1);
+        is_potential_cluster_root.resize(size);
+        finished_at_monot_azimuth_angle.resize(size);
+        next_idx.resize(size, static_cast<size_t>(-1));  // No next initially
+        id.resize(size);
+        number_of_visited_neighbors.resize(size);
+    }
+    
+    // Initialize values for a specific index
+    void initializePixel(size_t index) {
+        x[index] = std::nanf("");
+        y[index] = std::nanf("");
+        z[index] = std::nanf("");
+        firing_idx[index] = 0;
+        intensity[index] = 0;
+        distance[index] = std::nanf("");
+        azimuth_angle[index] = std::nanf("");
+        elevation_angle[index] = std::nanf("");
+        stamp_ns[index] = 0;
+        col_idx[index] = 0;
+        row_idx[index] = 0;
+        monot_azimuth_angle[index] = std::nan("");
+        monot_col_idx[index] = -1;
+        globally_unique_point_index[index] = static_cast<uint64_t>(-1);
+        ground_point_label[index] = 0;
+        is_ignored[index] = false;
+        height_over_ground[index] = std::nanf("");
+        debug_ground_point_label[index] = WHITE;
+        parent_idx[index] = static_cast<size_t>(-1);
+        rank[index] = 0;
+        clust_start_monot_col_idx[index] = -1;
+        clust_end_monot_col_idx[index] = -1;
+        is_potential_cluster_root[index] = false;
+        finished_at_monot_azimuth_angle[index] = 0.0;
+        next_idx[index] = static_cast<size_t>(-1);
+        id[index] = 0;
+        number_of_visited_neighbors[index] = 0;
+    }
+    
+    // Clear values for a range of columns
+    void clearColumns(int64_t from_monot_col_idx, int64_t to_monot_col_idx, int num_rows, int num_columns) {
+        for (int64_t c = from_monot_col_idx; c <= to_monot_col_idx; ++c) {
+            int ring_buf_col_idx = static_cast<int>(c % num_columns);
+            for (int r = 0; r < num_rows; ++r) {
+                size_t idx = ring_buf_col_idx * num_rows + r;
+                initializePixel(idx);
+            }
+        }
+    }
+    
+    // Helper functions for point coordinates
+    inline float lengthSquared(size_t idx1, size_t idx2) const {
+        float dx = x[idx1] - x[idx2];
+        float dy = y[idx1] - y[idx2];
+        float dz = z[idx1] - z[idx2];
+        return dx*dx + dy*dy + dz*dz;
+    }
+    
+    // Calculate distance from a point to the sensor origin
+    inline float getDistance(size_t idx, const Point3D& sensor_pos) const {
+        float dx = x[idx] - sensor_pos.x;
+        float dy = y[idx] - sensor_pos.y;
+        float dz = z[idx] - sensor_pos.z;
+        return std::sqrt(dx*dx + dy*dy + dz*dz);
+    }
+};
+
+// Helper functions for index conversion
+inline size_t pixelIndex(int col_idx, int row_idx, int num_rows) {
+    return col_idx * num_rows + row_idx;
+}
 
 class ContinuousClustering
 {
@@ -190,15 +331,13 @@ class ContinuousClustering
     }
 
     // continuous clustering
-    inline bool checkClusteringCondition(const Pixel& pixel_a, const Pixel& pixel_b) const;
     void calculateFovBounds(int64_t& fov_start_monot_col_idx,
                             int16_t& fov_start_row_idx,
                             int16_t& fov_end_row_idx,
                             uint16_t cur_row_idx,
                             int64_t cur_monot_col_idx,
-                            float half_angular_fov,
-                            float cur_elevation_angle);
-    inline bool findEdgesInFieldOfView(Pixel& pixel, float half_angular_fov, int ring_buf_first_col_idx);
+                            float half_angular_fov);
+    inline bool findEdgesInFieldOfView(size_t pixel_idx, int64_t monot_col_idx, uint16_t row_idx, float half_angular_fov);
     inline void performUnionFindForColumn(UnionFindJob&& job);
     inline void identifyFinishedClusters(int64_t cur_monot_col_idx);
     inline void collectPointsForCusterAndPublish(PointCollectionJob&& job);
@@ -211,15 +350,27 @@ class ContinuousClustering
     inline bool union_set(Pixel* pixel_a, Pixel* pixel_b);
     inline void print_set(Pixel* pixel, std::vector<Pixel>& v);
 
+    // SoA versions of union find operations
+    inline void make_set_soa(size_t pixel_idx, float max_angle_diff);
+    inline size_t find_set_soa(size_t pixel_idx);
+    inline bool union_set_soa(size_t pixel_a_idx, size_t pixel_b_idx);
+    inline void collect_set_soa(size_t root_idx, std::vector<size_t>& indices);
+
   public:
     // continuous range image generation
-    std::vector<Pixel> range_image_{0};
+    RangeImageSoA range_image_soa_;  // New SoA range image
+    std::vector<Pixel> range_image_{0};  // Keep this for backward compatibility during transition
     int num_rows_{-1};
     int num_columns_{0};
     int num_columns_rot_{};
     float azimuth_width_per_column_{};
     int64_t ring_buf_start_monot_col_idx_{};
     int64_t ring_buf_end_monot_col_idx_{};
+
+    // Helper methods for transition
+    inline size_t getIndex(int col_idx, int row_idx) const {
+        return pixelIndex(col_idx, row_idx, num_rows_);
+    }
 
   private:
     Configuration config_;
@@ -237,7 +388,7 @@ class ContinuousClustering
     // clustering (union find & cluster extraction & point collection)
     float max_distance_squared_{0.7 * 0.7};
     std::vector<float> laser_elevation_angles_;
-    std::vector<Pixel*> potential_cluster_roots_;
+    std::vector<size_t> potential_cluster_root_idxs_;
     std::function<void(int64_t, int64_t, bool)> finished_column_callback_;
     std::function<void(const std::vector<Pixel>&, uint64_t)> finished_cluster_callback_;
 
