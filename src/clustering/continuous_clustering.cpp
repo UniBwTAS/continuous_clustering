@@ -10,12 +10,6 @@ ContinuousClustering::ContinuousClustering() = default;
 
 void ContinuousClustering::reset(int num_rows)
 {
-    // recalculate some intermediate values in case the parameters have changed
-    num_rows_ = num_rows;
-    num_columns_rot_ = config_.range_image.num_columns_rot;
-    num_columns_ = num_columns_rot_ * 10;
-    azimuth_width_per_column_ = static_cast<float>((2 * M_PI)) / static_cast<float>(num_columns_rot_);
-
     // shutdown workers
     range_image_thread_pool_.shutdown();
     ground_segmentation_thread_pool_.shutdown();
@@ -23,9 +17,10 @@ void ContinuousClustering::reset(int num_rows)
     point_collection_thread_pool_.shutdown();
 
     // init/reset range image (implemented as ring buffer)
-    range_image_soa_.resize(num_columns_, num_rows);
-    range_image_.resize(num_columns_ * num_rows); // Keep for backward compatibility
-    clearColumns(0, num_columns_ - 1);
+    num_columns_rot_ = config_.range_image.num_columns_rot;
+    azimuth_width_per_column_ = static_cast<float>((2 * M_PI)) / static_cast<float>(num_columns_rot_);
+    range_image_soa_.resize(num_columns_rot_ * 10, num_rows);
+    range_image_soa_.clearColumns(0, range_image_soa_.width - 1);
     ring_buf_start_monot_col_idx_ = -1; // does not start at zero but at the minimum laser of first firing
     ring_buf_end_monot_col_idx_ = -1;
 
@@ -80,7 +75,7 @@ bool ContinuousClustering::resetRequired() const
 
 void ContinuousClustering::addFiring(const RawPoints::ConstPtr& firing, const Eigen::Isometry3d& odom_from_sensor)
 {
-    if (num_rows_ != firing->points.size())
+    if (range_image_soa_.height != firing->points.size())
         throw std::runtime_error("The number of points in a firing has changed. This is probably a bug!");
     range_image_thread_pool_.enqueue({firing, odom_from_sensor});
 }
@@ -163,10 +158,10 @@ void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
         int64_t monot_col_idx = rotation_index * num_columns_rot_ + column_index_within_rotation;
 
         // calculate regular column index
-        int col_idx = static_cast<int>(monot_col_idx % num_columns_);
+        int col_idx = static_cast<int>(monot_col_idx % range_image_soa_.width);
 
         // get current pixel index (both SoA and AoS use the same indexing)
-        size_t index = col_idx * num_rows_ + row_idx; // column major order
+        size_t index = col_idx * range_image_soa_.height + row_idx; // column major order
 
         // calculate continuous azimuth angle (even if we move it to the next cell, this value remains the same)
         double monot_azimuth_angle = (2 * M_PI) * static_cast<double>(rotation_index) + increasing_azimuth_angle;
@@ -176,9 +171,9 @@ void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
         if (!std::isnan(range_image_soa_.distance[index]) && !std::isnan(distance))
         {
             int next_col_idx = col_idx + 1;
-            if (next_col_idx >= num_columns_)
-                next_col_idx -= num_columns_;
-            size_t next_index = next_col_idx * num_rows_ + row_idx;
+            if (next_col_idx >= range_image_soa_.width)
+                next_col_idx -= range_image_soa_.width;
+            size_t next_index = next_col_idx * range_image_soa_.height + row_idx;
             if (std::isnan(range_image_soa_.distance[next_index]))
             {
                 index = next_index;
@@ -225,23 +220,6 @@ void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
             range_image_soa_.row_idx[index] = row_idx;
             range_image_soa_.monot_col_idx[index] = monot_col_idx;
             range_image_soa_.globally_unique_point_index[index] = raw_point.globally_unique_point_index;
-
-            // For backward compatibility during transition, also fill the AoS structure
-            auto& pixel = range_image_[index];
-            pixel.xyz.x = static_cast<float>(p_odom.x());
-            pixel.xyz.y = static_cast<float>(p_odom.y());
-            pixel.xyz.z = static_cast<float>(p_odom.z());
-            pixel.firing_idx = raw_point.firing_index;
-            pixel.intensity = raw_point.intensity;
-            pixel.stamp_ns = raw_point.stamp;
-            pixel.distance = distance;
-            pixel.azimuth_angle = azimuth_angle;
-            pixel.elevation_angle = std::asin(static_cast<float>(p.z()) / distance);
-            pixel.monot_azimuth_angle = monot_azimuth_angle;
-            pixel.col_idx = col_idx;
-            pixel.row_idx = row_idx;
-            pixel.monot_col_idx = monot_col_idx;
-            pixel.globally_unique_point_index = raw_point.globally_unique_point_index;
         }
 
         // keep track of global column index of rearmost & foremost laser
@@ -287,7 +265,7 @@ void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
 
 void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJob&& job)
 {
-    int col_idx = static_cast<int>(job.cur_monot_col_idx % num_columns_);
+    int col_idx = static_cast<int>(job.cur_monot_col_idx % range_image_soa_.width);
 
     if (!ego_robot_frame_from_sensor_frame_)
         throw std::runtime_error("Transform robot frame from sensor frame was not set yet!");
@@ -310,7 +288,7 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
     float previous_z = 0;
     uint8_t previous_label;
 
-    for (int row_index = num_rows_ - 1; row_index >= 0; row_index--)
+    for (int row_index = range_image_soa_.height - 1; row_index >= 0; row_index--)
     {
         // get pixel index
         size_t index = range_image_soa_.getIndex(col_idx, row_index);
@@ -335,18 +313,14 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
                 "This column is not cleared. Probably this means the ring buffer is full or there "
                 "is some other issue with clearing (not cleared at all or written after clearing): " +
                 std::to_string(pixel_monot_col_idx_copy) + ", " + std::to_string(job.cur_monot_col_idx) + ", " +
-                std::to_string(num_columns_) +
+                std::to_string(range_image_soa_.width) +
                 "; This typically happens when the clustering is not fast enough to handle all the firings. Consider "
                 "to play the sensor data more slowly or to adjust the parameters to make the clustering faster.");
         }
 
         // refill local/global column index because it was not filled for omitted cells
         range_image_soa_.monot_col_idx[index] = job.cur_monot_col_idx;
-        range_image_soa_.col_idx[index] = static_cast<uint16_t>(job.cur_monot_col_idx % num_columns_);
-
-        // For backward compatibility during transition
-        range_image_[index].monot_col_idx = job.cur_monot_col_idx;
-        range_image_[index].col_idx = static_cast<uint16_t>(job.cur_monot_col_idx % num_columns_);
+        range_image_soa_.col_idx[index] = static_cast<uint16_t>(job.cur_monot_col_idx % range_image_soa_.width);
 
         // keep track of the elevation angles of the lasers (for later processing steps)
         float elevation_current_laser = range_image_soa_.elevation_angle[index];
@@ -361,11 +335,6 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
             // recalculate continuous azimuth for omitted/NaN cells (for later processing steps)
             range_image_soa_.monot_azimuth_angle[index] =
                 (static_cast<double>(job.cur_monot_col_idx) + 0.5) * azimuth_width_per_column_;
-
-            // For backward compatibility during transition
-            range_image_[index].elevation_angle = laser_elevation_angles_[row_index];
-            range_image_[index].monot_azimuth_angle =
-                (static_cast<double>(job.cur_monot_col_idx) + 0.5) * azimuth_width_per_column_;
             continue;
         }
 
@@ -377,10 +346,6 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
         {
             range_image_soa_.ground_point_label[index] = GP_FOG;
             range_image_soa_.debug_ground_point_label[index] = LIGHTGRAY;
-
-            // For backward compatibility during transition
-            range_image_[index].ground_point_label = GP_FOG;
-            range_image_[index].debug_ground_point_label = LIGHTGRAY;
             continue;
         }
 
@@ -403,10 +368,6 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
         {
             range_image_soa_.ground_point_label[index] = GP_EGO_VEHICLE;
             range_image_soa_.debug_ground_point_label[index] = VIOLET;
-
-            // For backward compatibility during transition
-            range_image_[index].ground_point_label = GP_EGO_VEHICLE;
-            range_image_[index].debug_ground_point_label = VIOLET;
             continue;
         }
 
@@ -422,10 +383,6 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
                 range_image_soa_.ground_point_label[index] = GP_GROUND;
                 range_image_soa_.debug_ground_point_label[index] = GRAY;
 
-                // For backward compatibility during transition
-                range_image_[index].ground_point_label = GP_GROUND;
-                range_image_[index].debug_ground_point_label = GRAY;
-
                 last_ground_x = current_x_wrt_sensor;
                 last_ground_y = current_y_wrt_sensor;
                 last_ground_z = current_z_wrt_sensor;
@@ -435,10 +392,6 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
             {
                 range_image_soa_.ground_point_label[index] = GP_OBSTACLE;
                 range_image_soa_.debug_ground_point_label[index] = ORANGE;
-
-                // For backward compatibility during transition
-                range_image_[index].ground_point_label = GP_OBSTACLE;
-                range_image_[index].debug_ground_point_label = ORANGE;
 
                 first_obstacle_detected = true;
             }
@@ -483,10 +436,6 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
         {
             range_image_soa_.ground_point_label[index] = GP_GROUND;
             range_image_soa_.debug_ground_point_label[index] = GREEN;
-
-            // For backward compatibility during transition
-            range_image_[index].ground_point_label = GP_GROUND;
-            range_image_[index].debug_ground_point_label = GREEN;
         }
         else // try to find remaining ground points
         {
@@ -494,20 +443,12 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
             {
                 range_image_soa_.ground_point_label[index] = GP_GROUND;
                 range_image_soa_.debug_ground_point_label[index] = YELLOWGREEN;
-
-                // For backward compatibility during transition
-                range_image_[index].ground_point_label = GP_GROUND;
-                range_image_[index].debug_ground_point_label = YELLOWGREEN;
             }
             else if (std::abs(last_ground_to_current_x) < c.ground_because_close_to_last_certain_ground_max_dist_diff &&
                      std::abs(last_ground_to_current_y) < c.ground_because_close_to_last_certain_ground_max_z_diff)
             {
                 range_image_soa_.ground_point_label[index] = GP_GROUND;
                 range_image_soa_.debug_ground_point_label[index] = YELLOW;
-
-                // For backward compatibility during transition
-                range_image_[index].ground_point_label = GP_GROUND;
-                range_image_[index].debug_ground_point_label = YELLOW;
             }
         }
 
@@ -517,13 +458,9 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
             range_image_soa_.ground_point_label[index] = GP_OBSTACLE;
             range_image_soa_.debug_ground_point_label[index] = RED;
 
-            // For backward compatibility during transition
-            range_image_[index].ground_point_label = GP_OBSTACLE;
-            range_image_[index].debug_ground_point_label = RED;
-
             // go down in the rows and mark very close points also as obstacle
             int prev_row_index = row_index + 1;
-            while (prev_row_index < num_rows_)
+            while (prev_row_index < range_image_soa_.height)
             {
                 size_t prev_index = range_image_soa_.getIndex(col_idx, prev_row_index);
 
@@ -544,10 +481,6 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
                     {
                         range_image_soa_.ground_point_label[prev_index] = GP_OBSTACLE;
                         range_image_soa_.debug_ground_point_label[prev_index] = DARKRED;
-
-                        // For backward compatibility during transition
-                        range_image_[prev_index].ground_point_label = GP_OBSTACLE;
-                        range_image_[prev_index].debug_ground_point_label = DARKRED;
                     }
                     prev_row_index++;
                 }
@@ -586,21 +519,17 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
 
     // Process points for clustering - no changes needed for this part
     // Second pass to prepare for clustering
-    for (int row_index = num_rows_ - 1; row_index >= 0; row_index--)
+    for (int row_index = range_image_soa_.height - 1; row_index >= 0; row_index--)
     {
         size_t index = range_image_soa_.getIndex(col_idx, row_index);
 
         // prepare everything for next step in pipeline (point association)
         range_image_soa_.is_ignored[index] = false;
 
-        // For backward compatibility during transition
-        range_image_[index].is_ignored = false;
-
         // ignore this point if it is NaN
         if (std::isnan(range_image_soa_.distance[index]))
         {
             range_image_soa_.is_ignored[index] = true;
-            range_image_[index].is_ignored = true;
             continue;
         }
 
@@ -608,7 +537,6 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
         if (range_image_soa_.ground_point_label[index] != GP_OBSTACLE)
         {
             range_image_soa_.is_ignored[index] = true;
-            range_image_[index].is_ignored = true;
             continue;
         }
 
@@ -616,13 +544,13 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
         if (range_image_soa_.distance[index] < 1. * config_.clustering.max_distance)
         {
             range_image_soa_.is_ignored[index] = true;
-            range_image_[index].is_ignored = true;
             continue;
         }
 
         // ignore this pixel if the distance in combination with elevation diff can't be below distance threshold
         // TODO: reenable this?
-        // if (config_.clustering.ignore_pixels_with_too_big_elevation_angle_diff && row_index < (num_rows_ - 1) &&
+        // if (config_.clustering.ignore_pixels_with_too_big_elevation_angle_diff && row_index <
+        // (range_image_soa_.height - 1) &&
         //     std::atan2(config_.clustering.max_distance, pixel.distance) < laser_elevation_angles_[row_index])
         // {
         //     pixel.is_ignored = true;
@@ -637,7 +565,6 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
             if ((column_even && !row_even) || (!column_even && row_even))
             {
                 range_image_soa_.is_ignored[index] = true;
-                range_image_[index].is_ignored = true;
                 continue;
             }
         }
@@ -647,7 +574,6 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
             if (row_even)
             {
                 range_image_soa_.is_ignored[index] = true;
-                range_image_[index].is_ignored = true;
                 continue;
             }
         }
@@ -657,7 +583,6 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
             if (column_even)
             {
                 range_image_soa_.is_ignored[index] = true;
-                range_image_[index].is_ignored = true;
                 continue;
             }
         }
@@ -682,108 +607,6 @@ bool ContinuousClustering::hasTransformRobotFrameFromSensorFrame()
     return ego_robot_frame_from_sensor_frame_ != nullptr;
 }
 
-void ContinuousClustering::make_set(Pixel* pixel, float half_angular_fov)
-{
-    // regular union find algorithm
-    pixel->parent = pixel;
-    pixel->rank = 0;
-
-    // extension for collect after union find
-    pixel->next = pixel;
-
-    // extension for finished cluster extraction
-    pixel->finished_at_monot_azimuth_angle = pixel->monot_azimuth_angle + half_angular_fov;
-    pixel->is_potential_cluster_root = false;
-
-    // infinite cluster detection (e.g. in a closed room or tunnel)
-    pixel->clust_start_monot_col_idx = pixel->monot_col_idx;
-    pixel->clust_end_monot_col_idx = pixel->monot_col_idx;
-}
-
-Pixel* ContinuousClustering::find_set(Pixel* pixel)
-{
-    // regular union find algorithm with path compression
-
-    // find root vertex of current tree
-    Pixel* root = pixel;
-    while (root->parent != root)
-        root = root->parent;
-
-    // path compression: again, iterate from leaf to root and
-    // re-attach all vertices to the (now known) root
-    while (pixel->parent != root)
-    {
-        Pixel* tmp = pixel->parent;
-        pixel->parent = root;
-        pixel = tmp;
-    }
-
-    return root;
-}
-
-bool ContinuousClustering::union_set(Pixel* pixel_a, Pixel* pixel_b)
-{
-    // regular union find algorithm
-    Pixel* root_a = find_set(pixel_a);
-    Pixel* root_b = find_set(pixel_b);
-    if (root_a == root_b)
-        return true; // already same cluster -> nothing to do
-
-    // extension for infinite cluster detection
-    int64_t new_start_col_idx = std::min(root_a->clust_start_monot_col_idx, root_b->clust_start_monot_col_idx);
-    int64_t new_end_col_idx = std::max(root_a->clust_end_monot_col_idx, root_b->clust_end_monot_col_idx);
-    int new_width = new_end_col_idx - new_start_col_idx + 1;
-    if (new_width > num_columns_rot_)
-        return false; // clusters not merged (broader than full rotation)
-
-    // regular union find algorithm (with union by rank)
-    Pixel* root_after_union;
-    Pixel* child_after_union;
-    if (root_a->rank > root_b->rank)
-    {
-        root_b->parent = root_a;
-        root_after_union = root_a;
-        child_after_union = root_b;
-    }
-    else
-    {
-        root_a->parent = root_b;
-        if (root_a->rank == root_b->rank)
-            root_b->rank += 1;
-        root_after_union = root_b;
-        child_after_union = root_a;
-    }
-
-    // extension for infinite cluster detection
-    root_after_union->clust_start_monot_col_idx = new_start_col_idx;
-    root_after_union->clust_end_monot_col_idx = new_end_col_idx;
-
-    // extension for cluster extraction
-    root_after_union->finished_at_monot_azimuth_angle =
-        std::max(root_a->finished_at_monot_azimuth_angle, root_b->finished_at_monot_azimuth_angle);
-    child_after_union->is_potential_cluster_root = false;
-
-    // extension for collecting pixels (swap next pointers)
-    Pixel* tmp = root_b->next;
-    root_b->next = root_a->next;
-    root_a->next = tmp;
-
-    return true;
-}
-
-void ContinuousClustering::print_set(Pixel* pixel, std::vector<Pixel>& v)
-{
-    // extension for print after union find
-    v.clear();
-    Pixel* start_pixel = pixel;
-    v.push_back(*pixel);
-    while (pixel->next != start_pixel)
-    {
-        pixel = pixel->next;
-        v.push_back(*pixel);
-    }
-}
-
 void ContinuousClustering::calculateFovBounds(int64_t& fov_start_monot_col_idx,
                                               int16_t& fov_start_row_idx,
                                               int16_t& fov_end_row_idx,
@@ -797,7 +620,7 @@ void ContinuousClustering::calculateFovBounds(int64_t& fov_start_monot_col_idx,
 
     // optain elevation angle of current pixel
     double cur_elevation_angle = laser_elevation_angles_[cur_row_idx];
-    
+
     // upper bound
     uint16_t row_idx = cur_row_idx;
     while (row_idx > 0 && laser_elevation_angles_[row_idx - 1] < cur_elevation_angle + half_angular_fov)
@@ -806,23 +629,23 @@ void ContinuousClustering::calculateFovBounds(int64_t& fov_start_monot_col_idx,
 
     // lower bound
     row_idx = cur_row_idx;
-    while (row_idx < num_rows_ - 1 && laser_elevation_angles_[row_idx + 1] > cur_elevation_angle - half_angular_fov)
+    while (row_idx < range_image_soa_.height - 1 &&
+           laser_elevation_angles_[row_idx + 1] > cur_elevation_angle - half_angular_fov)
         row_idx++;
     fov_end_row_idx = row_idx;
 }
 
-bool ContinuousClustering::findEdgesInFieldOfView(size_t pixel_idx, int64_t monot_col_idx, uint16_t row_idx, float half_angular_fov)
+bool ContinuousClustering::findEdgesInFieldOfView(size_t pixel_idx,
+                                                  int64_t monot_col_idx,
+                                                  uint16_t row_idx,
+                                                  float half_angular_fov)
 {
     // calculate FoV bounds
     int64_t fov_start_monot_col_idx;
     int16_t fov_start_row_idx;
     int16_t fov_end_row_idx;
-    calculateFovBounds(fov_start_monot_col_idx,
-                       fov_start_row_idx,
-                       fov_end_row_idx,
-                       row_idx,
-                       monot_col_idx,
-                       half_angular_fov);
+    calculateFovBounds(
+        fov_start_monot_col_idx, fov_start_row_idx, fov_end_row_idx, row_idx, monot_col_idx, half_angular_fov);
 
     // go left each column until azimuth angle difference gets too large
     bool at_least_one_edge = false;
@@ -835,15 +658,17 @@ bool ContinuousClustering::findEdgesInFieldOfView(size_t pixel_idx, int64_t mono
                 continue;
 
             // get other pixel
-            size_t pixel_other_idx = (other_monot_col_idx % num_columns_) * num_rows_ + other_row_idx;
+            size_t pixel_other_idx =
+                (other_monot_col_idx % range_image_soa_.width) * range_image_soa_.height + other_row_idx;
 
             // count number of visited pixels for analyzing
             range_image_soa_.number_of_visited_neighbors[pixel_other_idx] += 1;
 
             // if other pixel is not ignored and is below the clustering threshold -> associate
-            if (!range_image_soa_.is_ignored[pixel_other_idx] && range_image_soa_.lengthSquared(pixel_idx, pixel_other_idx) < max_distance_squared_)
+            if (!range_image_soa_.is_ignored[pixel_other_idx] &&
+                range_image_soa_.lengthSquared(pixel_idx, pixel_other_idx) < max_distance_squared_)
             {
-                //at_least_one_edge = union_set(&pixel, &pixel_other);
+                // at_least_one_edge = union_set(&pixel, &pixel_other);
                 at_least_one_edge |= union_set_soa(pixel_idx, pixel_other_idx);
             }
         }
@@ -857,15 +682,15 @@ void ContinuousClustering::performUnionFindForColumn(UnionFindJob&& job)
     // clear all columns that are not needed anymore
     int64_t prev_ring_buf_start_monot_col_idx = ring_buf_start_monot_col_idx_;
     ring_buf_start_monot_col_idx_ = min_unfinished_monot_col_idx_;
-    clearColumns(prev_ring_buf_start_monot_col_idx, ring_buf_start_monot_col_idx_ - 1);
+    range_image_soa_.clearColumns(prev_ring_buf_start_monot_col_idx, ring_buf_start_monot_col_idx_ - 1);
 
     // get actual column index of current column
-    int current_col_idx = static_cast<int>(job.cur_monot_col_idx % num_columns_);
+    int current_col_idx = static_cast<int>(job.cur_monot_col_idx % range_image_soa_.width);
 
-    for (int row_index = 0; row_index < num_rows_; row_index++)
+    for (int row_index = 0; row_index < range_image_soa_.height; row_index++)
     {
         // Get index for current pixel in the SoA data structure
-        size_t pixel_idx = current_col_idx * num_rows_ + row_index;
+        size_t pixel_idx = current_col_idx * range_image_soa_.height + row_index;
 
         // check whether pixel should be ignored
         if (range_image_soa_.is_ignored[pixel_idx])
@@ -875,26 +700,18 @@ void ContinuousClustering::performUnionFindForColumn(UnionFindJob&& job)
         float half_angular_fov = std::asin(config_.clustering.max_distance / range_image_soa_.distance[pixel_idx]);
 
         // initialize a new cluster containing only this pixel (initialize for union find)
-        // SoA implementation of make_set
         make_set_soa(pixel_idx, half_angular_fov);
-
-        // Compatibility with existing AoS implementation
-        Pixel& pixel = range_image_[pixel_idx];
-        make_set(&pixel, half_angular_fov);
 
         // traverse field of view
         bool neighbor_found = findEdgesInFieldOfView(pixel_idx, job.cur_monot_col_idx, row_index, half_angular_fov);
         if (!neighbor_found)
         {
             range_image_soa_.is_potential_cluster_root[pixel_idx] = true;
-            // For the transition period, we still use AoS for the potential_cluster_roots_
-            pixel.is_potential_cluster_root = true;
             potential_cluster_root_idxs_.push_back(pixel_idx);
         }
         else
         {
             range_image_soa_.is_potential_cluster_root[pixel_idx] = false;
-            pixel.is_potential_cluster_root = false;
         }
     }
 
@@ -918,16 +735,12 @@ void ContinuousClustering::identifyFinishedClusters(int64_t cur_monot_col_idx)
     for (size_t root_pixel_idx : potential_cluster_root_idxs_)
     {
         // discard cluster roots eliminated during union operation
-        // std::cout << p->finished_at_monot_azimuth_angle << " " << monot_azimuth_angle_of_col << std::endl;
         if (!range_image_soa_.is_potential_cluster_root[root_pixel_idx])
             continue;
-        // std::cout << "WTF: " << p->finished_at_monot_azimuth_angle << "T " << monot_azimuth_angle_of_col <<
-        // std::endl;
 
         // check whether no more points can be added to this cluster
         if (monot_azimuth_angle_of_col > range_image_soa_.finished_at_monot_azimuth_angle[root_pixel_idx])
         {
-            std::cout << "finished" << std::endl;
             finished_cluster_root_idxs.push_back(root_pixel_idx);
         }
         else
@@ -963,8 +776,8 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PointCollectionJob&&
     for (size_t cluster_root_idx : job.cluster_root_idxs)
     {
         // create cluster id
-        int64_t cluster_id =
-            range_image_soa_.monot_col_idx[cluster_root_idx] * num_rows_ + range_image_soa_.row_idx[cluster_root_idx];
+        int64_t cluster_id = range_image_soa_.monot_col_idx[cluster_root_idx] * range_image_soa_.height +
+                             range_image_soa_.row_idx[cluster_root_idx];
 
         // collect minimum and maximum stamp for this cluster
         uint64_t min_stamp_for_this_cluster = std::numeric_limits<uint64_t>::max();
@@ -981,7 +794,6 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PointCollectionJob&&
             if (range_image_soa_.stamp_ns[pixel_idx] > max_stamp_for_this_cluster)
                 max_stamp_for_this_cluster = range_image_soa_.stamp_ns[pixel_idx];
             range_image_soa_.id[pixel_idx] = cluster_id;
-            range_image_[pixel_idx].id = cluster_id;
             pixels_idxs_of_cluster.push_back(pixel_idx);
 
             pixel_idx = range_image_soa_.next_idx[pixel_idx];
@@ -1009,23 +821,6 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PointCollectionJob&&
     min_unfinished_monot_col_idx_ = job.min_required_monot_col_idx;
 
     // the cols are not cleared here but in the edge generation/association step
-}
-
-void ContinuousClustering::clearColumns(int64_t from_monot_col_idx, int64_t to_monot_col_idx)
-{
-    // Clear using the SoA structure
-    range_image_soa_.clearColumns(from_monot_col_idx, to_monot_col_idx);
-
-    // For backward compatibility during transition, also clear the AoS structure
-    for (int64_t c = from_monot_col_idx; c <= to_monot_col_idx; ++c)
-    {
-        int ring_buf_col_idx = static_cast<int>(c % num_columns_);
-        for (int r = 0; r < num_rows_; ++r)
-        {
-            auto& pixel = range_image_[ring_buf_col_idx * num_rows_ + r];
-            pixel = Pixel(); // Reset to default constructed state
-        }
-    }
 }
 
 void ContinuousClustering::recordJobQueueWorkload(size_t num_jobs_sensor_input)
@@ -1132,21 +927,6 @@ bool ContinuousClustering::union_set_soa(size_t pixel_a_idx, size_t pixel_b_idx)
     range_image_soa_.next_idx[root_a_idx] = tmp;
 
     return true;
-}
-
-void ContinuousClustering::collect_set_soa(size_t root_idx, std::vector<size_t>& indices)
-{
-    // Extension for collecting indices after union find
-    indices.clear();
-    size_t start_idx = root_idx;
-    indices.push_back(root_idx);
-    size_t current_idx = range_image_soa_.next_idx[root_idx];
-
-    while (current_idx != start_idx)
-    {
-        indices.push_back(current_idx);
-        current_idx = range_image_soa_.next_idx[current_idx];
-    }
 }
 
 } // namespace continuous_clustering
