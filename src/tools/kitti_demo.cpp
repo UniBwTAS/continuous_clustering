@@ -45,24 +45,27 @@ class ROSInterface
     void publishColumn(int64_t from_monot_col_idx,
                        int64_t to_monot_col_idx,
                        bool ground_points_only,
-                       const ContinuousClustering& clustering)
+                       const RangeImageSoA& range_image)
     {
         // publish column in odom frame
         ros::Publisher* pub = ground_points_only ? &pub_column_ground : &pub_column_cluster;
         ProcessingStage stage = ground_points_only ? GROUND_POINT_SEGMENTATION : CONTINUOUS_CLUSTERING;
         if (pub->getNumSubscribers() > 0)
         {
-            auto msg = columnToPointCloud(clustering, from_monot_col_idx, to_monot_col_idx, "odom", stage);
+            auto msg = columnToPointCloud(range_image, from_monot_col_idx, to_monot_col_idx, "odom", stage);
             if (msg)
                 pub->publish(msg);
         }
     };
 
-    void publishCluster(const std::vector<Pixel>& cluster_points, int num_rows_in_range_image, uint64_t stamp_cluster)
+    void publishCluster(const std::vector<size_t>& cluster_points,
+                        int num_rows_in_range_image,
+                        uint64_t stamp_cluster,
+                        const RangeImageSoA& range_image)
     {
         if (pub_cluster.getNumSubscribers() == 0)
             return;
-        pub_cluster.publish(clusterToPointCloud(cluster_points, num_rows_in_range_image, stamp_cluster, "odom"));
+        pub_cluster.publish(clusterToPointCloud(range_image, cluster_points, stamp_cluster, "odom"));
     };
 
     void publishFiringAndClockAndTF(const RawPoints::Ptr& firing,
@@ -180,8 +183,8 @@ class KittiDemo
         for (int relative_column_index = 0; relative_column_index < num_columns_to_publish; ++relative_column_index)
         {
             // get local column index from global column index
-            int ring_buf_col_idx = static_cast<int>((from_monot_col_idx + relative_column_index) %
-                                                                  clustering.num_columns_);
+            int ring_buf_col_idx =
+                static_cast<int>((from_monot_col_idx + relative_column_index) % clustering.num_columns_);
 
             // variables to check if a frame is finished
             bool new_frame = false;
@@ -189,8 +192,7 @@ class KittiDemo
             for (int row_index = 0; row_index < clustering.num_rows_; ++row_index)
             {
                 // get processed point
-                const Pixel& point =
-                    clustering.range_image_[ring_buf_col_idx * clustering.num_rows_ + row_index];
+                const Pixel& point = clustering.range_image_[ring_buf_col_idx * clustering.num_rows_ + row_index];
 
                 // check if cell in range image contains point
                 if (point.globally_unique_point_index != static_cast<uint64_t>(-1))
@@ -300,17 +302,17 @@ class KittiDemo
                 {
                     if (enable_publishers)
                         middleware.publishColumn(
-                            from_monot_col_idx, to_monot_col_idx, ground_points_only, clustering);
+                            from_monot_col_idx, to_monot_col_idx, ground_points_only, clustering.range_image_soa_);
                     if (evaluate && !ground_points_only)
-                        addColumnAndEvaluateFrameIfCompleted(
-                            clustering, from_monot_col_idx, to_monot_col_idx);
+                        addColumnAndEvaluateFrameIfCompleted(clustering, from_monot_col_idx, to_monot_col_idx);
                 });
 
             clustering.setFinishedClusterCallback(
-                [&](const std::vector<Pixel>& cluster_points, uint64_t stamp_cluster)
+                [&](const std::vector<size_t>& cluster_points, uint64_t stamp_cluster)
                 {
                     if (enable_publishers)
-                        middleware.publishCluster(cluster_points, clustering.num_rows_, stamp_cluster);
+                        middleware.publishCluster(
+                            cluster_points, clustering.num_rows_, stamp_cluster, clustering.range_image_soa_);
                 });
 
             // info required for evaluation

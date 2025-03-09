@@ -23,7 +23,7 @@ void ContinuousClustering::reset(int num_rows)
     point_collection_thread_pool_.shutdown();
 
     // init/reset range image (implemented as ring buffer)
-    range_image_soa_.resize(num_columns_ * num_rows);
+    range_image_soa_.resize(num_columns_, num_rows);
     range_image_.resize(num_columns_ * num_rows); // Keep for backward compatibility
     clearColumns(0, num_columns_ - 1);
     ring_buf_start_monot_col_idx_ = -1; // does not start at zero but at the minimum laser of first firing
@@ -90,7 +90,7 @@ void ContinuousClustering::setFinishedColumnCallback(std::function<void(int64_t,
     finished_column_callback_ = std::move(cb);
 }
 
-void ContinuousClustering::setFinishedClusterCallback(std::function<void(const std::vector<Pixel>&, uint64_t)> cb)
+void ContinuousClustering::setFinishedClusterCallback(std::function<void(const std::vector<size_t>&, uint64_t)> cb)
 {
     finished_cluster_callback_ = std::move(cb);
 }
@@ -313,7 +313,7 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
     for (int row_index = num_rows_ - 1; row_index >= 0; row_index--)
     {
         // get pixel index
-        size_t index = getIndex(col_idx, row_index);
+        size_t index = range_image_soa_.getIndex(col_idx, row_index);
 
         // check if there is a problem with the ring buffer
         int64_t pixel_monot_col_idx_copy = range_image_soa_.monot_col_idx[index];
@@ -525,7 +525,7 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
             int prev_row_index = row_index + 1;
             while (prev_row_index < num_rows_)
             {
-                size_t prev_index = getIndex(col_idx, prev_row_index);
+                size_t prev_index = range_image_soa_.getIndex(col_idx, prev_row_index);
 
                 // Convert previous point to 2D
                 float prev_x_wrt_sensor = range_image_soa_.x[prev_index] - sensor_position_point_.x;
@@ -588,7 +588,7 @@ void ContinuousClustering::performGroundPointSegmentationForColumn(SegmentationJ
     // Second pass to prepare for clustering
     for (int row_index = num_rows_ - 1; row_index >= 0; row_index--)
     {
-        size_t index = getIndex(col_idx, row_index);
+        size_t index = range_image_soa_.getIndex(col_idx, row_index);
 
         // prepare everything for next step in pipeline (point association)
         range_image_soa_.is_ignored[index] = false;
@@ -958,7 +958,7 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PointCollectionJob&&
     uint64_t min_stamp_for_this_msg = std::numeric_limits<uint64_t>::max();
 
     // create buffer
-    static thread_local std::vector<Pixel> pixels_of_cluster;
+    static thread_local std::vector<size_t> pixels_idxs_of_cluster;
 
     for (size_t cluster_root_idx : job.cluster_root_idxs)
     {
@@ -972,7 +972,7 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PointCollectionJob&&
 
         // collect all of its child pixels
         // extension for print after union find
-        pixels_of_cluster.clear();
+        pixels_idxs_of_cluster.clear();
         size_t pixel_idx = cluster_root_idx;
         while (true)
         {
@@ -982,7 +982,7 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PointCollectionJob&&
                 max_stamp_for_this_cluster = range_image_soa_.stamp_ns[pixel_idx];
             range_image_soa_.id[pixel_idx] = cluster_id;
             range_image_[pixel_idx].id = cluster_id;
-            pixels_of_cluster.push_back(range_image_[pixel_idx]);
+            pixels_idxs_of_cluster.push_back(pixel_idx);
 
             pixel_idx = range_image_soa_.next_idx[pixel_idx];
             if (pixel_idx == cluster_root_idx)
@@ -1000,7 +1000,7 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PointCollectionJob&&
                 config_.clustering.use_last_point_for_cluster_stamp ?
                     max_stamp_for_this_cluster :
                     min_stamp_for_this_cluster + (max_stamp_for_this_cluster - min_stamp_for_this_cluster) / 2;
-            finished_cluster_callback_(pixels_of_cluster, stamp_cluster);
+            finished_cluster_callback_(pixels_idxs_of_cluster, stamp_cluster);
         }
     }
 
@@ -1014,7 +1014,7 @@ void ContinuousClustering::collectPointsForCusterAndPublish(PointCollectionJob&&
 void ContinuousClustering::clearColumns(int64_t from_monot_col_idx, int64_t to_monot_col_idx)
 {
     // Clear using the SoA structure
-    range_image_soa_.clearColumns(from_monot_col_idx, to_monot_col_idx, num_rows_, num_columns_);
+    range_image_soa_.clearColumns(from_monot_col_idx, to_monot_col_idx);
 
     // For backward compatibility during transition, also clear the AoS structure
     for (int64_t c = from_monot_col_idx; c <= to_monot_col_idx; ++c)
