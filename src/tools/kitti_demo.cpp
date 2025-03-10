@@ -45,7 +45,7 @@ class ROSInterface
     void publishColumn(int64_t from_monot_col_idx,
                        int64_t to_monot_col_idx,
                        bool ground_points_only,
-                       const RangeImageSoA& range_image)
+                       const RangeImage& range_image)
     {
         // publish column in odom frame
         ros::Publisher* pub = ground_points_only ? &pub_column_ground : &pub_column_cluster;
@@ -58,14 +58,13 @@ class ROSInterface
         }
     };
 
-    void publishCluster(const std::vector<size_t>& cluster_points,
-                        int num_rows_in_range_image,
+    void publishCluster(const std::vector<uint64_t>& cluster_pixel_idxs,
                         uint64_t stamp_cluster,
-                        const RangeImageSoA& range_image)
+                        const RangeImage& range_image)
     {
         if (pub_cluster.getNumSubscribers() == 0)
             return;
-        pub_cluster.publish(clusterToPointCloud(range_image, cluster_points, stamp_cluster, "odom"));
+        pub_cluster.publish(clusterToPointCloud(range_image, cluster_pixel_idxs, stamp_cluster, "odom"));
     };
 
     void publishFiringAndClockAndTF(const RawPoints::Ptr& firing,
@@ -107,9 +106,10 @@ class DummyInterface
     void publishColumn(int64_t from_monot_col_idx,
                        int64_t to_monot_col_idx,
                        bool ground_points_only,
-                       const ContinuousClustering& clustering) {};
-    void publishCluster(const std::vector<Point>& cluster_points, int num_rows_in_range_image, uint64_t stamp_cluster) {
-    };
+                       const RangeImage& range_image) {};
+    void publishCluster(const std::vector<uint64_t>& cluster_pixel_idxs,
+                        uint64_t stamp_cluster,
+                        const RangeImage& range_image) {};
     void publishFiringAndClockAndTF(const RawPoints::Ptr& firing,
                                     const Eigen::Isometry3d& odom_from_velodyne,
                                     bool publish_firing) {};
@@ -173,7 +173,7 @@ class KittiDemo
         previous_frame_index++;
     }
 
-    void addColumnAndEvaluateFrameIfCompleted(const ContinuousClustering& clustering,
+    void addColumnAndEvaluateFrameIfCompleted(const RangeImage& range_image,
                                               int64_t from_monot_col_idx,
                                               int64_t to_monot_col_idx)
     {
@@ -183,24 +183,23 @@ class KittiDemo
         for (int relative_column_index = 0; relative_column_index < num_columns_to_publish; ++relative_column_index)
         {
             // get local column index from global column index
-            int ring_buf_col_idx =
-                static_cast<int>((from_monot_col_idx + relative_column_index) % clustering.num_columns_);
+            int ring_buf_col_idx = static_cast<int>((from_monot_col_idx + relative_column_index) % range_image.width);
 
             // variables to check if a frame is finished
             bool new_frame = false;
 
-            for (int row_index = 0; row_index < clustering.num_rows_; ++row_index)
+            for (int row_index = 0; row_index < range_image.height; ++row_index)
             {
-                // get processed point
-                const Pixel& point = clustering.range_image_[ring_buf_col_idx * clustering.num_rows_ + row_index];
+                // get processed point index
+                uint64_t pixel_idx = ring_buf_col_idx * range_image.height + row_index;
 
                 // check if cell in range image contains point
-                if (point.globally_unique_point_index != static_cast<uint64_t>(-1))
+                if (range_image.globally_unique_point_index[pixel_idx] != static_cast<uint64_t>(-1))
                 {
                     // get meta info from current point
-                    uint16_t sequence_index = (point.globally_unique_point_index >> 48) & 0xFFFF;
-                    uint16_t frame_index = (point.globally_unique_point_index >> 32) & 0xFFFF;
-                    uint32_t kitti_point_index = point.globally_unique_point_index & 0xFFFFFFFF;
+                    uint16_t sequence_index = (range_image.globally_unique_point_index[pixel_idx] >> 48) & 0xFFFF;
+                    uint16_t frame_index = (range_image.globally_unique_point_index[pixel_idx] >> 32) & 0xFFFF;
+                    uint32_t kitti_point_index = range_image.globally_unique_point_index[pixel_idx] & 0xFFFFFFFF;
 
                     // check if we have a new frame
                     if (frame_index < previous_frame_index)
@@ -213,8 +212,8 @@ class KittiDemo
                     // add detection label to point in current ground truth point cloud
                     auto it = map_frame_to_point_cloud.find({sequence_index, frame_index});
                     KittiSegmentationEvaluationPoint& evaluation_point = it->second[kitti_point_index];
-                    evaluation_point.is_ground_point = (point.ground_point_label == GP_GROUND);
-                    evaluation_point.detection_label = clustering.num_rows_;
+                    evaluation_point.is_ground_point = (range_image.ground_point_label[pixel_idx] == GP_GROUND);
+                    evaluation_point.detection_label = range_image.height;
                     evaluation_point.has_corresponding_point_in_detection_point_cloud = true;
                 }
             }
@@ -302,17 +301,17 @@ class KittiDemo
                 {
                     if (enable_publishers)
                         middleware.publishColumn(
-                            from_monot_col_idx, to_monot_col_idx, ground_points_only, clustering.range_image_soa_);
+                            from_monot_col_idx, to_monot_col_idx, ground_points_only, clustering.range_image_);
                     if (evaluate && !ground_points_only)
-                        addColumnAndEvaluateFrameIfCompleted(clustering, from_monot_col_idx, to_monot_col_idx);
+                        addColumnAndEvaluateFrameIfCompleted(
+                            clustering.range_image_, from_monot_col_idx, to_monot_col_idx);
                 });
 
             clustering.setFinishedClusterCallback(
-                [&](const std::vector<size_t>& cluster_points, uint64_t stamp_cluster)
+                [&](const std::vector<uint64_t>& cluster_pixel_idxs, uint64_t stamp_cluster)
                 {
                     if (enable_publishers)
-                        middleware.publishCluster(
-                            cluster_points, clustering.num_rows_, stamp_cluster, clustering.range_image_soa_);
+                        middleware.publishCluster(cluster_pixel_idxs, stamp_cluster, clustering.range_image_);
                 });
 
             // info required for evaluation

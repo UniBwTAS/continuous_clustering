@@ -8,21 +8,21 @@
 namespace continuous_clustering
 {
 
-sensor_msgs::PointCloud2Ptr clusterToPointCloud(const RangeImageSoA& range_image,
-                                                const std::vector<size_t>& cluster_points,
+sensor_msgs::PointCloud2Ptr clusterToPointCloud(const RangeImage& range_image,
+                                                const std::vector<uint64_t>& cluster_pixel_idxs,
                                                 uint64_t stamp_cluster,
                                                 const std::string& frame_id)
 {
     sensor_msgs::PointCloud2Ptr msg(new sensor_msgs::PointCloud2);
     msg->header.stamp.fromNSec(stamp_cluster);
     msg->header.frame_id = frame_id;
-    msg->width = cluster_points.size();
+    msg->width = cluster_pixel_idxs.size();
     msg->height = 1;
 
     PointCloud2Iterators container = prepareMessageAndCreateIterators(*msg, CONTINUOUS_CLUSTERING);
 
     int data_index_message = 0;
-    for (size_t pixel_idx : cluster_points)
+    for (uint64_t pixel_idx : cluster_pixel_idxs)
     {
         addPointToMessage(container, data_index_message, pixel_idx, range_image, CONTINUOUS_CLUSTERING);
         data_index_message++;
@@ -31,7 +31,7 @@ sensor_msgs::PointCloud2Ptr clusterToPointCloud(const RangeImageSoA& range_image
     return msg;
 }
 
-sensor_msgs::PointCloud2Ptr columnToPointCloud(const RangeImageSoA& range_image,
+sensor_msgs::PointCloud2Ptr columnToPointCloud(const RangeImage& range_image,
                                                int64_t from_monot_col_idx,
                                                int64_t to_monot_col_idx,
                                                const std::string& frame_id,
@@ -56,7 +56,7 @@ sensor_msgs::PointCloud2Ptr columnToPointCloud(const RangeImageSoA& range_image,
         int ring_buf_col_idx = static_cast<int>((from_monot_col_idx + message_column_index) % range_image.width);
         for (int row_index = 0; row_index < range_image.height; ++row_index)
         {
-            size_t pixel_idx = ring_buf_col_idx * range_image.height + row_index;
+            uint64_t pixel_idx = ring_buf_col_idx * range_image.height + row_index;
             int data_index_message = row_index * static_cast<int>(msg->width) + message_column_index;
             addPointToMessage(container, data_index_message, pixel_idx, range_image, fill_fields_up_to_stage);
 
@@ -227,7 +227,7 @@ PointCloud2Iterators prepareMessageAndCreateIterators(sensor_msgs::PointCloud2& 
 void addPointToMessage(PointCloud2Iterators& container,
                        int data_index_message,
                        int64_t pixel_idx,
-                       const continuous_clustering::RangeImageSoA& range_image,
+                       const continuous_clustering::RangeImage& range_image,
                        ProcessingStage fill_fields_up_to_stage)
 {
     ros::Time stamp;

@@ -135,25 +135,25 @@ struct InsertionJob
 
 struct SegmentationJob
 {
-    int64_t cur_monot_col_idx;
+    uint64_t cur_monot_col_idx;
     Eigen::Isometry3d odom_frame_from_sensor_frame;
 };
 
 struct UnionFindJob
 {
-    int64_t cur_monot_col_idx;
+    uint64_t cur_monot_col_idx;
 };
 
 struct PointCollectionJob
 {
-    int64_t cur_monot_col_idx;
-    int64_t min_required_monot_col_idx;
+    uint64_t cur_monot_col_idx;
+    uint64_t min_required_monot_col_idx;
 
-    std::vector<size_t> cluster_root_idxs;
+    std::vector<uint64_t> cluster_root_idxs;
 };
 
 // Structure of Arrays for Range Image - more cache-friendly memory layout
-struct RangeImageSoA
+struct RangeImage
 {
     // raw sensor data
     std::vector<float> x;
@@ -180,7 +180,7 @@ struct RangeImageSoA
     std::vector<uint8_t> debug_ground_point_label;
 
     // clustering (union find)
-    std::vector<size_t> parent_idx; // Indices instead of pointers
+    std::vector<int64_t> parent_idx; // Indices instead of pointers
     std::vector<uint16_t> rank;
 
     // clustering (infinite cluster detection)
@@ -192,7 +192,7 @@ struct RangeImageSoA
     std::vector<double> finished_at_monot_azimuth_angle;
 
     // point collection
-    std::vector<size_t> next_idx; // Indices instead of pointers
+    std::vector<int64_t> next_idx; // Indices instead of pointers
     std::vector<uint64_t> id;
 
     // debugging
@@ -206,7 +206,7 @@ struct RangeImageSoA
     {
         width = w;
         height = h;
-        size_t size = w * h;
+        int64_t size = w * h;
 
         x.resize(size, std::nanf(""));
         y.resize(size, std::nanf(""));
@@ -226,19 +226,19 @@ struct RangeImageSoA
         is_ignored.resize(size);
         height_over_ground.resize(size, std::nanf(""));
         debug_ground_point_label.resize(size, WHITE);
-        parent_idx.resize(size, static_cast<size_t>(-1)); // No parent initially
+        parent_idx.resize(size, static_cast<int64_t>(-1)); // No parent initially
         rank.resize(size);
         clust_start_monot_col_idx.resize(size, -1);
         clust_end_monot_col_idx.resize(size, -1);
         is_potential_cluster_root.resize(size);
         finished_at_monot_azimuth_angle.resize(size);
-        next_idx.resize(size, static_cast<size_t>(-1)); // No next initially
+        next_idx.resize(size, static_cast<int64_t>(-1)); // No next initially
         id.resize(size);
         number_of_visited_neighbors.resize(size);
     }
 
     // Initialize values for a specific index
-    void initializePixel(size_t index)
+    void initializePixel(uint64_t index)
     {
         x[index] = std::nanf("");
         y[index] = std::nanf("");
@@ -258,13 +258,13 @@ struct RangeImageSoA
         is_ignored[index] = false;
         height_over_ground[index] = std::nanf("");
         debug_ground_point_label[index] = WHITE;
-        parent_idx[index] = static_cast<size_t>(-1);
+        parent_idx[index] = static_cast<int64_t>(-1);
         rank[index] = 0;
         clust_start_monot_col_idx[index] = -1;
         clust_end_monot_col_idx[index] = -1;
         is_potential_cluster_root[index] = false;
         finished_at_monot_azimuth_angle[index] = 0.0;
-        next_idx[index] = static_cast<size_t>(-1);
+        next_idx[index] = static_cast<int64_t>(-1);
         id[index] = 0;
         number_of_visited_neighbors[index] = 0;
     }
@@ -277,14 +277,14 @@ struct RangeImageSoA
             int ring_buf_col_idx = static_cast<int>(c % width);
             for (int r = 0; r < height; ++r)
             {
-                size_t idx = ring_buf_col_idx * height + r;
-                initializePixel(idx);
+                uint64_t pixel_idx = ring_buf_col_idx * height + r;
+                initializePixel(pixel_idx);
             }
         }
     }
 
     // Helper functions for point coordinates
-    inline float lengthSquared(size_t idx1, size_t idx2) const
+    inline float lengthSquared(uint64_t idx1, uint64_t idx2) const
     {
         float dx = x[idx1] - x[idx2];
         float dy = y[idx1] - y[idx2];
@@ -293,7 +293,7 @@ struct RangeImageSoA
     }
 
     // Calculate distance from a point to the sensor origin
-    inline float getDistance(size_t idx, const Point3D& sensor_pos) const
+    inline float getDistance(uint64_t idx, const Point3D& sensor_pos) const
     {
         float dx = x[idx] - sensor_pos.x;
         float dy = y[idx] - sensor_pos.y;
@@ -302,7 +302,7 @@ struct RangeImageSoA
     }
 
     // Helper functions for index conversion
-    inline size_t getIndex(int col_idx, int row_idx)
+    inline uint64_t getIndex(int col_idx, int row_idx)
     {
         return col_idx * height + row_idx;
     }
@@ -329,10 +329,10 @@ class ContinuousClustering
 
     // continuous clustering
     void setFinishedColumnCallback(std::function<void(int64_t, int64_t, bool)> cb);
-    void setFinishedClusterCallback(std::function<void(const std::vector<size_t>&, uint64_t)> cb);
+    void setFinishedClusterCallback(std::function<void(const std::vector<uint64_t>&, uint64_t)> cb);
 
     // debugging
-    void recordJobQueueWorkload(size_t num_jobs_sensor_input); // debugging
+    void recordJobQueueWorkload(uint64_t num_jobs_sensor_input); // debugging
 
   private:
     // range image generation
@@ -353,31 +353,20 @@ class ContinuousClustering
                             int64_t cur_monot_col_idx,
                             float half_angular_fov);
     inline bool
-    findEdgesInFieldOfView(size_t pixel_idx, int64_t monot_col_idx, uint16_t row_idx, float half_angular_fov);
+    findEdgesInFieldOfView(uint64_t pixel_idx, int64_t monot_col_idx, uint16_t row_idx, float half_angular_fov);
     inline void performUnionFindForColumn(UnionFindJob&& job);
     inline void identifyFinishedClusters(int64_t cur_monot_col_idx);
     inline void collectPointsForCusterAndPublish(PointCollectionJob&& job);
-    inline void clearColumns(int64_t from_monot_col_idx, int64_t to_monot_col_idx);
 
   public:
-    // union find
-    inline void make_set(Pixel* pixel, float max_angle_diff);
-    inline Pixel* find_set(Pixel* pixel);
-    inline bool union_set(Pixel* pixel_a, Pixel* pixel_b);
-    inline void print_set(Pixel* pixel, std::vector<Pixel>& v);
-
-    // SoA versions of union find operations
-    inline void make_set_soa(size_t pixel_idx, float max_angle_diff);
-    inline size_t find_set_soa(size_t pixel_idx);
-    inline bool union_set_soa(size_t pixel_a_idx, size_t pixel_b_idx);
-    inline void collect_set_soa(size_t root_idx, std::vector<size_t>& indices);
+    // union_find
+    inline void make_set(uint64_t pixel_idx, float max_angle_diff);
+    inline uint64_t find_set(uint64_t pixel_idx);
+    inline bool union_set(uint64_t pixel_a_idx, uint64_t pixel_b_idx);
 
   public:
     // continuous range image generation
-    RangeImageSoA range_image_soa_;     // New SoA range image
-    std::vector<Pixel> range_image_{0}; // Keep this for backward compatibility during transition
-    int num_rows_{-1};
-    int num_columns_{0};
+    RangeImage range_image_;
     int num_columns_rot_{};
     float azimuth_width_per_column_{};
     int64_t ring_buf_start_monot_col_idx_{};
@@ -399,9 +388,9 @@ class ContinuousClustering
     // clustering (union find & cluster extraction & point collection)
     float max_distance_squared_{0.7 * 0.7};
     std::vector<float> laser_elevation_angles_;
-    std::vector<size_t> potential_cluster_root_idxs_;
+    std::vector<uint64_t> potential_cluster_root_idxs_;
     std::function<void(int64_t, int64_t, bool)> finished_column_callback_;
-    std::function<void(const std::vector<size_t>&, uint64_t)> finished_cluster_callback_;
+    std::function<void(const std::vector<uint64_t>&, uint64_t)> finished_cluster_callback_;
 
     // multi-threading
     ThreadPool<InsertionJob> range_image_thread_pool_{"R"};
@@ -412,7 +401,7 @@ class ContinuousClustering
 
     // performance statistics
     bool stop_statistics_ = false;
-    std::list<size_t> num_pending_jobs_;
+    std::list<uint64_t> num_pending_jobs_;
 };
 } // namespace continuous_clustering
 

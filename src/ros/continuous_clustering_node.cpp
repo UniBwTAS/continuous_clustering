@@ -34,8 +34,9 @@ class RosContinuousClustering
         clustering_.setFinishedColumnCallback(
             [this](int64_t from_monot_col_idx, int64_t to_monot_col_idx, bool ground_points_only)
             { onFinishedColumn(from_monot_col_idx, to_monot_col_idx, ground_points_only); });
-        clustering_.setFinishedClusterCallback([this](const std::vector<size_t>& cluster_points, uint64_t stamp_cluster)
-                                               { onFinishedCluster(cluster_points, stamp_cluster); });
+        clustering_.setFinishedClusterCallback(
+            [this](const std::vector<uint64_t>& cluster_pixel_idxs, uint64_t stamp_cluster)
+            { onFinishedCluster(cluster_pixel_idxs, stamp_cluster); });
 
         // use desired sensor input
         if (sensor_manufacturer == "velodyne")
@@ -163,15 +164,17 @@ class RosContinuousClustering
         clustering_.addFiring(firing, tf2::transformToEigen(odom_from_sensor));
     }
 
-    void onFinishedCluster(const std::vector<size_t>& cluster_points, uint64_t stamp_cluster)
+    void onFinishedCluster(const std::vector<uint64_t>& cluster_pixel_idxs, uint64_t stamp_cluster)
     {
-        pub_clusters.publish(clusterToPointCloud(clustering_.range_image_soa_, cluster_points, stamp_cluster, odom_frame));
+        pub_clusters.publish(
+            clusterToPointCloud(clustering_.range_image_, cluster_pixel_idxs, stamp_cluster, odom_frame));
     }
 
     void onFinishedColumn(int64_t from_monot_col_idx, int64_t to_monot_col_idx, bool ground_points_only)
     {
         ProcessingStage stage = ground_points_only ? GROUND_POINT_SEGMENTATION : CONTINUOUS_CLUSTERING;
-        auto msg = columnToPointCloud(clustering_.range_image_soa_, from_monot_col_idx, to_monot_col_idx, odom_frame, stage);
+        auto msg =
+            columnToPointCloud(clustering_.range_image_, from_monot_col_idx, to_monot_col_idx, odom_frame, stage);
         ros::Publisher* pub = ground_points_only ? &pub_ground_point_segmentation : &pub_instance_segmentation;
         if (msg && pub->getNumSubscribers() > 0)
             pub->publish(msg);
