@@ -5,11 +5,9 @@ project(continuous_clustering VERSION 0.0.1 LANGUAGES CXX)
 add_compile_options(-std=c++17)
 add_compile_options(-pthread)
 
-# recommended when using perf profiler
-# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
-
+# Set optimization flags for better vectorization and generate optimization reports
 set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ftree-vectorize -fopt-info-vec -fopt-info-vec-missed")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(Eigen3 REQUIRED)

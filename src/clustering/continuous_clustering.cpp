@@ -235,7 +235,7 @@ void ContinuousClustering::insertFiringIntoRangeImage(InsertionJob&& job)
 
     // if the azimuth range of the firing covers more than 180 degrees, this means that the firing is
     // intersected with negative x-axis (this means that the range image was incorrectly filled -> reset)
-    if ((monot_col_idx_of_foremost_laser - monot_col_idx_of_rearmost_laser) > cols_of_half_rotation)
+if ((monot_col_idx_of_foremost_laser - monot_col_idx_of_rearmost_laser) > cols_of_half_rotation)
     {
         std::cout << "Very first firing after reset intersects with negative x-axis: " +
                          std::to_string(monot_col_idx_of_rearmost_laser) + ", " +
@@ -648,8 +648,10 @@ bool ContinuousClustering::findEdgesInFieldOfView(uint64_t pixel_idx,
     calculateFovBounds(
         fov_start_monot_col_idx, fov_start_row_idx, fov_end_row_idx, row_idx, monot_col_idx, half_angular_fov);
 
-    // go left each column until azimuth angle difference gets too large
-    bool at_least_one_edge = false;
+    // Vector to store indices of pixels that are below the distance threshold
+    std::vector<uint64_t> potential_neighbors;
+
+    // Phase 1: Calculate distances and find potential neighbors (can be vectorized by compiler)
     for (int64_t other_monot_col_idx = monot_col_idx; other_monot_col_idx >= fov_start_monot_col_idx;
          other_monot_col_idx--)
     {
@@ -661,20 +663,26 @@ bool ContinuousClustering::findEdgesInFieldOfView(uint64_t pixel_idx,
             // get other pixel
             uint16_t other_col_idx = range_image_.fromMonotColIdx(other_monot_col_idx);
             uint64_t pixel_other_idx = range_image_.getIndex(other_col_idx, other_row_idx);
-
+            
             // count number of visited pixels for analyzing
-            range_image_.number_of_visited_neighbors[pixel_other_idx] += 1;
-
-            // if other pixel is not ignored and is below the clustering threshold -> associate
+            // range_image_.number_of_visited_neighbors[pixel_other_idx] += 1;
+            
+            // if other pixel is not ignored and is below the clustering threshold -> save for association
             if (!range_image_.is_ignored[pixel_other_idx] &&
                 range_image_.lengthSquared(pixel_idx, pixel_other_idx) < max_distance_squared_)
             {
-                // at_least_one_edge = union_set(&pixel, &pixel_other);
-                at_least_one_edge |= union_set(pixel_idx, pixel_other_idx);
+                potential_neighbors.push_back(pixel_other_idx);
             }
         }
     }
-
+    
+    // Phase 2: Perform union operations on potential neighbors
+    bool at_least_one_edge = false;
+    for (uint64_t pixel_other_idx : potential_neighbors)
+    {
+        at_least_one_edge |= union_set(pixel_idx, pixel_other_idx);
+    }
+    
     return at_least_one_edge;
 }
 
