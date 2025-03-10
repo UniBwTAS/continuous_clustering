@@ -183,7 +183,7 @@ class KittiDemo
         for (int relative_column_index = 0; relative_column_index < num_columns_to_publish; ++relative_column_index)
         {
             // get local column index from global column index
-            int ring_buf_col_idx = static_cast<int>((from_monot_col_idx + relative_column_index) % range_image.width);
+            uint16_t ring_buf_col_idx = range_image.fromMonotColIdx(from_monot_col_idx + relative_column_index);
 
             // variables to check if a frame is finished
             bool new_frame = false;
@@ -191,7 +191,7 @@ class KittiDemo
             for (int row_index = 0; row_index < range_image.height; ++row_index)
             {
                 // get processed point index
-                uint64_t pixel_idx = ring_buf_col_idx * range_image.height + row_index;
+                uint64_t pixel_idx = range_image.getIndex(ring_buf_col_idx, row_index);
 
                 // check if cell in range image contains point
                 if (range_image.globally_unique_point_index[pixel_idx] != static_cast<uint64_t>(-1))

@@ -53,10 +53,10 @@ sensor_msgs::PointCloud2Ptr columnToPointCloud(const RangeImage& range_image,
 
     for (int message_column_index = 0; message_column_index < msg->width; ++message_column_index)
     {
-        int ring_buf_col_idx = static_cast<int>((from_monot_col_idx + message_column_index) % range_image.width);
+        uint16_t ring_buf_col_idx = range_image.fromMonotColIdx(from_monot_col_idx + message_column_index);
         for (int row_index = 0; row_index < range_image.height; ++row_index)
         {
-            uint64_t pixel_idx = ring_buf_col_idx * range_image.height + row_index;
+            uint64_t pixel_idx = range_image.getIndex(ring_buf_col_idx, row_index);
             int data_index_message = row_index * static_cast<int>(msg->width) + message_column_index;
             addPointToMessage(container, data_index_message, pixel_idx, range_image, fill_fields_up_to_stage);
 

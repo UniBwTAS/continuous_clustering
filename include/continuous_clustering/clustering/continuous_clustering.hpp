@@ -2,6 +2,7 @@
 #define CONTINUOUS_CLUSTERING_CONTINUOUS_CLUSTERING_HPP
 
 #include <set>
+#include <iostream>
 
 #include <Eigen/Geometry>
 
@@ -201,12 +202,40 @@ struct RangeImage
     uint16_t width;
     uint16_t height;
 
+    // Ensure the width is a power of 2
+    uint16_t ensurePowerOfTwo(uint16_t value)
+    {
+        if (value == 0)
+            return 1;
+
+        // Check if already a power of 2
+        if ((value & (value - 1)) == 0)
+            return value;
+
+        // Check if the requested width is too large to represent as a power of 2 in uint16_t
+        if (value > std::numeric_limits<uint16_t>::max() / 2)
+            throw std::runtime_error("Requested width is too large. The maximum width supported is 32768 (2^15) to "
+                                     "ensure efficient bitwise operations.");
+
+        // Find the next power of 2
+        uint16_t powerOfTwo = 1;
+        while (powerOfTwo < value)
+            powerOfTwo *= 2;
+
+        return powerOfTwo;
+    }
+
     // Resize all arrays
     void resize(uint16_t w, uint16_t h)
     {
-        width = w;
+        // Ensure width is a power of 2 for efficient bitwise operations
+        width = ensurePowerOfTwo(w);
         height = h;
-        int64_t size = w * h;
+        int64_t size = width * height;
+        std::cout
+            << "Choosed a width of " << width << " instead of " << w
+            << " in order to replace modulo (%) operation by bitwise AND operation. This makes the code more efficient."
+            << std::endl;
 
         x.resize(size, std::nanf(""));
         y.resize(size, std::nanf(""));
@@ -272,14 +301,11 @@ struct RangeImage
     // Clear values for a range of columns
     void clearColumns(int64_t from_monot_col_idx, int64_t to_monot_col_idx)
     {
-        for (int64_t c = from_monot_col_idx; c <= to_monot_col_idx; ++c)
+        for (int64_t monot_col_idx = from_monot_col_idx; monot_col_idx <= to_monot_col_idx; ++monot_col_idx)
         {
-            int ring_buf_col_idx = static_cast<int>(c % width);
-            for (int r = 0; r < height; ++r)
-            {
-                uint64_t pixel_idx = ring_buf_col_idx * height + r;
-                initializePixel(pixel_idx);
-            }
+            uint16_t col_idx = fromMonotColIdx(monot_col_idx);
+            for (int row_idx = 0; row_idx < height; ++row_idx)
+                initializePixel(getIndex(col_idx, row_idx));
         }
     }
 
@@ -302,9 +328,15 @@ struct RangeImage
     }
 
     // Helper functions for index conversion
-    inline uint64_t getIndex(int col_idx, int row_idx)
+    inline uint64_t getIndex(int col_idx, int row_idx) const
     {
         return col_idx * height + row_idx;
+    }
+
+    // Convert monotonic column index to actual column index
+    inline uint16_t fromMonotColIdx(int64_t monot_col_idx) const
+    {
+        return static_cast<uint16_t>(monot_col_idx & (width - 1));
     }
 };
 
