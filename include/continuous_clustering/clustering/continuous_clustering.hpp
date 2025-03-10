@@ -389,6 +389,7 @@ class ContinuousClustering
     inline void performUnionFindForColumn(UnionFindJob&& job);
     inline void identifyFinishedClusters(int64_t cur_monot_col_idx);
     inline void collectPointsForCusterAndPublish(PointCollectionJob&& job);
+    void calculateDistancesAndFindPotentialNeighbors(uint64_t pixel_idx, int64_t monot_col_idx, uint16_t row_idx, int64_t fov_start_monot_col_idx, int16_t fov_start_row_idx, int16_t fov_end_row_idx, std::vector<uint64_t>& potential_neighbors);
 
   public:
     // union_find
